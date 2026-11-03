@@ -1,0 +1,293 @@
+import json
+import time
+from pathlib import Path
+
+import pytest
+from support import write
+from typer.testing import CliRunner
+
+from atril.checks import ok
+from atril.commands import knowledge as commands
+from atril.config import load_station, load_syllabus
+from atril.deeptutor import DeepTutor
+from atril.knowledge import (
+    AddResult,
+    IndexedSource,
+    Indexer,
+    KnowledgeApi,
+    Ledger,
+    content_digest,
+    ledger_path,
+)
+from atril.main import app
+from atril.ollama import OllamaStatus
+
+runner = CliRunner()
+
+
+@pytest.fixture
+def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Estación con fuentes en disco, DeepTutor instalado y servicios simulados."""
+    loaded = load_station(station_dir)
+    write(loaded.deeptutor_cli, "")
+    syllabus = load_syllabus(loaded.syllabi_dir / "normativa")
+    for source in syllabus.sources:
+        path = syllabus.source_path(source)
+        assert path is not None
+        write(path, f"%PDF {source.id}")
+
+    clock = [0.0]
+
+    def fake_sleep(seconds: float) -> None:
+        clock[0] += seconds
+
+    monkeypatch.setattr(time, "sleep", fake_sleep)
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        commands.ollama,
+        "get_status",
+        lambda url: OllamaStatus(True, "0.12.0", ("qwen3-embedding:8b",)),
+    )
+    monkeypatch.setattr(
+        commands.ollama, "probe_embedding", lambda config: [ok("embed")]
+    )
+    return station_dir
+
+
+def _invoke(station: Path, *args: str):
+    return runner.invoke(app, ["--estacion", str(station), *args])
+
+
+def _record_adds(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    added: list[str] = []
+
+    def fake_add(self: Indexer, kb_id: str, item, tick=None) -> AddResult:
+        added.append(f"{kb_id}:{item.file}")
+        write(self.station.kb_dir(kb_id) / "metadata.json", "{}")
+        return AddResult(True, 0.5)
+
+    monkeypatch.setattr(Indexer, "add", fake_add)
+    return added
+
+
+def _ledger(station: Path) -> Ledger:
+    return Ledger(ledger_path(load_syllabus(station / "temarios" / "normativa")))
+
+
+def test_index_adds_new_sources_and_is_idempotent(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    added = _record_adds(monkeypatch)
+
+    result = _invoke(station, "kb", "indexar", "normativa")
+
+    assert result.exit_code == 0, result.output
+    assert added == [
+        "norm-edificacion-cte:DBSI.pdf",
+        "norm-edificacion-cte:LOE.pdf",
+        "norm-edificacion-cte-guias:guia-db-si.pdf",
+    ]
+    assert set(_ledger(station).kb("norm-edificacion-cte").sources) == {
+        "cte-db-si",
+        "loe",
+    }
+
+    added.clear()
+    again = _invoke(station, "kb", "indexar", "normativa")
+    assert again.exit_code == 0
+    assert added == []
+    assert "Nada que indexar" in again.output
+
+
+def test_index_one_kb_and_unknown_kb(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    added = _record_adds(monkeypatch)
+
+    result = _invoke(
+        station, "kb", "indexar", "normativa", "norm-edificacion-cte-guias"
+    )
+    assert result.exit_code == 0, result.output
+    assert added == ["norm-edificacion-cte-guias:guia-db-si.pdf"]
+
+    result = _invoke(station, "kb", "indexar", "normativa", "otra")
+    assert result.exit_code == 1
+    assert "no tiene la KB 'otra'" in result.output
+
+
+def test_index_skips_changed_and_asks_for_reindex(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    added = _record_adds(monkeypatch)
+    _invoke(station, "kb", "indexar", "normativa")
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+    path = syllabus.source_path(syllabus.sources[0])
+    assert path is not None
+    write(path, "%PDF nueva versión")
+    added.clear()
+
+    result = _invoke(station, "kb", "indexar", "normativa")
+
+    assert result.exit_code == 0, result.output
+    assert added == []
+    assert "cambiada" in result.output
+    assert "atril kb reindexar norm-edificacion-cte" in result.output
+
+
+def test_index_failure_shows_log(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log = load_station(station).logs_dir / "indexado.log"
+    write(log, "Traceback\nCUDA error: out of memory\n")
+    monkeypatch.setattr(
+        Indexer,
+        "add",
+        lambda self, kb_id, item, tick=None: AddResult(False, 1.0, "fallo", log),
+    )
+
+    result = _invoke(station, "kb", "indexar", "normativa")
+
+    assert result.exit_code == 1
+    assert "CUDA error" in result.output
+    assert "Vuelve a ejecutar" in result.output
+
+
+def test_index_stops_when_embedding_fails(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from atril.checks import error
+
+    monkeypatch.setattr(
+        commands.ollama, "probe_embedding", lambda config: [error("CUDA error")]
+    )
+    added = _record_adds(monkeypatch)
+
+    result = _invoke(station, "kb", "indexar", "normativa")
+
+    assert result.exit_code == 1
+    assert added == []
+
+
+@pytest.fixture
+def reindex_env(station: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, list]:
+    """KB indexada con DBSI y LOE, DT en marcha y API/run simulados."""
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+    loaded = load_station(station)
+    kb_dir = loaded.kb_dir("norm-edificacion-cte")
+    write(kb_dir / "metadata.json", "{}")
+    write(
+        kb_dir / ".indexing-run.json",
+        json.dumps({"task_id": "t0", "state": "completed"}),
+    )
+    ledger = Ledger(ledger_path(syllabus))
+    cte, loe = syllabus.sources[0], syllabus.sources[1]
+    for source in (cte, loe):
+        path = syllabus.source_path(source)
+        assert path is not None
+        ledger.kb("norm-edificacion-cte").sources[source.id] = IndexedSource(
+            path.name, content_digest(source, path), "t"
+        )
+    ledger.kb("norm-edificacion-cte").sources["retirada"] = IndexedSource(
+        "viejo.pdf", "h", "t"
+    )
+    ledger.save()
+
+    calls: dict[str, list] = {"deleted": [], "reindexed": [], "lifecycle": []}
+    monkeypatch.setattr(DeepTutor, "backend_up", lambda self: True)
+    monkeypatch.setattr(
+        commands, "embedding_selection", lambda station, env: '{"m": 1}'
+    )
+
+    def fake_delete(self: KnowledgeApi, kb_id: str, filename: str) -> bool:
+        calls["deleted"].append(filename)
+        return True
+
+    def fake_reindex(self: KnowledgeApi, kb_id: str, selection: str) -> dict:
+        calls["reindexed"].append(selection)
+        write(
+            kb_dir / ".indexing-run.json",
+            json.dumps({"task_id": "t1", "state": "completed"}),
+        )
+        return {"task_id": "t1"}
+
+    monkeypatch.setattr(KnowledgeApi, "delete_file", fake_delete)
+    monkeypatch.setattr(KnowledgeApi, "reindex", fake_reindex)
+    monkeypatch.setattr(
+        commands, "shutdown", lambda dt: calls["lifecycle"].append("parar")
+    )
+    monkeypatch.setattr(
+        commands, "launch", lambda dt, timeout: calls["lifecycle"].append("arrancar")
+    )
+    calls["added"] = _record_adds(monkeypatch)
+    return calls
+
+
+def test_reindex_replaces_changed_and_purges_removed(
+    station: Path, reindex_env: dict[str, list]
+) -> None:
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+    loe_path = syllabus.source_path(syllabus.sources[1])
+    assert loe_path is not None
+    write(loe_path, "%PDF LOE modificada")
+
+    result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
+
+    assert result.exit_code == 0, result.output
+    assert reindex_env["deleted"] == ["viejo.pdf", "LOE.pdf"]
+    assert reindex_env["added"] == ["norm-edificacion-cte:LOE.pdf"]
+    assert reindex_env["reindexed"] == ['{"m": 1}']
+    entry = _ledger(station).kb("norm-edificacion-cte")
+    assert set(entry.sources) == {"cte-db-si", "loe"}
+    assert entry.sources["loe"].sha256 == content_digest(syllabus.sources[1], loe_path)
+    assert entry.pending_reindex is False
+
+
+def test_reindex_restarts_stuck_worker(
+    station: Path, reindex_env: dict[str, list]
+) -> None:
+    kb_dir = load_station(station).kb_dir("norm-edificacion-cte")
+    write(
+        kb_dir / ".indexing-run.json", json.dumps({"task_id": "t0", "state": "failed"})
+    )
+
+    result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
+
+    assert result.exit_code == 0, result.output
+    assert reindex_env["lifecycle"] == ["parar", "arrancar"]
+    assert "liberar el worker" in result.output
+
+
+def test_reindex_reports_failed_run(
+    station: Path, reindex_env: dict[str, list], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kb_dir = load_station(station).kb_dir("norm-edificacion-cte")
+
+    def failing(self: KnowledgeApi, kb_id: str, selection: str) -> dict:
+        run = {
+            "task_id": "t1",
+            "state": "failed",
+            "error": "http://localhost:11434 timeout",
+        }
+        write(kb_dir / ".indexing-run.json", json.dumps(run))
+        return {"task_id": "t1"}
+
+    monkeypatch.setattr(KnowledgeApi, "reindex", failing)
+
+    result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
+
+    assert result.exit_code == 1
+    assert "failed" in result.output
+    assert "GPU" in result.output
+    assert (
+        _ledger(station).kb("norm-edificacion-cte").sources.get("retirada") is not None
+    )
+
+
+def test_reindex_unknown_or_missing_kb(station: Path) -> None:
+    result = _invoke(station, "kb", "reindexar", "nada")
+    assert result.exit_code == 1
+    assert "no existe la KB 'nada'" in result.output
+
+    result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
+    assert result.exit_code == 1
+    assert "todavía no existe" in result.output

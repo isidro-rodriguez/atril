@@ -136,6 +136,32 @@ def check(status: OllamaStatus, config: OllamaConfig) -> list[Finding]:
     return findings
 
 
+def probe_embedding(config: OllamaConfig, timeout: float = 180.0) -> list[Finding]:
+    """Pide un embedding de prueba para cargar el modelo y comprobar su dimensión.
+
+    Se hace antes de indexar: si el modelo no carga (VRAM ocupada, error CUDA),
+    es mejor saberlo ahora que a mitad de un PDF de 2000 páginas.
+    """
+    try:
+        reply = net.request_json(
+            f"{config.url.rstrip('/')}/api/embed",
+            method="POST",
+            payload={"model": config.embedding, "input": "prueba", "keep_alive": "30m"},
+            timeout=timeout,
+        )
+        dimension = len(reply["embeddings"][0])
+    except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+        return [error(f"El embedding de prueba con {config.embedding} falla: {exc}")]
+    if dimension != config.dimension:
+        return [
+            error(
+                f"{config.embedding} devuelve vectores de {dimension} dimensiones; "
+                f"atril.toml declara {config.dimension}."
+            )
+        ]
+    return [ok(f"Embedding de prueba correcto ({dimension} dimensiones).")]
+
+
 def app_path() -> Path | None:
     """Ruta de la aplicación de escritorio de Ollama en Windows, si existe."""
     if sys.platform != "win32":

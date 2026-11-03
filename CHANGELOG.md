@@ -5,6 +5,21 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.5.0] - 2026-11-03
+
+### Added
+
+- `atril kb indexar <t> [kb]`: sustituye a `indexar.ps1`. Muestra el plan por KB (nueva,
+  indexada, cambiada, retirada, sin fichero), comprueba Ollama con un embedding de prueba
+  (dimensión y modelos ajenos en VRAM) y añade las fuentes nuevas una a una con
+  `deeptutor kb create|add`, con avance (fase, chunks, actividad) y aviso si se cuelga. Cada
+  fuente terminada queda en `fuentes/indexado.json`; si se interrumpe, al repetir continúa.
+  Las fuentes que DeepTutor ya tenía con el mismo contenido cuentan como indexadas.
+- `atril kb reindexar <kb>`: sustituye a `reindexar.ps1`. Arranca DeepTutor si hace falta (o
+  lo reinicia si el último indexado dejó el worker atascado), quita por la API las versiones
+  anteriores de fuentes cambiadas y las fuentes retiradas del temario, añade las versiones
+  nuevas, lanza el reindexado y sigue su progreso hasta el final.
+
 ## [0.4.0] - 2026-11-03
 
 ### Added

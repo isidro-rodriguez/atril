@@ -14,7 +14,16 @@ from rich.console import Console
 from rich.markup import escape
 
 from atril.checks import Finding, Level
-from atril.config import ConfigError, Station, find_station, load_station
+from atril.config import (
+    ConfigError,
+    Station,
+    Syllabus,
+    find_station,
+    load_station,
+    load_syllabi,
+    load_syllabus,
+)
+from atril.config.syllabus import KnowledgeBase
 
 console = Console(soft_wrap=True)
 """Consola de salida normal; ``soft_wrap`` evita cortar rutas y mensajes largos."""
@@ -48,6 +57,37 @@ def get_station(ctx: typer.Context) -> Station:
         return load_station(station_root(ctx))
     except ConfigError as exc:
         fail(str(exc))
+
+
+def get_syllabus(ctx: typer.Context, syllabus_id: str) -> Syllabus:
+    """Carga un temario por id; termina con error si no existe o no es válido."""
+    station = get_station(ctx)
+    root = station.syllabi_dir / syllabus_id
+    if not (root / "temario.toml").is_file():
+        found = sorted(
+            p.parent.name for p in station.syllabi_dir.glob("*/temario.toml")
+        )
+        names = ", ".join(found) or "ninguno"
+        fail(f"no existe el temario {syllabus_id!r} (disponibles: {names}).")
+    try:
+        return load_syllabus(root)
+    except ConfigError as exc:
+        fail(str(exc))
+
+
+def find_kb(ctx: typer.Context, kb_id: str) -> tuple[Syllabus, KnowledgeBase]:
+    """Temario y KB a partir del id de KB (único en la estación)."""
+    station = get_station(ctx)
+    try:
+        syllabi, _ = load_syllabi(station.syllabi_dir)
+    except ConfigError as exc:
+        fail(str(exc))
+    for syllabus in syllabi:
+        for kb in syllabus.knowledge_bases:
+            if kb.id == kb_id:
+                return syllabus, kb
+    known = ", ".join(kb.id for s in syllabi for kb in s.knowledge_bases) or "ninguna"
+    fail(f"no existe la KB {kb_id!r} en ningún temario (disponibles: {known}).")
 
 
 def show(findings: Iterable[Finding], title: str | None = None) -> bool:

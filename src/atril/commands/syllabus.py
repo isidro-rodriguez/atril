@@ -17,8 +17,8 @@ from rich.progress import (
 from rich.table import Table
 
 from atril.checks import info, warning
-from atril.commands._common import console, fail, get_station, show
-from atril.config import ConfigError, Syllabus, load_syllabi, load_syllabus
+from atril.commands._common import console, fail, get_station, get_syllabus, show
+from atril.config import ConfigError, Syllabus, load_syllabi
 from atril.config.syllabus import Source
 from atril.sources import Outcome, Result, SourceManager, is_due
 from atril.sources import Progress as ProgressCallback
@@ -94,7 +94,7 @@ def list_syllabi(ctx: typer.Context) -> None:
 @syllabus_app.command("cobertura")
 def coverage(ctx: typer.Context, syllabus_id: SyllabusId) -> None:
     """Muestra, KB a KB, qué fuentes están en disco y cuándo se comprobaron."""
-    syllabus = _syllabus(ctx, syllabus_id)
+    syllabus = get_syllabus(ctx, syllabus_id)
     manager = SourceManager(syllabus)
     for kb in syllabus.knowledge_bases:
         kind = "vinculante" if kb.binding else "no vinculante"
@@ -129,7 +129,7 @@ def download_sources(
     ctx: typer.Context, syllabus_id: SyllabusId, source_ids: SourceIds = None
 ) -> None:
     """Descarga las fuentes que faltan (no toca las que ya están en disco)."""
-    syllabus = _syllabus(ctx, syllabus_id)
+    syllabus = get_syllabus(ctx, syllabus_id)
     manager = SourceManager(syllabus)
     results = []
     with _progress() as progress:
@@ -156,7 +156,7 @@ def check_sources(
 
     Por defecto revisa solo las que tocan según su frecuencia ([bold]comprobar[/]).
     """
-    syllabus = _syllabus(ctx, syllabus_id)
+    syllabus = get_syllabus(ctx, syllabus_id)
     manager = SourceManager(syllabus)
     now = get_now()
     candidates = [source for source in _select(syllabus, source_ids) if source.url]
@@ -177,22 +177,6 @@ def check_sources(
             [info(f"{skipped} fuentes no tocan todavía (usa --todas para forzarlas).")]
         )
     _report(syllabus, results, "Comprobación")
-
-
-def _syllabus(ctx: typer.Context, syllabus_id: str) -> Syllabus:
-    """Carga un temario por id; termina con error si no existe o no es válido."""
-    station = get_station(ctx)
-    root = station.syllabi_dir / syllabus_id
-    if not (root / "temario.toml").is_file():
-        found = sorted(
-            p.parent.name for p in station.syllabi_dir.glob("*/temario.toml")
-        )
-        names = ", ".join(found) or "ninguno"
-        fail(f"no existe el temario {syllabus_id!r} (disponibles: {names}).")
-    try:
-        return load_syllabus(root)
-    except ConfigError as exc:
-        fail(str(exc))
 
 
 def _select(syllabus: Syllabus, source_ids: list[str] | None) -> list[Source]:

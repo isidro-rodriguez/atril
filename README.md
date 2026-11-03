@@ -3,7 +3,7 @@
 CLI para gestionar una instalación local de [DeepTutor](https://github.com/HKUDS/DeepTutor)
 y sus temarios (fuentes, bases de conocimiento, evaluación y backup).
 
-> Estado: fase 2 en curso. Implementados `validar`, el grupo DeepTutor, temarios y fuentes.
+> Estado: fase 2 en curso. Falta `kb evaluar`.
 
 ## 🚀 Instalación
 
@@ -31,7 +31,8 @@ atril --estacion D:\Desarrollo\DeepTutor validar   # o ATRIL_ESTACION, o desde l
 | DeepTutor | `instalar` · `actualizar` · `arrancar` · `parar` · `estado` · `parches` | 1 ✅ |
 | Temarios | `temario lista` · `temario cobertura <t>` | 2 ✅ |
 | Fuentes | `fuentes descargar <t> [ids]` · `fuentes comprobar <t> [ids] [--todas]` | 2 ✅ |
-| KB | `kb indexar <t> [kb]` · `kb reindexar <kb>` · `kb evaluar <kb>` | 2 |
+| KB | `kb indexar <t> [kb]` · `kb reindexar <kb>` | 2 ✅ |
+| KB | `kb evaluar <kb>` | 2 |
 | Backup | `backup` · `backup comprobar` · `backup restaurar` | 3 |
 | Otros | `accesos` | 5 |
 

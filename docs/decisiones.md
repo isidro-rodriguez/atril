@@ -21,7 +21,7 @@ El código de atril vive en su repo (`D:\Desarrollo\Repositorios\atril`), nunca 
 - Fuentes fuera del espacio: el agente usa la KB; lo no indexado se busca en web (dominios oficiales, regla del prompt).
 - Tipos de fuente: `pdf` (URL → `kb add`), `markdown` (`kb add --docs-dir`), `github` (`kb add-github-source`), `web` (`kb add-web-source`). `github`/`web` sin probar aún.
 - Guías no vinculantes en KB separada de la norma vinculante.
-- Indexado documento a documento, con registro propio y reanudación; quitar documentos exige reindexar (DT no purga vectores; el reindexado se fuerza enviando `embedding_model` = selección activa).
+- Indexado documento a documento, con registro propio (`fuentes\indexado.json`) y reanudación; quitar o cambiar documentos exige reindexar (DT no purga vectores y guarda una versión nueva con el mismo nombre como `nombre (2).pdf`; el reindexado se fuerza enviando `embedding_model` = selección activa). `kb indexar` solo añade fuentes nuevas; `kb reindexar` quita versiones anteriores y retiradas por la API, añade las nuevas y reindexa.
 - Backup con restic: disco externo (conectado solo durante la copia) + Google Drive vía rclone, carpeta por defecto `Atril/`. Retención 7 diarias / 4 semanales / 12 mensuales. Git bundle de los repos dentro del snapshot. Parar DT antes de copiar (SQLite). Restaurar en la misma ruta (rutas absolutas en `kb_config.json`).
 - Interfaz: CLI Typer primero; TUI Textual solo si aporta comodidad real.
 - README esquemático; detalle en `CLAUDE.md` y `docs/`.

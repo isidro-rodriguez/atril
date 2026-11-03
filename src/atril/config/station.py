@@ -139,6 +139,20 @@ class Station:
         return self.data_dir / "user" / "runtime" / "launcher.log"
 
     @property
+    def knowledge_dir(self) -> Path:
+        """Bases de conocimiento de DeepTutor."""
+        return self.data_dir / "knowledge_bases"
+
+    def kb_dir(self, kb_id: str) -> Path:
+        """Carpeta de una KB en DeepTutor."""
+        return self.knowledge_dir / kb_id
+
+    @property
+    def logs_dir(self) -> Path:
+        """Logs de atril (indexados, evaluaciones); en ``data/``, entra en el backup."""
+        return self.data_dir / "atril" / "logs"
+
+    @property
     def launcher_state(self) -> Path:
         """Estado del lanzador en segundo plano (``pid``, ``status``)."""
         return self.data_dir / "user" / "runtime" / "launcher.json"

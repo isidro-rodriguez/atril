@@ -32,11 +32,12 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── scripts/backup.py       # git bundle of this repo (`poe backup`)
 ├── src/atril/
-│   ├── commands/           # CLI commands by area (config, deeptutor, install, syllabus); `_common`
+│   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
 │   ├── install.py          # Install/update steps (git, uv, npm, ollama, deeptutor config)
+│   ├── knowledge.py        # KB indexing: plan, ledger, CLI adds, run state, reindex API
 │   ├── net.py              # Minimal urllib helpers (is_up, get_json)
 │   ├── ollama.py           # Ollama status and checks
 │   ├── patches.py          # Patch registry and idempotent apply
@@ -97,6 +98,14 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   Downloads write `.part`/`.nuevo` first and require the `%PDF-` header; a failed download never
   replaces the current file. All HTTP goes through `net.open_url` (browser-like User-Agent), which
   tests replace.
+- KB indexing: new sources are added **one by one** with the DeepTutor CLI (`kb create|add`, no
+  server needed); `fuentes/indexado.json` records the indexed hash per KB and source. DeepTutor
+  stores a changed file with the same name as `name (2).pdf` and never purges vectors, so changed
+  and removed sources are handled only in `kb reindexar`: delete the old file through the API,
+  re-add, then `POST /reindex` with the active `embedding_model`. Success of an add is a **new**
+  completed run (different `task_id`) or DeepTutor's "already indexed" message, never a lookup by
+  file name. Run state comes from `<kb>/.indexing-run.json`; a `running` run whose owner process
+  died counts as `interrupted`, and those states require restarting DeepTutor before reindexing.
 
 ## Project rules (load-bearing)
 
