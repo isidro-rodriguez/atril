@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -239,3 +240,32 @@ def test_knowledge_api(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> No
     assert calls[0][:2] == ("DELETE", f"{base}/files/a%20%282%29.pdf")
     assert calls[2][1] == f"{base}/reindex?resource_library=true"
     assert calls[2][2] == {"embedding_model": '{"model_id": "m"}'}
+
+
+def test_add_limits_threads_and_lowers_priority(
+    station_dir: Path,
+    syllabus: Syllabus,
+    monkeypatch: pytest.MonkeyPatch,
+    fast_poll: None,
+) -> None:
+    text = (station_dir / "atril.toml").read_text(encoding="utf-8")
+    (station_dir / "atril.toml").write_text(
+        text.replace("hilos = 0", "hilos = 3"), encoding="utf-8"
+    )
+    station = load_station(station_dir)
+    kb = syllabus.knowledge_bases[0]
+    item = plan(syllabus, kb, Ledger(ledger_path(syllabus)))[0]
+    lowered: list[int] = []
+    monkeypatch.setattr(knowledge, "lower_priority", lowered.append)
+    _run_with(
+        monkeypatch,
+        "import os; print('Skipped (content already indexed):', "
+        "os.environ['OMP_NUM_THREADS'], os.environ['MKL_NUM_THREADS'])",
+    )
+
+    result = Indexer(station, env={"PATH": os.environ.get("PATH", "")}).add(kb.id, item)
+
+    assert result.ok
+    assert len(lowered) == 1
+    log = sorted(station.logs_dir.glob("indexado-*.log"))[-1]
+    assert "3 3" in log.read_text(encoding="utf-8")

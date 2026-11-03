@@ -5,6 +5,21 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.11.0] - 2026-11-03
+
+### Added
+
+- `[indexado] hilos`: límite de hilos de CPU (PyTorch, NumPy, Docling) para el indexado; `0`
+  (por defecto) es sin límite. Cambia el ritmo, no el resultado.
+- Aviso antes de indexar si el modelo de embedding no cabe entero en la VRAM: la parte que va a
+  la CPU satura el procesador.
+
+### Changed
+
+- `atril kb indexar` lanza el CLI de DeepTutor con prioridad baja de CPU y de disco (la heredan
+  sus procesos hijos). Con el equipo libre va igual de rápido; cuando se usa, cede el turno y el
+  equipo sigue respondiendo.
+
 ## [0.10.0] - 2026-11-03
 
 ### Added

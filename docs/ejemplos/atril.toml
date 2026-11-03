@@ -26,6 +26,7 @@ parser = "docling" # text_only | docling | mineru | markitdown | pymupdf4llm | .
 chunk = 1024
 solape = 150
 descargar_modelos = true  # permite a Docling/MinerU descargar sus modelos
+hilos = 0          # hilos de CPU al indexar; 0 = sin límite (p. ej. la mitad de núcleos)
 
 [backup]
 # La contraseña de restic se toma de RESTIC_PASSWORD o RESTIC_PASSWORD_FILE.

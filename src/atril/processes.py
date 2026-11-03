@@ -5,6 +5,7 @@ vivos, siguen ocupando los puertos. Aquí se identifican y se cierran, pero solo
 si su línea de comandos pertenece a la estación.
 """
 
+import contextlib
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,6 +56,29 @@ def _normalize(path: str) -> str:
     while "//" in text[1:]:
         text = text[0] + text[1:].replace("//", "/")
     return text.rstrip("/").casefold()
+
+
+def lower_priority(pid: int) -> bool:
+    """Baja la prioridad de CPU y de disco de un proceso (sus hijos la heredan).
+
+    No cambia lo que hace el proceso, solo cede el turno a las aplicaciones
+    interactivas: el equipo responde mientras se indexa.
+
+    Returns:
+        ``True`` si se ha podido bajar la prioridad de CPU.
+    """
+    try:
+        process = psutil.Process(pid)
+        windows = hasattr(psutil, "BELOW_NORMAL_PRIORITY_CLASS")
+        process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if windows else 10)
+    except (psutil.Error, OSError):
+        return False
+    with contextlib.suppress(psutil.Error, OSError, AttributeError, ValueError):
+        if hasattr(psutil, "IOPRIO_LOW"):
+            process.ionice(psutil.IOPRIO_LOW)
+        elif hasattr(psutil, "IOPRIO_CLASS_BE"):
+            process.ionice(psutil.IOPRIO_CLASS_BE, value=7)
+    return True
 
 
 def port_owners(ports: Iterable[int]) -> list[PortOwner]:

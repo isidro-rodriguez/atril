@@ -110,8 +110,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   replaces the current file. All HTTP goes through `net.open_url` (browser-like User-Agent), which
   tests replace.
 - KB indexing: new sources are added **one by one** with the DeepTutor CLI (`kb create|add`, no
-  server needed); `fuentes/indexado.json` records the indexed hash per KB and source. DeepTutor
-  stores a changed file with the same name as `name (2).pdf` and never purges vectors, so changed
+  server needed), started at below-normal CPU/IO priority (`processes.lower_priority`) and with
+  `[indexado] hilos` as thread limit; `fuentes/indexado.json` records the indexed hash per KB and
+  source. DeepTutor stores a changed file with the same name as `name (2).pdf` and never purges vectors, so changed
   and removed sources are handled only in `kb reindexar`: delete the old file through the API,
   re-add, then `POST /reindex` with the active `embedding_model`. Success of an add is a **new**
   completed run (different `task_id`) or DeepTutor's "already indexed" message, never a lookup by

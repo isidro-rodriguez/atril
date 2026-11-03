@@ -30,7 +30,7 @@ from atril import net
 from atril.config._toml import StateFileError, load_state
 from atril.config.station import Station
 from atril.config.syllabus import KnowledgeBase, Source, SourceKind, Syllabus
-from atril.processes import kill_tree
+from atril.processes import kill_tree, lower_priority
 
 STALL_SECONDS = 15 * 60
 """Sin actividad durante este tiempo, el indexado probablemente está colgado."""
@@ -278,6 +278,14 @@ class AddResult:
     log: Path | None = None
 
 
+THREAD_VARIABLES = (
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
+"""Variables con las que PyTorch, NumPy y Docling limitan sus hilos de CPU."""
+
 Tick = Callable[[KbRun | None, float], None]
 """Avance: run actual (si lo hay) y segundos transcurridos."""
 
@@ -289,6 +297,13 @@ class Indexer:
         """Prepara el indexador con el entorno de ``deeptutor``."""
         self.station = station
         self.env = env
+
+    def _env(self) -> dict[str, str]:
+        """Entorno del CLI, con el límite de hilos de ``[indexado] hilos``."""
+        threads = self.station.indexing.threads
+        if not threads:
+            return self.env
+        return {**self.env, **dict.fromkeys(THREAD_VARIABLES, str(threads))}
 
     def kb_exists(self, kb_id: str) -> bool:
         """La KB ya existe en DeepTutor."""
@@ -335,8 +350,9 @@ class Indexer:
         started = time.monotonic()
         with out_log.open("w", encoding="utf-8") as out:
             process = subprocess.Popen(
-                command, stdout=out, stderr=subprocess.STDOUT, env=self.env
+                command, stdout=out, stderr=subprocess.STDOUT, env=self._env()
             )
+            lower_priority(process.pid)
             try:
                 while process.poll() is None:
                     time.sleep(POLL_SECONDS)

@@ -529,6 +529,11 @@ def _embedding_preflight(station: Station) -> list[Finding]:
         return findings
     with console.status(f"Cargando {escape(station.ollama.embedding)} en Ollama..."):
         findings.extend(ollama.probe_embedding(station.ollama))
+    # Ya cargado, se ve si cabe entero en la VRAM.
+    loaded = ollama.get_status(station.ollama.url)
+    findings.extend(
+        w for w in ollama.offload_warnings(loaded, station.ollama) if w not in findings
+    )
     return findings
 
 

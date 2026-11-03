@@ -81,6 +81,8 @@ class IndexingConfig:
     chunk_overlap: int
     download_models: bool
     """Permite que el parser descargue sus modelos locales (Docling, MinerU)."""
+    threads: int = 0
+    """Hilos de CPU para el parser y el troceado; 0 = sin límite."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,6 +302,7 @@ def _indexing(table: Table) -> IndexingConfig:
         chunk_size=table.get_int("chunk", 1024),
         chunk_overlap=table.get_int("solape", 150, minimum=0),
         download_models=table.get_bool("descargar_modelos", True),
+        threads=table.get_int("hilos", 0, minimum=0),
     )
     if config.parser not in PARSERS:
         raise table.error(

@@ -28,6 +28,8 @@ class LoadedModel:
     name: str
     size_vram: int
     context_length: int | None
+    size: int = 0
+    """Memoria total del modelo; si supera ``size_vram``, parte va a la CPU."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,7 @@ def _loaded(raw: dict[str, Any]) -> LoadedModel:
         name=raw["name"],
         size_vram=int(raw.get("size_vram", 0)),
         context_length=raw.get("context_length"),
+        size=int(raw.get("size", 0)),
     )
 
 
@@ -125,6 +128,7 @@ def check(status: OllamaStatus, config: OllamaConfig) -> list[Finding]:
                 )
             )
 
+    findings.extend(offload_warnings(status, config))
     env_context = os.environ.get("OLLAMA_CONTEXT_LENGTH")
     if env_context and env_context != str(config.context):
         findings.append(
@@ -133,6 +137,25 @@ def check(status: OllamaStatus, config: OllamaConfig) -> list[Finding]:
                 f"atril.toml declara contexto = {config.context}."
             )
         )
+    return findings
+
+
+def offload_warnings(status: OllamaStatus, config: OllamaConfig) -> list[Finding]:
+    """Avisa si el modelo de embedding cargado no cabe entero en la VRAM.
+
+    Lo que no cabe se ejecuta en la CPU: el indexado se vuelve lento y deja el
+    equipo sin respuesta.
+    """
+    findings = []
+    for model in status.loaded:
+        if same_model(model.name, config.embedding) and model.size > model.size_vram:
+            on_cpu = round(100 * (model.size - model.size_vram) / model.size)
+            findings.append(
+                warning(
+                    f"El embedding no cabe entero en la VRAM: un {on_cpu} % se "
+                    "ejecuta en la CPU y el indexado cargará el procesador."
+                )
+            )
     return findings
 
 

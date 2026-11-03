@@ -100,3 +100,14 @@ def test_get_status_offline(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ollama.net, "get_json", refuse)
 
     assert ollama.get_status("http://x:1") == OllamaStatus(running=False)
+
+
+def test_offload_warning_when_embedding_spills_to_cpu() -> None:
+    gib = 1024**3
+    fits = LoadedModel("qwen3-embedding:8b", 5 * gib, 8192, size=5 * gib)
+    spills = LoadedModel("qwen3-embedding:8b", 3 * gib, 8192, size=4 * gib)
+
+    assert ollama.offload_warnings(OllamaStatus(True, loaded=(fits,)), CONFIG) == []
+    [finding] = ollama.offload_warnings(OllamaStatus(True, loaded=(spills,)), CONFIG)
+    assert finding.level is Level.WARNING
+    assert "25 %" in finding.message

@@ -88,6 +88,8 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 
 ## Lecciones de la instalación previa
 
+- El indexado puede dejar el equipo sin respuesta: el CLI de DT corre con prioridad baja de CPU y disco (no cambia el resultado), `[indexado] hilos` limita los hilos de PyTorch/Docling, y se avisa si el embedding no cabe entero en la VRAM (la parte en CPU satura el procesador).
+
 - Windows: `deeptutor start --detach` con `DETACHED_PROCESS` abre una consola vacía (el `python.exe` del venv es un redirector); parche `arranque-sin-ventana` (`CREATE_NO_WINDOW`).
 
 - Ollama: otro cliente puede expulsar el modelo de embedding de la VRAM (8 GB) y la recarga fallar (CUDA error); comprobar antes de indexar y avisar de otros modelos cargados.

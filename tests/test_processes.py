@@ -60,3 +60,31 @@ def test_belongs_to_compares_paths_not_text(
     owner = PortOwner(8001, 1, "p", " ".join(args), tuple(args))
 
     assert owner.belongs_to(Path(root)) is expected
+
+
+def test_lower_priority_of_child_process() -> None:
+    import subprocess
+    import sys
+
+    import psutil
+
+    from atril.processes import lower_priority
+
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+    try:
+        before = psutil.Process(child.pid).nice()
+        assert lower_priority(child.pid)
+        after = psutil.Process(child.pid).nice()
+        if hasattr(psutil, "BELOW_NORMAL_PRIORITY_CLASS"):
+            assert after == psutil.BELOW_NORMAL_PRIORITY_CLASS
+        else:
+            assert after > before
+    finally:
+        child.kill()
+        child.wait()
+
+
+def test_lower_priority_of_missing_process() -> None:
+    from atril.processes import lower_priority
+
+    assert lower_priority(2**22 + 12345) is False
