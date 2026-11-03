@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 from rich.markup import escape
 from rich.panel import Panel
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 from rich.table import Table
 
 from atril import ollama
@@ -24,6 +25,13 @@ from atril.commands.deeptutor import launch, shutdown
 from atril.config.station import Station
 from atril.config.syllabus import KnowledgeBase, Syllabus
 from atril.deeptutor import DeepTutor
+from atril.evaluation import (
+    EvalReport,
+    EvaluationError,
+    previous_report,
+    reports_dir,
+    run_evaluation,
+)
 from atril.knowledge import (
     POLL_SECONDS,
     RETRY_STATES,
@@ -120,12 +128,8 @@ def reindex(
     dt = DeepTutor(station)
     if not dt.installed:
         fail("DeepTutor no está instalado; usa atril instalar.")
+    _require_kb(station, syllabus, kb)
     kb_dir = station.kb_dir(kb.id)
-    if not (kb_dir / "metadata.json").is_file():
-        fail(
-            f"la KB {kb.id} todavía no existe; "
-            f"créala con: atril kb indexar {syllabus.id}"
-        )
 
     before = KbRun.load(kb_dir)
     _ensure_running(dt, before)
@@ -189,7 +193,86 @@ def reindex(
     success(f"KB {kb.id} reindexada.")
 
 
+@kb_app.command("evaluar")
+def evaluate(
+    ctx: typer.Context,
+    kb_id: Annotated[str, typer.Argument(help="Id de la KB (único en la estación).")],
+    top_k: Annotated[
+        int,
+        typer.Option("--k", "-k", min=1, help="Posiciones que cuentan como acierto."),
+    ] = 5,
+    dataset: Annotated[
+        Path | None,
+        typer.Option(
+            "--dataset",
+            exists=True,
+            dir_okay=False,
+            help="Preguntas (.jsonl); por defecto, la 'evaluacion' de la KB.",
+        ),
+    ] = None,
+    detail: Annotated[
+        bool,
+        typer.Option(
+            "--detalle", help="Muestra los fragmentos de todas las preguntas."
+        ),
+    ] = False,
+) -> None:
+    """Evalúa la recuperación de una KB comparando con el [bold]texto completo[/].
+
+    Guarda el informe en el temario (eval/informes/) y compara las métricas con
+    el informe anterior de la misma KB y conjunto de preguntas.
+    """
+    station = get_station(ctx)
+    syllabus, kb = find_kb(ctx, kb_id)
+    dt = DeepTutor(station)
+    if not dt.installed:
+        fail("DeepTutor no está instalado; usa atril instalar.")
+    _require_kb(station, syllabus, kb)
+    questions = dataset or (syllabus.root / kb.eval_file if kb.eval_file else None)
+    if questions is None:
+        fail(f"la KB {kb.id} no declara 'evaluacion' en temario.toml; usa --dataset.")
+    if not questions.is_file():
+        fail(f"no existe el conjunto de preguntas {questions}.")
+    if not show(_embedding_preflight(station), "Ollama"):
+        fail("corrige el embedding antes de evaluar.")
+
+    folder = reports_dir(syllabus)
+    before = previous_report(folder, kb.id, questions.name, top_k)
+    with Progress(
+        TextColumn(f"Evaluando {escape(kb.id)}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("", total=None)
+        try:
+            report = run_evaluation(
+                station,
+                dt.env(),
+                kb.id,
+                questions,
+                top_k,
+                lambda done, total: progress.update(task, completed=done, total=total),
+            )
+        except EvaluationError as exc:
+            fail(str(exc))
+
+    _show_cases(report, detail)
+    _show_metrics(report, before)
+    path = report.save(folder)
+    console.print(f"Informe: [cyan]{escape(str(path.relative_to(syllabus.root)))}[/]")
+    if any(case.error for case in report.cases):
+        fail("algunas preguntas han dado error; revisa la tabla.")
+
+
 # --- indexado ------------------------------------------------------------------
+
+
+def _require_kb(station: Station, syllabus: Syllabus, kb: KnowledgeBase) -> None:
+    """Termina con error si la KB aún no existe en DeepTutor."""
+    if not (station.kb_dir(kb.id) / "metadata.json").is_file():
+        fail(f"la KB {kb.id} aún no existe; créala con: atril kb indexar {syllabus.id}")
 
 
 def _kbs(syllabus: Syllabus, kb_id: str | None) -> list[KnowledgeBase]:
@@ -387,6 +470,68 @@ def _follow(kb_dir: Path) -> KbRun | None:
                     "atril parar, y repite este comando (reanuda).[/]"
                 )
     return run
+
+
+def _show_cases(report: EvalReport, detail: bool) -> None:
+    """Tabla de preguntas: acierto y posición, o fallo con lo que se recuperó."""
+    table = Table("Caso", "Resultado", "Pregunta", "Recuperado", title="Preguntas")
+    table.title_justify = "left"
+    for case in report.cases:
+        if case.error:
+            result = "[bold red]error[/]"
+        elif case.rank is None:
+            result = "[bold yellow]fallo[/]"
+        else:
+            style = "green" if case.rank == 1 else "cyan"
+            result = f"[{style}]rango {case.rank}[/]"
+        show_hits = detail or case.rank is None or bool(case.error)
+        hits = (
+            "\n".join(f"{h.title} p.{h.page or '?'}" for h in case.hits[:3])
+            if show_hits
+            else ""
+        )
+        table.add_row(
+            escape(case.case_id),
+            result,
+            escape(case.query),
+            escape(case.error or hits),
+        )
+    console.print(table)
+
+
+def _show_metrics(report: EvalReport, before: EvalReport | None) -> None:
+    """Métricas, con la diferencia respecto al informe anterior si lo hay."""
+    columns = ["Métrica", "Valor"]
+    if before:
+        columns += [f"Anterior ({before.created_at[:10]})", "Cambio"]
+    table = Table(*columns, title=f"Métricas (k={report.k})")
+    table.title_justify = "left"
+    for key, value in report.metrics.items():
+        row = [escape(key), _metric(value)]
+        if before:
+            old = before.metrics.get(key)
+            row.append(_metric(old) if old is not None else "—")
+            row.append(_delta(key, value, old))
+        table.add_row(*row)
+    console.print(table)
+
+
+def _metric(value: float | int) -> str:
+    """Valor con 3 decimales si es real."""
+    return f"{value:.3f}" if isinstance(value, float) else str(value)
+
+
+def _delta(key: str, value: float | int, old: float | int | None) -> str:
+    """Cambio coloreado: verde si mejora (para fallos, si baja)."""
+    if old is None:
+        return ""
+    change = value - old
+    if abs(change) < 1e-9:
+        return "="
+    better = change < 0 if "failed" in key else change > 0
+    style = "green" if better else "red"
+    text = f"{change:+.3f}" if isinstance(change, float) else f"{change:+d}"
+    return f"[{style}]{text}[/]"
 
 
 def _previous(ledger: Ledger, kb: KnowledgeBase, item: PlanItem) -> PlanItem:

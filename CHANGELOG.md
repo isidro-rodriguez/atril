@@ -5,6 +5,17 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.6.0] - 2026-11-03
+
+### Added
+
+- `atril kb evaluar <kb> [-k 5] [--dataset f.jsonl] [--detalle]`: sustituye a `evaluar.ps1` y
+  `eval_completo.py`. Evalúa la recuperación con el evaluador de DeepTutor comparando con el
+  texto completo del chunk (`evidence_text`), no con los 200 caracteres de `content`. Muestra
+  avance, una tabla por pregunta (rango del acierto, o lo recuperado en los fallos) y las
+  métricas comparadas con el informe anterior de la misma KB, conjunto y `k`. Guarda el
+  informe en `temarios/<t>/eval/informes/`, fuera del espacio de trabajo.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added

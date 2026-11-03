@@ -290,4 +290,4 @@ def test_reindex_unknown_or_missing_kb(station: Path) -> None:
 
     result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
     assert result.exit_code == 1
-    assert "todavía no existe" in result.output
+    assert "aún no existe" in result.output

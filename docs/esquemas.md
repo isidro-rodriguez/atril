@@ -55,7 +55,7 @@ Ruta: `temarios\<id>\temario.toml`. El id del temario es el nombre de la carpeta
 | | `vinculante` | booleano | **obligatorio** | Norma y guías en KB distintas |
 | | `fuentes` | lista de patrones | **obligatorio** | `fnmatch` sobre id de fuente (`cte-*`) |
 | | `descripcion` | texto | — | |
-| | `evaluacion` | ruta relativa | — | JSONL de preguntas (`eval/…`) |
+| | `evaluacion` | ruta relativa | — | JSONL de preguntas (`eval/…`); informes en `eval\informes\` |
 | `[[fuente]]` | `id` | slug | **obligatorio** | Único en el temario |
 | | `tipo` | `pdf` · `markdown` · `github` · `web` | **obligatorio** | |
 | | `titulo` | texto | — | |

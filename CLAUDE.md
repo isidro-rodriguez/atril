@@ -36,6 +36,7 @@
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
+│   ├── evaluation.py       # Full-text retrieval evaluation (app/ Python) and reports
 │   ├── install.py          # Install/update steps (git, uv, npm, ollama, deeptutor config)
 │   ├── knowledge.py        # KB indexing: plan, ledger, CLI adds, run state, reindex API
 │   ├── net.py              # Minimal urllib helpers (is_up, get_json)
@@ -106,6 +107,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   completed run (different `task_id`) or DeepTutor's "already indexed" message, never a lookup by
   file name. Run state comes from `<kb>/.indexing-run.json`; a `running` run whose owner process
   died counts as `interrupted`, and those states require restarting DeepTutor before reindexing.
+- Evaluation runs DeepTutor's evaluator with `app/`'s Python (`evaluation._EVAL_SCRIPT`), matching
+  gold answers against `evidence_text` (full chunk) instead of the 200-char `content`. Reports go to
+  `temarios/<t>/eval/informes/` — never inside `espacio/`, which the agent reads — and each run is
+  compared with the latest previous report for the same KB, dataset and `k`.
 
 ## Project rules (load-bearing)
 
