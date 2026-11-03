@@ -10,7 +10,7 @@ La estación es la carpeta que contiene ``atril.toml``. Su estructura es fija:
 from dataclasses import dataclass
 from pathlib import Path
 
-from acodo.utils import valid_slug, valid_url
+from acodo.utils import valid_path, valid_slug, valid_url
 
 from atril.config._toml import ConfigError, Table, load_toml
 
@@ -157,7 +157,7 @@ def load_station(root: Path) -> Station:
         deeptutor=_deeptutor(top.get_table("deeptutor")),
         ollama=_ollama(top.get_table("ollama")),
         indexing=_indexing(top.get_table("indexado", required=False)),
-        backup=_backup(top.get_table("backup"), root.resolve()),
+        backup=_backup(top.get_table("backup")),
     )
     top.close()
     return station
@@ -224,8 +224,8 @@ def _indexing(table: Table) -> IndexingConfig:
     return config
 
 
-def _backup(table: Table, root: Path) -> BackupConfig:
-    """Tabla ``[backup]``; las rutas relativas de ``repos_git`` parten de ``root``."""
+def _backup(table: Table) -> BackupConfig:
+    """Tabla ``[backup]``."""
     targets_table = table.get_table("destinos")
     targets = []
     for name, target in targets_table.get_named_tables():
@@ -244,9 +244,16 @@ def _backup(table: Table, root: Path) -> BackupConfig:
     )
     keep.close()
 
-    repos = tuple(root / repo for repo in table.get_str_list("repos_git", []))
+    repos = table.get_str_list("repos_git", [])
+    for repo in repos:
+        if not valid_path(repo, absolute=True):
+            raise table.error(f"'repos_git' exige rutas absolutas: {repo!r}.")
 
-    config = BackupConfig(targets=tuple(targets), retention=retention, git_repos=repos)
+    config = BackupConfig(
+        targets=tuple(targets),
+        retention=retention,
+        git_repos=tuple(Path(repo) for repo in repos),
+    )
     table.close()
     return config
 

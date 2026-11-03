@@ -11,7 +11,13 @@ from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
-from acodo.utils import valid_domain, valid_filename, valid_slug, valid_url
+from acodo.utils import (
+    valid_domain,
+    valid_filename,
+    valid_relative_path,
+    valid_slug,
+    valid_url,
+)
 
 from atril.config._toml import ConfigError, Table, load_toml
 
@@ -170,15 +176,10 @@ def _relative_path(table: Table, key: str, default: str | None = None) -> str | 
     value = table.get_str(key, default)
     if value is None:
         return None
-    parts = PurePosixPath(value.replace("\\", "/")).parts
-    if (
-        not parts
-        or value.startswith(("/", "\\"))
-        or ":" in value
-        or any(part == ".." or not valid_filename(part) for part in parts)
-    ):
+    if not valid_relative_path(value):
         raise table.error(f"'{key}' debe ser una ruta relativa válida: {value!r}.")
-    return "/".join(parts)
+    # Se normaliza a "/" y sin segmentos vacíos ni ".", igual en Windows y Linux.
+    return "/".join(PurePosixPath(value.replace("\\", "/")).parts)
 
 
 def _id(table: Table) -> str:

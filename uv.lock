@@ -4,11 +4,11 @@ requires-python = ">=3.13"
 
 [[package]]
 name = "acodo"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/96/50/4eda45fa162a6aa9a87e8c12aea5540c01e8b8a08c5ff970b7f8a84df9e6/acodo-0.4.0.tar.gz", hash = "sha256:3ce0db5f11001b08b98f05347b882f33610bf823291d20a5097be351b0d701a7", size = 28314, upload-time = "2026-10-30T16:01:42.282Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/45/da/680d1936f62c864671350f9f9922a6b2d1b597601b1bed46d8755a7438ba/acodo-0.5.0.tar.gz", hash = "sha256:ee33f98d92ed2e4cc75adf66c863b9368183d40f7dccbe79d0216d02c0914eed", size = 29048, upload-time = "2026-11-03T13:02:55.776Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6c/25/be8e9ab33e648c603be1783b41a2a4b36848247b18b8c4882c26e233d70a/acodo-0.4.0-py3-none-any.whl", hash = "sha256:491573deb8443551fec11bbefd50026559564dea9c15a8a301916953970016a2", size = 31190, upload-time = "2026-10-30T16:01:41.426Z" },
+    { url = "https://files.pythonhosted.org/packages/54/69/3b9158d3b7b90177ff809fcc46de547264f3bf915725e33eb324d054c1aa/acodo-0.5.0-py3-none-any.whl", hash = "sha256:ec9551463d6ca04a3694ebf9407fda139d79c22214fe5fca3f9d951dc084d9c2", size = 31975, upload-time = "2026-11-03T13:02:54.724Z" },
 ]
 
 [[package]]
@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "atril"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "acodo" },
@@ -40,7 +40,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "acodo", specifier = ">=0.4,<1" },
+    { name = "acodo", specifier = ">=0.5,<1" },
     { name = "typer", specifier = ">=0.20" },
 ]
 

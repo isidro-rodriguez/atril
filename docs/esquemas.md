@@ -26,7 +26,7 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 | | `chunk` | entero ≥ 1 | `1024` | |
 | | `solape` | entero ≥ 0 | `150` | Menor que `chunk` |
 | `[backup]` | `retencion` | `{ diarias, semanales, mensuales }` | `7`, `4`, `12` | `restic forget --keep-*` |
-| | `repos_git` | lista de rutas | `[]` | Git bundle en el snapshot; relativas a la estación |
+| | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`) |
 | `[backup.destinos.<nombre>]` | `repo` | texto | **obligatorio** | Repositorio restic; al menos uno |
 
 La contraseña de restic **nunca** va en `atril.toml`: `RESTIC_PASSWORD` o

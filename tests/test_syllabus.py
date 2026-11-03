@@ -152,3 +152,19 @@ def test_load_syllabi_skips_folders_without_file(tmp_path: Path) -> None:
 
     assert [s.id for s in syllabi] == ["uno"]
     assert warnings == ["borrador: carpeta sin temario.toml, se ignora."]
+
+
+def test_relative_paths_are_normalized(tmp_path: Path) -> None:
+    source = '[[fuente]]\nid = "a"\ntipo = "markdown"\ncarpeta = \'./01_cte\\notas/\'\n'
+    root = _syllabus(tmp_path, KB + source)
+
+    assert load_syllabus(root).sources[0].folder == "01_cte/notas"
+
+
+@pytest.mark.parametrize("folder", ["~/x", "C:x", "D:/x", "a/CON"])
+def test_folder_must_stay_inside(tmp_path: Path, folder: str) -> None:
+    source = f'[[fuente]]\nid = "a"\ntipo = "markdown"\ncarpeta = \'{folder}\'\n'
+    root = _syllabus(tmp_path, KB + source)
+
+    with pytest.raises(ConfigError, match="ruta relativa"):
+        load_syllabus(root)

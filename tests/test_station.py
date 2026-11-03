@@ -13,6 +13,7 @@ def test_example_station_is_valid(station_dir: Path) -> None:
     assert station.ollama.dimension == 4096
     assert [t.name for t in station.backup.targets] == ["disco", "drive"]
     assert station.app_dir == station_dir.resolve() / "app"
+    assert station.backup.git_repos == (Path(r"D:\Desarrollo\Repositorios\atril"),)
 
 
 def test_defaults(tmp_path: Path) -> None:
@@ -37,6 +38,7 @@ def test_defaults(tmp_path: Path) -> None:
         ("[estacion]\nraiz = 'D:/x'", "claves desconocidas: estacion"),
         ("[indexado]\nchunk = 100\nsolape = 100", "'solape' debe ser menor"),
         ("[indexado]\nchunk = true", "tipo no válido"),
+        ("[backup]\nrepos_git = ['repos/atril']", "exige rutas absolutas"),
     ],
 )
 def test_invalid_station(tmp_path: Path, extra: str, message: str) -> None:
