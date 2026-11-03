@@ -58,7 +58,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 1. ✅ Núcleo: config, control de DT (instalar/actualizar/arrancar/parar/estado, huérfanos, parches), comprobación de Ollama. `atril.toml` sustituye a `setup.json`.
 2. ✅ Temarios: fuentes (descarga/actualización con hash e histórico), KB (indexado y reindexado), evaluación con texto completo e informes comparados en `eval\informes\`.
 3. ✅ Backup y restauración (`atril backup`, `backup comprobar`, `backup restaurar`). La restauración va a `<estación>.restaurar-<fecha>` y después se intercambia; lo actual queda en `<estación>.previo-<fecha>`.
-4. Migración de la estructura actual (`deeptutor_app` → `app`, `materia_normativa` → `temarios\normativa`).
+4. Migración de la estructura actual con `scripts\migrar_estacion.py` (plan por defecto, `--aplicar` para ejecutar; no borra nada, todo lo sobrante va a `_legado\`): `deeptutor_app` → `app` (venv apartado y recreado con `atril instalar`), `materia_normativa` → `temarios\normativa\espacio` (el historial de chats viaja con la carpeta; el catálogo de espacios de DT se actualiza), fuentes con nombre estable y registros (`registro.json`, `indexado.json`) generados por hash contra `raw\` de cada KB, de modo que no hay que reindexar.
 5. Publicación en PyPI y accesos directos.
 6. TUI (opcional).
 

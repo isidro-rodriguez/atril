@@ -5,6 +5,21 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.7.1] - 2026-11-03
+
+### Fixed
+
+- Identificación de procesos de DeepTutor: un proceso solo es de la estación si alguno de sus
+  argumentos es una ruta **dentro** de la raíz (comparando rutas, sin distinguir mayúsculas ni
+  separadores). Antes bastaba con que la ruta apareciera como texto, de modo que un proceso de
+  `D:\DeepTutorBackup` contaba como de `D:\DeepTutor` y `atril parar` podía cerrarlo.
+
+### Added
+
+- `scripts/migrar_estacion.py` (no forma parte del paquete): migración de un solo uso de la
+  estación anterior (scripts PowerShell) a la estructura de atril, con plan previo y sin borrar
+  nada.
+
 ## [0.7.0] - 2026-11-03
 
 ### Added

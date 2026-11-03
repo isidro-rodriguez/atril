@@ -20,17 +20,41 @@ class PortOwner:
     pid: int
     name: str
     cmdline: str
+    args: tuple[str, ...] = ()
+    """Argumentos tal cual (si no se conocen, se parte ``cmdline`` por espacios)."""
 
     def belongs_to(self, root: Path) -> bool:
-        r"""Indica si la línea de comandos contiene ``root`` (sin mayúsculas).
+        r"""Indica si algún argumento es una ruta dentro de ``root``.
+
+        Se comparan rutas, no texto: ``D:\DeepTutorBackup`` no está dentro de
+        ``D:\DeepTutor``. Sin distinguir mayúsculas ni separadores (Windows).
 
         Examples:
-            >>> owner = PortOwner(8001, 1, "python.exe", r"D:\DT\app\.venv\python.exe")
-            >>> owner.belongs_to(Path("D:/DT")), owner.belongs_to(Path("D:/Otro"))
+            >>> owner = PortOwner(8001, 1, "python", r"D:\DT\app\python.exe")
+            >>> owner.belongs_to(Path("D:/DT")), owner.belongs_to(Path("D:/D"))
             (True, False)
         """
-        cmdline = self.cmdline.replace("\\", "/").casefold()
-        return root.as_posix().casefold() in cmdline
+        base = _normalize(str(root))
+        arguments = self.args or tuple(self.cmdline.split())
+        for argument in arguments:
+            for candidate in (argument, *argument.split("=")[1:]):
+                path = _normalize(candidate)
+                if path == base or path.startswith(base + "/"):
+                    return True
+        return False
+
+
+def _normalize(path: str) -> str:
+    r"""Ruta comparable: sin comillas, con ``/``, sin ``/`` final y en minúsculas.
+
+    Examples:
+        >>> _normalize(r'"D:\Desarrollo\DeepTutor\"')
+        'd:/desarrollo/deeptutor'
+    """
+    text = path.strip().strip('"').strip("'").replace("\\", "/")
+    while "//" in text[1:]:
+        text = text[0] + text[1:].replace("//", "/")
+    return text.rstrip("/").casefold()
 
 
 def port_owners(ports: Iterable[int]) -> list[PortOwner]:
@@ -50,7 +74,8 @@ def _describe(port: int, pid: int) -> PortOwner:
     """Nombre y línea de comandos de ``pid`` (vacíos si no se pueden leer)."""
     try:
         process = psutil.Process(pid)
-        return PortOwner(port, pid, process.name(), " ".join(process.cmdline()))
+        args = tuple(process.cmdline())
+        return PortOwner(port, pid, process.name(), " ".join(args), args)
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return PortOwner(port, pid, "", "")
 

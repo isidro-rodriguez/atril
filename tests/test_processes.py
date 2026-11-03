@@ -2,6 +2,8 @@ import os
 import socket
 from pathlib import Path
 
+import pytest
+
 from atril.processes import PortOwner, port_owners
 
 
@@ -21,3 +23,40 @@ def test_belongs_to_ignores_case_and_separators() -> None:
 
     assert owner.belongs_to(Path("D:/Desarrollo/DeepTutor"))
     assert not owner.belongs_to(Path("D:/Desarrollo/Otra"))
+
+
+@pytest.mark.parametrize(
+    ("root", "args", "expected"),
+    [
+        (
+            "D:/Desarrollo/DeepTutor",
+            [r"D:\Desarrollo\DeepTutor\app\.venv\python.exe"],
+            True,
+        ),
+        (
+            "D:/Desarrollo/DeepTutor",
+            [r"D:\Desarrollo\DeepTutorBackup\app\python.exe"],
+            False,
+        ),
+        (
+            "D:/Desarrollo/DeepTutor",
+            [r"D:\Desarrollo\DeepTutor.previo-1\app\node.exe"],
+            False,
+        ),
+        ("D:/Desarrollo/DeepTutor", ["node", r"--home=D:\Desarrollo\DeepTutor"], True),
+        (
+            "D:/Desarrollo/DeepTutor",
+            ["python", '"d:\\desarrollo\\deeptutor\\app\\x.py"'],
+            True,
+        ),
+        ("/home/u/dt", ["/home/u/dt/app/.venv/bin/python"], True),
+        ("/home/u/dt", ["/home/u/dt-backup/app/.venv/bin/python"], False),
+        ("/home/u/dt", ["/home/u/dt"], True),
+    ],
+)
+def test_belongs_to_compares_paths_not_text(
+    root: str, args: list[str], expected: bool
+) -> None:
+    owner = PortOwner(8001, 1, "p", " ".join(args), tuple(args))
+
+    assert owner.belongs_to(Path(root)) is expected

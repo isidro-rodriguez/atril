@@ -30,7 +30,9 @@
 │   ├── decisiones.md       # Design decisions (source of truth for scope and phases)
 │   ├── esquemas.md         # atril.toml and temario.toml reference
 │   └── ejemplos/           # Example config files, validated by the tests
-├── scripts/backup.py       # git bundle of this repo (`poe backup`)
+├── scripts/
+│   ├── backup.py           # git bundle of this repo (`poe backup`)
+│   └── migrar_estacion.py  # One-off migration of the old PowerShell station (not packaged)
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
@@ -84,7 +86,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   `rich_help_panel` and help strings may use Rich markup.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;
   a command exits with code 1 when any finding is an error.
-- Only kill processes whose command line contains the station root; never touch others.
+- Only kill processes with an **argument that is a path inside the station root**, compared as
+  paths (`processes._normalize`), never as substrings: `D:\DeepTutorBackup` is not inside
+  `D:\DeepTutor`. Never touch other processes.
 - Patches are idempotent text replacements registered in `atril.patches.PATCHES`; a patch whose
   original and patched text are both missing is an error (DeepTutor changed), never forced.
 - Tests never wait for real time or call real services: fake `time.sleep`/`time.monotonic`,
