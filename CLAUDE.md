@@ -32,7 +32,7 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── scripts/backup.py       # git bundle of this repo (`poe backup`)
 ├── src/atril/
-│   ├── commands/           # CLI commands by area (config, deeptutor, install); `_common` helpers
+│   ├── commands/           # CLI commands by area (config, deeptutor, install, syllabus); `_common`
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
@@ -41,6 +41,7 @@
 │   ├── ollama.py           # Ollama status and checks
 │   ├── patches.py          # Patch registry and idempotent apply
 │   ├── processes.py        # Port owners and process trees (psutil)
+│   ├── sources.py          # Source download, registry, version check and history
 │   ├── __init__.py         # Exposes __version__ via importlib.metadata
 │   ├── __main__.py         # python -m atril
 │   ├── main.py             # Typer app: registers commands (entry point `atril`)
@@ -91,6 +92,11 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   search and ports; `install._SETTINGS_SCRIPT`, run with `app/`'s Python, for parser and chunks.
 - `app/` is a shallow clone: update with `fetch --depth 1` + `reset --hard FETCH_HEAD`, only on a
   clean tree and after reverting patches.
+- Sources keep a **stable file name** (`archivo` or the URL's last segment, no date): versions go
+  to `fuentes/historico/`, and `fuentes/registro.json` (text, sorted) records hash and dates.
+  Downloads write `.part`/`.nuevo` first and require the `%PDF-` header; a failed download never
+  replaces the current file. All HTTP goes through `net.open_url` (browser-like User-Agent), which
+  tests replace.
 
 ## Project rules (load-bearing)
 

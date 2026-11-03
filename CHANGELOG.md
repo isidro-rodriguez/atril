@@ -5,6 +5,20 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.4.0] - 2026-11-03
+
+### Added
+
+- `atril temario lista`: temarios con número de KB y fuentes, presentes y pendientes.
+- `atril temario cobertura <t>`: por KB, cada fuente con su fichero, estado (presente, falta,
+  manual, modificada a mano) y última comprobación.
+- `atril fuentes descargar <t> [ids]`: sustituye a `descargar-normativa.ps1`. Descarga lo que
+  falta con barra de progreso, valida la cabecera `%PDF-`, registra hash y fechas en
+  `fuentes/registro.json` e indica dónde colocar las fuentes manuales.
+- `atril fuentes comprobar <t> [ids] [--todas]`: vuelve a descargar las fuentes que tocan
+  según su frecuencia; si el hash cambia, guarda la versión anterior en `fuentes/historico/` y
+  avisa de qué KB hay que reindexar. Un fallo de descarga nunca sustituye el fichero vigente.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added

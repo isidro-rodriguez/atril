@@ -117,6 +117,27 @@ class Syllabus:
         """Versiones anteriores de las fuentes."""
         return self.sources_dir / "historico"
 
+    @property
+    def registry_file(self) -> Path:
+        """Registro de descargas y comprobaciones (texto, versionable)."""
+        return self.sources_dir / "registro.json"
+
+    def source_path(self, source: Source) -> Path | None:
+        """Ruta local de una fuente: el PDF o la carpeta de Markdown.
+
+        Returns:
+            ``None`` para fuentes remotas (``github``, ``web``), que indexa DeepTutor
+            directamente.
+        """
+        if source.folder is None:
+            return None
+        folder = self.sources_dir / source.folder
+        return folder / source.filename if source.filename else folder
+
+    def kb_of(self, source: Source) -> KnowledgeBase:
+        """KB a la que pertenece la fuente (siempre hay exactamente una)."""
+        return next(kb for kb in self.knowledge_bases if kb.matches(source.id))
+
     def sources_of(self, kb: KnowledgeBase) -> tuple[Source, ...]:
         """Fuentes que pertenecen a ``kb``, en el orden de declaración."""
         return tuple(source for source in self.sources if kb.matches(source.id))

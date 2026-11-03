@@ -73,6 +73,17 @@ Ruta: `temarios\<id>\temario.toml`. El id del temario es el nombre de la carpeta
 | `github` | `kb add-github-source` | Obligatoria | Prohibida | Prohibido |
 | `web` | `kb add-web-source` | Obligatoria | Prohibida | Prohibido |
 
+### Ficheros de fuentes
+
+| Ruta (bajo el temario) | Contenido |
+|---|---|
+| `fuentes\<carpeta>\<archivo>` | Versión vigente, con nombre estable (sin fecha) |
+| `fuentes\historico\<carpeta>\<nombre>.<AAAA-MM-DD>.pdf` | Versiones anteriores (fecha de su descarga) |
+| `fuentes\registro.json` | Hash SHA-256, tamaño, URL, fecha de descarga y de última comprobación |
+
+`atril fuentes comprobar` revisa las fuentes según `comprobar` (`semanal`: 7 días, `mensual`: 30)
+desde su última comprobación; `--todas` o ids explícitos fuerzan la revisión.
+
 ### Pertenencia fuente ↔ KB
 
 - Cada fuente debe pertenecer a **exactamente una** KB (error si a ninguna o a varias).
