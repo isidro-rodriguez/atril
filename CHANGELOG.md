@@ -5,6 +5,22 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.7.0] - 2026-11-03
+
+### Added
+
+- `atril backup [-d destino] [--sin-arrancar]`: copia `atril.toml`, `data/` y `temarios/` con
+  restic en cada destino (sin `app/`, que se reconstruye), con un git bundle de cada repo
+  (temarios con git y `repos_git`). Para DeepTutor durante la copia y lo vuelve a arrancar,
+  crea el repositorio si no existe, muestra el avance y aplica la retención con `--prune`. Un
+  disco externo desconectado se salta con un aviso.
+- `atril backup comprobar [-d destino] [--datos 5%]`: `restic check` (opcionalmente leyendo
+  parte de los datos) y los últimos snapshots de cada destino.
+- `atril backup restaurar -d destino [-s snapshot] [--si]`: restaura en una carpeta junto a la
+  estación y después intercambia `atril.toml`, `data/` y `temarios/`; lo anterior se conserva
+  en `<estación>.previo-<fecha>`. Avisa si el snapshot es de otra ruta, porque las KB guardan
+  rutas absolutas.
+
 ## [0.6.0] - 2026-11-03
 
 ### Added

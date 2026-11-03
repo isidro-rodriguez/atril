@@ -39,8 +39,10 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 | | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`) |
 | `[backup.destinos.<nombre>]` | `repo` | texto | **obligatorio** | Repositorio restic; al menos uno |
 
-La contraseña de restic **nunca** va en `atril.toml`: `RESTIC_PASSWORD` o
-`RESTIC_PASSWORD_FILE`.
+La contraseña de restic **nunca** va en `atril.toml`: `RESTIC_PASSWORD`,
+`RESTIC_PASSWORD_FILE` o `RESTIC_PASSWORD_COMMAND`. Requiere restic 0.17 o posterior (y rclone
+para destinos `rclone:`). Un destino local cuya carpeta padre no existe se considera un disco
+desconectado y se salta.
 
 ## `temario.toml` (temario)
 

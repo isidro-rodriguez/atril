@@ -57,7 +57,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 0. ✅ Cerrar esquemas `atril.toml` y `temario.toml`; esqueleto desde `acodo-template`; `atril validar`.
 1. ✅ Núcleo: config, control de DT (instalar/actualizar/arrancar/parar/estado, huérfanos, parches), comprobación de Ollama. `atril.toml` sustituye a `setup.json`.
 2. ✅ Temarios: fuentes (descarga/actualización con hash e histórico), KB (indexado y reindexado), evaluación con texto completo e informes comparados en `eval\informes\`.
-3. Backup y restauración.
+3. ✅ Backup y restauración (`atril backup`, `backup comprobar`, `backup restaurar`). La restauración va a `<estación>.restaurar-<fecha>` y después se intercambia; lo actual queda en `<estación>.previo-<fecha>`.
 4. Migración de la estructura actual (`deeptutor_app` → `app`, `materia_normativa` → `temarios\normativa`).
 5. Publicación en PyPI y accesos directos.
 6. TUI (opcional).

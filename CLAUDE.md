@@ -32,8 +32,9 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── scripts/backup.py       # git bundle of this repo (`poe backup`)
 ├── src/atril/
-│   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge)
+│   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
+│   ├── backup.py           # restic backups, git bundles, restore staging and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
 │   ├── evaluation.py       # Full-text retrieval evaluation (app/ Python) and reports
@@ -111,6 +112,12 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   gold answers against `evidence_text` (full chunk) instead of the 200-char `content`. Reports go to
   `temarios/<t>/eval/informes/` — never inside `espacio/`, which the agent reads — and each run is
   compared with the latest previous report for the same KB, dataset and `k`.
+- Backups use restic (>= 0.17: exit code 10 = no repository, 12 = wrong password). They copy
+  `atril.toml`, `data/` and `temarios/` (never `app/`) plus git bundles in `data/atril/bundles/`,
+  stop DeepTutor first (SQLite) and restart it after. A local repo whose parent folder is missing
+  is a disconnected disk: skipped with a warning, or an error if requested explicitly. Restore
+  goes to `<root>.restaurar-<ts>` next to the station, then swaps in; the current content moves to
+  `<root>.previo-<ts>` and is never deleted. The restic password only comes from the environment.
 
 ## Project rules (load-bearing)
 

@@ -3,7 +3,7 @@
 CLI para gestionar una instalación local de [DeepTutor](https://github.com/HKUDS/DeepTutor)
 y sus temarios (fuentes, bases de conocimiento, evaluación y backup).
 
-> Estado: fases 0–2 completas (configuración, DeepTutor, temarios, fuentes y KB).
+> Estado: fases 0–3 completas (configuración, DeepTutor, temarios, fuentes, KB y backup).
 
 ## 🚀 Instalación
 
@@ -32,7 +32,7 @@ atril --estacion D:\Desarrollo\DeepTutor validar   # o ATRIL_ESTACION, o desde l
 | Temarios | `temario lista` · `temario cobertura <t>` | 2 ✅ |
 | Fuentes | `fuentes descargar <t> [ids]` · `fuentes comprobar <t> [ids] [--todas]` | 2 ✅ |
 | KB | `kb indexar <t> [kb]` · `kb reindexar <kb>` · `kb evaluar <kb> [-k 5] [--detalle]` | 2 ✅ |
-| Backup | `backup` · `backup comprobar` · `backup restaurar` | 3 |
+| Backup | `backup [-d destino]` · `backup comprobar [--datos 5%]` · `backup restaurar -d destino` | 3 ✅ |
 | Otros | `accesos` | 5 |
 
 Configuración: [`docs/esquemas.md`](docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](docs/ejemplos/).

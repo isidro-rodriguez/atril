@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from atril import __version__
-from atril.commands import config, deeptutor, install, knowledge, syllabus
+from atril.commands import backup, config, deeptutor, install, knowledge, syllabus
 from atril.commands._common import console
 
 app = typer.Typer(
@@ -67,6 +67,7 @@ app.command("parches", rich_help_panel=_DEEPTUTOR)(deeptutor.patches)
 app.add_typer(syllabus.syllabus_app, name="temario", rich_help_panel=_SYLLABI)
 app.add_typer(syllabus.sources_app, name="fuentes", rich_help_panel=_SYLLABI)
 app.add_typer(knowledge.kb_app, name="kb", rich_help_panel=_SYLLABI)
+app.add_typer(backup.backup_app, name="backup", rich_help_panel="Backup")
 
 
 def main() -> None:
