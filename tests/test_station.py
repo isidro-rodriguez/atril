@@ -9,7 +9,7 @@ from atril.config import ConfigError, find_station, load_station
 def test_example_station_is_valid(station_dir: Path) -> None:
     station = load_station(station_dir)
 
-    assert station.deeptutor.patches == ("paginas-citas",)
+    assert station.deeptutor.patches == ("paginas-citas", "arranque-sin-ventana")
     assert station.ollama.dimension == 4096
     assert [t.name for t in station.backup.targets] == ["disco", "drive"]
     assert station.app_dir == station_dir.resolve() / "app"

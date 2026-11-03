@@ -40,10 +40,12 @@ sources_app = typer.Typer(
 )
 
 SyllabusId = Annotated[
-    str, typer.Argument(help="Id del temario (nombre de su carpeta).")
+    str,
+    typer.Argument(metavar="TEMARIO", help="Id del temario (nombre de su carpeta)."),
 ]
 SourceIds = Annotated[
-    list[str] | None, typer.Argument(help="Ids de fuente; por defecto, todas.")
+    list[str] | None,
+    typer.Argument(metavar="FUENTES", help="Ids de fuente; por defecto, todas."),
 ]
 
 _OUTCOME_STYLE = {

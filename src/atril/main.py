@@ -34,8 +34,7 @@ def root(
         typer.Option(
             "--estacion",
             envvar="ATRIL_ESTACION",
-            help="Raíz de la estación. Por defecto, la carpeta actual o una "
-            "superior que contenga [bold]atril.toml[/].",
+            help="Raíz; por defecto, la carpeta (o superior) con [bold]atril.toml[/].",
             file_okay=False,
         ),
     ] = None,

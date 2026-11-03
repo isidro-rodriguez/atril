@@ -76,7 +76,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | Backup con ficheros sin leer (restic 3) o bundle de `repos_git` fallido | **Incompleto**: código 1, sin retención (no desplaza a un snapshot completo) |
 | `actualizar` con otro remoto u otra rama en `app/` | Se aborta antes del `reset --hard` |
 | Intercambio de restauración a medias | Se deshace; si no puede, lo dice y lo previo queda en `.previo-<fecha>` |
-| Snapshot de otra ruta | Exige `--forzar-otra-ruta` (no basta `--si`) |
+| Snapshot de otra ruta | Exige `--nueva-ruta` (no basta `--si`) |
 | `registro.json`/`indexado.json` dañados | Error claro; nunca se sobrescriben |
 | Parche con el texto repetido o ambos presentes | `código cambiado`; nunca se fuerza |
 | venv con otra versión de Python | `uv venv --clear` y reinstalación |
@@ -87,6 +87,8 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | Fuentes `github`/`web` | Experimentales: sin batería de pruebas hasta tener un uso real |
 
 ## Lecciones de la instalación previa
+
+- Windows: `deeptutor start --detach` con `DETACHED_PROCESS` abre una consola vacía (el `python.exe` del venv es un redirector); parche `arranque-sin-ventana` (`CREATE_NO_WINDOW`).
 
 - Ollama: otro cliente puede expulsar el modelo de embedding de la VRAM (8 GB) y la recarga fallar (CUDA error); comprobar antes de indexar y avisar de otros modelos cargados.
 - Tras un indexado fallido, el worker queda atascado en el servidor: reiniciar DT antes de reintentar.

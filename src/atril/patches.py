@@ -92,6 +92,17 @@ PATCHES: dict[str, Patch] = {
             old='"page": meta.get("page_label", meta.get("page", "")),',
             new='"page": meta.get("page_label") or meta.get("page", ""),',
         ),
+        Patch(
+            name="arranque-sin-ventana",
+            description="Windows: 'deeptutor start --detach' sin ventana de consola "
+            "vacía. Con DETACHED_PROCESS, el python.exe del venv (un redirector) "
+            "lanza el intérprete real en una consola nueva y visible; con "
+            "CREATE_NO_WINDOW la consola existe, pero oculta.",
+            file="deeptutor/runtime/launcher.py",
+            old="| subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]",
+            new="| subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]"
+            "  # atril: sin ventana",
+        ),
     )
 }
 """Parches disponibles, por nombre (el que se usa en ``[deeptutor] parches``)."""

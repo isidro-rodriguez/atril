@@ -62,3 +62,21 @@ def test_revert(tmp_path: Path) -> None:
     assert PATCH.revert(tmp_path) is PatchState.PENDING
     assert (tmp_path / "pkg/mod.py").read_text() == "x = old()\n"
     assert PATCH.revert(tmp_path) is PatchState.PENDING
+
+
+def test_no_window_patch_on_launcher_snippet(tmp_path: Path) -> None:
+    patch = PATCHES["arranque-sin-ventana"]
+    snippet = (
+        "    if os.name == 'nt':\r\n"
+        "        flags = (\r\n"
+        "            subprocess.CREATE_NEW_PROCESS_GROUP\r\n"
+        f"            {patch.old}\r\n"
+        "        )\r\n"
+    )
+    (tmp_path / patch.file).parent.mkdir(parents=True)
+    (tmp_path / patch.file).write_bytes(snippet.encode())
+
+    assert patch.apply(tmp_path) is PatchState.APPLIED
+    text = (tmp_path / patch.file).read_bytes().decode()
+    assert "CREATE_NO_WINDOW" in text and "DETACHED_PROCESS" not in text
+    assert text.count("\r\n") == 5

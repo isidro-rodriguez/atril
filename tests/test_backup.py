@@ -423,10 +423,10 @@ def test_restore_from_other_path_needs_flag(
 
     blocked = _invoke(station, "restaurar", "-d", "disco", "--si")
     assert blocked.exit_code == 1
-    assert "--forzar-otra-ruta" in blocked.output
+    assert "--nueva-ruta" in blocked.output
     assert cli["restore"] == []
 
-    forced = _invoke(station, "restaurar", "-d", "disco", "--si", "--forzar-otra-ruta")
+    forced = _invoke(station, "restaurar", "-d", "disco", "--si", "--nueva-ruta")
     assert cli["restore"] == ["8b3931f2"]
     assert "estación reconocible" in forced.output  # el restore simulado no deja nada
 

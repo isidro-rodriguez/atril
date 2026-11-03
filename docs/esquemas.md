@@ -18,7 +18,7 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 | | `rama` | texto | `"dev"` | |
 | | `python` | texto | `"3.13"` | Versión para `app\.venv` |
 | | `puertos` | `{ backend, frontend }` | `8001`, `3782` | Distintos, 1–65535 |
-| | `parches` | lista de nombres | `[]` | Parches incluidos en atril (`paginas-citas`) |
+| | `parches` | lista de nombres | `[]` | Parches incluidos en atril (`paginas-citas`, `arranque-sin-ventana`) |
 | | `paquetes` | lista de requisitos | `[]` | Extra en `app\.venv` (p. ej. `claude-agent-sdk`) |
 | | `busqueda` | texto | — | Proveedor de búsqueda de DT (`duckduckgo`) |
 | `[deeptutor.llm]` (opcional) | `proveedor` | texto | — | Junto con `modelo`; sin claves en el fichero |

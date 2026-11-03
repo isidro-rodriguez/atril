@@ -120,9 +120,8 @@ def restore(
     other_path: Annotated[
         bool,
         typer.Option(
-            "--forzar-otra-ruta",
-            help="Restaura un snapshot hecho desde otra ruta (las KB guardan rutas "
-            "absolutas y habrá que revisarlas).",
+            "--nueva-ruta",
+            help="Acepta un snapshot hecho desde otra ruta de estación.",
         ),
     ] = False,
 ) -> None:
@@ -130,7 +129,9 @@ def restore(
 
     Restaura primero en una carpeta junto a la estación y después intercambia;
     lo que había se conserva en [bold]<estación>.previo-<fecha>[/] (bórralo tú
-    cuando compruebes que todo está bien). DeepTutor debe estar parado.
+    cuando compruebes que todo está bien). DeepTutor debe estar parado. Si el
+    intercambio falla a medias, se deshace. Un snapshot hecho desde otra ruta
+    exige [bold]--nueva-ruta[/] (las KB guardan rutas absolutas: revísalas).
     """
     station = get_station(ctx)
     executable = _restic()
@@ -155,7 +156,7 @@ def restore(
     if any(f.level is Level.WARNING for f in findings) and not other_path:
         fail(
             "el snapshot es de otra ruta; si es lo que quieres, repite con "
-            "--forzar-otra-ruta."
+            "--nueva-ruta."
         )
 
     stamp = time.strftime("%Y%m%d-%H%M%S")

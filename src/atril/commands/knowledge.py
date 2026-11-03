@@ -72,9 +72,12 @@ REINDEX_START_TIMEOUT = 60.0
 @kb_app.command("indexar")
 def index(
     ctx: typer.Context,
-    syllabus_id: Annotated[str, typer.Argument(help="Id del temario.")],
+    syllabus_id: Annotated[
+        str, typer.Argument(metavar="TEMARIO", help="Id del temario.")
+    ],
     kb_id: Annotated[
-        str | None, typer.Argument(help="KB del temario; por defecto, todas.")
+        str | None,
+        typer.Argument(metavar="KB", help="KB del temario; por defecto, todas."),
     ] = None,
 ) -> None:
     """Añade a sus KB las fuentes nuevas, [bold]una a una[/].
@@ -115,7 +118,9 @@ def index(
 @kb_app.command("reindexar")
 def reindex(
     ctx: typer.Context,
-    kb_id: Annotated[str, typer.Argument(help="Id de la KB (único en la estación).")],
+    kb_id: Annotated[
+        str, typer.Argument(metavar="KB", help="Id de la KB (único en la estación).")
+    ],
 ) -> None:
     """Reindexa una KB: sustituye fuentes cambiadas y purga las retiradas.
 
@@ -197,7 +202,9 @@ def reindex(
 @kb_app.command("evaluar")
 def evaluate(
     ctx: typer.Context,
-    kb_id: Annotated[str, typer.Argument(help="Id de la KB (único en la estación).")],
+    kb_id: Annotated[
+        str, typer.Argument(metavar="KB", help="Id de la KB (único en la estación).")
+    ],
     top_k: Annotated[
         int,
         typer.Option("--k", "-k", min=1, help="Posiciones que cuentan como acierto."),

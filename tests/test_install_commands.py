@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from support import write
+from support import write, write_other_patches
 from typer.testing import CliRunner
 
 from atril.checks import error, info, ok
@@ -23,6 +23,7 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     write(loaded.deeptutor_cli, "")
     (loaded.app_dir / ".git").mkdir()
     write(loaded.app_dir / PATCH.file, f"x = {{{PATCH.new}}}\n")
+    write_other_patches(loaded.app_dir, PATCH.name)
     monkeypatch.setattr(DeepTutor, "backend_up", lambda self: False)
     monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: False)
     monkeypatch.setattr(commands.install, "check_tools", lambda: [ok("git")])

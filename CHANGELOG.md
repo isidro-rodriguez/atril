@@ -5,6 +5,23 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.9.0] - 2026-11-03
+
+### Added
+
+- Parche `arranque-sin-ventana`: en Windows, `deeptutor start --detach` dejaba abierta una
+  consola vacía. El `python.exe` del venv es un redirector y, con `DETACHED_PROCESS`, el
+  intérprete real recibía una consola nueva y visible; con `CREATE_NO_WINDOW` sigue
+  desacoplado del terminal, pero sin ventana. Se activa en `[deeptutor] parches`.
+
+### Changed
+
+- `atril backup restaurar --forzar-otra-ruta` pasa a llamarse `--nueva-ruta`.
+- Ayudas de la CLI redactadas para caber en una línea en un terminal de 120 columnas, y
+  argumentos con nombres en español (`TEMARIO`, `FUENTES`, `KB`).
+- README: guía rápida con la instalación y el uso, un listado comentado de comandos y una
+  sección de desarrollo con la calidad.
+
 ## [0.8.0] - 2026-11-03
 
 Mejoras de la revisión externa (`revision_GPT.md`) sobre operaciones destructivas y estado.

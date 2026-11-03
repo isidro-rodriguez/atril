@@ -30,7 +30,7 @@ def start(
         typer.Option(
             "--espera",
             min=10,
-            help="Segundos máximos de espera (tras actualizar, compila el frontend).",
+            help="Segundos de espera; tras actualizar compila el frontend.",
         ),
     ] = 600,
 ) -> None:

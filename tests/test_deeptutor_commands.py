@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 
 import pytest
-from support import write
+from support import write, write_other_patches
 from typer.testing import CliRunner
 
 from atril import deeptutor as dt_module
@@ -23,6 +23,7 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Estación con DeepTutor «instalado», Ollama sano y sin esperas reales."""
     write(load_station(station_dir).deeptutor_cli, "")
     write(station_dir / "app" / PATCH.file, f"x = {{{PATCH.old}}}\n")
+    write_other_patches(station_dir / "app", PATCH.name)
     monkeypatch.setattr(
         commands.ollama,
         "get_status",

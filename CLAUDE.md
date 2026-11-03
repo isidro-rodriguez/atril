@@ -128,7 +128,7 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   (`forget`). A local repo whose parent folder is missing is a disconnected disk: skipped with a warning, or an error if requested explicitly. Restore
   goes to `<root>.restaurar-<ts>` next to the station, then swaps in; the current content moves to
   `<root>.previo-<ts>` and is never deleted. A failed swap is rolled back; a snapshot taken from
-  another path requires `--forzar-otra-ruta`. The restic password only comes from the environment.
+  another path requires `--nueva-ruta`. The restic password only comes from the environment.
 
 ## Project rules (load-bearing)
 
