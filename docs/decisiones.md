@@ -58,17 +58,17 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 1. ✅ Núcleo: config, control de DT (instalar/actualizar/arrancar/parar/estado, huérfanos, parches), comprobación de Ollama. `atril.toml` sustituye a `setup.json`.
 2. ✅ Temarios: fuentes (descarga/actualización con hash e histórico), KB (indexado y reindexado), evaluación con texto completo e informes comparados en `eval\informes\`.
 3. ✅ Backup y restauración (`atril backup`, `backup comprobar`, `backup restaurar`). La restauración va a `<estación>.restaurar-<fecha>` y después se intercambia; lo actual queda en `<estación>.previo-<fecha>`.
-4. Migración de la estructura actual con `scripts\migrar_estacion.py` (plan por defecto, `--aplicar` para ejecutar; no borra nada, todo lo sobrante va a `_legado\`): `deeptutor_app` → `app` (venv apartado y recreado con `atril instalar`), `materia_normativa` → `temarios\normativa\espacio` (el historial de chats viaja con la carpeta; el catálogo de espacios de DT se actualiza), fuentes con nombre estable y registros (`registro.json`, `indexado.json`) generados por hash contra `raw\` de cada KB, de modo que no hay que reindexar.
+4. ✅ Migración de la estructura actual con `scripts\migrar_estacion.py` (plan por defecto, `--aplicar` para ejecutar; no borra nada, todo lo sobrante va a `_legado\`): `deeptutor_app` → `app` (venv apartado y recreado con `atril instalar`), `materia_normativa` → `temarios\normativa\espacio` (el historial de chats viaja con la carpeta; el catálogo de espacios de DT se actualiza), fuentes con nombre estable y registros (`registro.json`, `indexado.json`) generados por hash contra `raw\` de cada KB, de modo que no hay que reindexar. Aplicada el 2026-11-03: `kb evaluar norm-edificacion-cte` repite recall@5 1,000 y MRR 0,986.
 5. Publicación en PyPI y accesos directos.
 6. TUI (opcional).
 
 ## Estado actual de la instalación (a 2026-11-03)
 
-- Estación: `D:\Desarrollo\DeepTutor\` con `deeptutor_app\` (DT dev v1.7.1, uv, Python 3.13), `data\`, `lanzador\`, `materia_normativa\` (espacio "Normativa" registrado), `evaluaciones\normativa\`.
+- Estación: `D:\Desarrollo\DeepTutor\` con la estructura de atril: `atril.toml`, `app\` (DT dev v1.7.1, uv, Python 3.13), `data\`, `temarios\normativa\` (espacio "Normativa" registrado en `espacio\`, 8 KB declaradas, 33 fuentes: 24 en disco y 9 manuales pendientes). `_legado\` guarda los scripts PowerShell y restos de la estructura anterior hasta borrarlo.
 - LLM: `claude_code` (Claude Code + plan Pro, OAuth), modelo `claude-code/opus`. Embedding: Ollama `qwen3-embedding:8b`, 4096 dim. Chunks 1024/150. Parser: Docling (sin `format-video`).
 - KB: `norm-edificacion-cte` (13 PDF vinculantes; eval 35 preguntas: recall@5 1,0, MRR 0,986) y `norm-edificacion-cte-guias` (4 guías). Pendientes: REBT, administrativo, urbanismo (Ley 4/2017 Canarias), Código Estructural (2000 págs, de noche). Fase 2 manual: reglamentos canarios 2018, PIOT/PGO, guía REBT, ISO 9001/14001/45001.
 - Qwen 3.5 9B (Ollama) solo para usos triviales, no normativa.
-- Scripts PowerShell 7 a portar a atril: `lanzador\` (`instalar.ps1`, `instalar-docling.ps1`, `deeptutor-launcher.ps1`, `aplicar-parches.ps1`, `indexar.ps1`, `reindexar.ps1`), `materia_normativa\descargar-normativa.ps1`, `evaluaciones\normativa\` (`evaluar.ps1`, `eval_completo.py`, `cte-v2.jsonl`, `ampliar-cte.ps1`, `separar-guias.ps1`, `purgar-guias.ps1`).
+- Pendiente: indexar `norm-estructuras` (Código Estructural, de noche); colocar las fuentes manuales (ISO, decretos de Canarias 2018, PIOT/PGO, guía REBT); revisar `revision_GPT.md` (P1 #2 corregido en 0.7.1); fase 5 (`atril accesos`).
 
 ## Lecciones de la instalación previa
 
