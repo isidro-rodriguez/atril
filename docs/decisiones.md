@@ -9,7 +9,7 @@ Uso personal: comandos, mensajes y docs en español; código e identificadores e
 | Carpeta | Contenido | Versionado | Backup |
 |---|---|---|---|
 | `app\` | Checkout de DeepTutor (HKUDS, rama dev), `.venv`, `node_modules` | git de HKUDS + parches de atril | No (reconstruible) |
-| `data\` | `DEEPTUTOR_HOME`: ajustes, KB, índices, `parse_cache`, chats | — | Sí (prioridad) |
+| `data\` | Datos de DT: ajustes, KB, índices, `parse_cache`, chats (`DEEPTUTOR_HOME` = raíz de la estación) | — | Sí (prioridad) |
 | `temarios\<t>\` | `temario.toml`, `prompt.md`, `espacio\` (único registrado en DT), `fuentes\` (+ `historico\`), `eval\` | git propio solo texto | Sí (PDF e histórico) |
 | `atril.toml` | Configuración de la estación | — | Sí |
 
@@ -55,7 +55,8 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 ## Fases
 
 0. ✅ Cerrar esquemas `atril.toml` y `temario.toml`; esqueleto desde `acodo-template`; `atril validar`.
-1. Núcleo: config, control de DT (arrancar/parar/estado, huérfanos, parches), comprobación de Ollama.
+1. ✅ Núcleo: config, control de DT (arrancar/parar/estado, huérfanos, parches), comprobación de Ollama.
+   1b. `instalar` y `actualizar` (portar `instalar.ps1`, `instalar-docling.ps1`, `setup.json`).
 2. Temarios: fuentes (descarga/actualización con hash e histórico), KB, evaluación.
 3. Backup y restauración.
 4. Migración de la estructura actual (`deeptutor_app` → `app`, `materia_normativa` → `temarios\normativa`).

@@ -84,3 +84,11 @@ def test_find_station_walks_up(tmp_path: Path) -> None:
 def test_find_station_fails_outside(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="--estacion"):
         find_station(tmp_path)
+
+
+def test_unknown_patch(tmp_path: Path) -> None:
+    text = MINIMAL_STATION.replace("[deeptutor]", "[deeptutor]\nparches = ['otro']")
+    write(tmp_path / "atril.toml", text)
+
+    with pytest.raises(ConfigError, match="parche desconocido: 'otro'"):
+        load_station(tmp_path)

@@ -1,18 +1,21 @@
 """Configuración de la estación (``atril.toml``).
 
-La estación es la carpeta que contiene ``atril.toml``. Su estructura es fija:
+La estación es la carpeta que contiene ``atril.toml`` y es también el
+``DEEPTUTOR_HOME`` (``deeptutor --home``). Su estructura es fija:
 
 - ``app/``: checkout de DeepTutor (reconstruible, sin backup).
-- ``data/``: ``DEEPTUTOR_HOME`` (ajustes, KB, índices, chats).
+- ``data/``: datos que DeepTutor crea bajo su ``home`` (ajustes, KB, índices, chats).
 - ``temarios/<id>/``: un temario por carpeta, cada uno con su ``temario.toml``.
 """
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from acodo.utils import valid_path, valid_slug, valid_url
 
 from atril.config._toml import ConfigError, Table, load_toml
+from atril.patches import PATCHES
 
 STATION_FILE = "atril.toml"
 """Nombre del fichero de configuración en la raíz de la estación."""
@@ -102,8 +105,13 @@ class Station:
 
     @property
     def data_dir(self) -> Path:
-        """``DEEPTUTOR_HOME``."""
+        """Datos de DeepTutor (``<DEEPTUTOR_HOME>/data``)."""
         return self.root / "data"
+
+    @property
+    def launcher_log(self) -> Path:
+        """Log del último ``deeptutor start``."""
+        return self.data_dir / "user" / "runtime" / "launcher.log"
 
     @property
     def syllabi_dir(self) -> Path:
@@ -112,8 +120,10 @@ class Station:
 
     @property
     def deeptutor_cli(self) -> Path:
-        """Ejecutable ``deeptutor`` del entorno virtual de ``app/`` (Windows)."""
-        return self.app_dir / ".venv" / "Scripts" / "deeptutor.exe"
+        """Ejecutable ``deeptutor`` del entorno virtual de ``app/``."""
+        if sys.platform == "win32":
+            return self.app_dir / ".venv" / "Scripts" / "deeptutor.exe"
+        return self.app_dir / ".venv" / "bin" / "deeptutor"
 
 
 def find_station(start: Path) -> Path:
@@ -185,8 +195,9 @@ def _deeptutor(table: Table) -> DeepTutorConfig:
 
     patches = table.get_str_list("parches", [])
     for patch in patches:
-        if not valid_slug(patch):
-            raise table.error(f"nombre de parche no válido: {patch!r}.")
+        if patch not in PATCHES:
+            known = ", ".join(sorted(PATCHES))
+            raise table.error(f"parche desconocido: {patch!r} (disponibles: {known}).")
 
     config = DeepTutorConfig(
         repo=_url(table, "repo", DEEPTUTOR_REPO),

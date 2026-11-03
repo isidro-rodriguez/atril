@@ -32,18 +32,26 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── scripts/backup.py       # git bundle of this repo (`poe backup`)
 ├── src/atril/
+│   ├── commands/           # CLI commands by area (config, deeptutor); `_common` helpers
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
+│   ├── checks.py           # Finding/Level: results shown by commands
+│   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
+│   ├── net.py              # Minimal urllib helpers (is_up, get_json)
+│   ├── ollama.py           # Ollama status and checks
+│   ├── patches.py          # Patch registry and idempotent apply
+│   ├── processes.py        # Port owners and process trees (psutil)
 │   ├── __init__.py         # Exposes __version__ via importlib.metadata
 │   ├── __main__.py         # python -m atril
-│   ├── main.py             # Typer app (entry point `atril`)
+│   ├── main.py             # Typer app: registers commands (entry point `atril`)
 │   └── py.typed
 └── tests/
 ```
 
 - Every `__init__.py` must include a short docstring describing the module or package.
 - The project uses `uv` as dependency manager and build backend.
-- Runtime dependencies: `acodo` (`acodo>=0.4,<1`) and `typer`. Anything else needs a
-  justification (stdlib first). Raise the `acodo` lower bound only when a newer API is needed.
+- Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` and `psutil` (ports, command lines
+  and process trees, portable and testable on Linux CI). Anything else needs a justification
+  (stdlib first). Raise the `acodo` lower bound only when a newer API is needed.
 - `README.md` must stay minimal: what it is, installation, usage, quality commands and links.
   Put any extra explanation in this file instead.
 
@@ -55,6 +63,7 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   (`app/.venv/Scripts/deeptutor.exe`) and its API (`localhost:8001`) via `subprocess` and
   `urllib`. Only exception: full-text evaluation runs with `app/`'s Python.
 - **The station layout is fixed**: `<root>/atril.toml`, `app/`, `data/`, `temarios/<id>/`.
+  `DEEPTUTOR_HOME` (`deeptutor --home`) is the station root; DeepTutor creates `data/` inside.
   Derive paths from `Station` / `Syllabus` properties, never hardcode them elsewhere.
 - **atril's code never lives inside the station.**
 - Target platform is Windows (PowerShell 7). CI also runs on Linux: keep logic
@@ -63,6 +72,13 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Configuration errors raise `atril.config.ConfigError` with a Spanish message naming the file,
   table and key. Commands catch it, print it in red and exit with code 1.
 - Every schema change updates `docs/esquemas.md`, `docs/ejemplos/` and the tests.
+- Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;
+  a command exits with code 1 when any finding is an error.
+- Only kill processes whose command line contains the station root; never touch others.
+- Patches are idempotent text replacements registered in `atril.patches.PATCHES`; a patch whose
+  original and patched text are both missing is an error (DeepTutor changed), never forced.
+- Tests never wait for real time or call real services: fake `time.sleep`/`time.monotonic`,
+  `ollama.get_status` and `DeepTutor` methods.
 
 ## Project rules (load-bearing)
 

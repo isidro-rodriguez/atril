@@ -5,6 +5,29 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.2.0] - 2026-11-03
+
+### Added
+
+- `atril arrancar`: abre Ollama si no responde, avisa de parches pendientes, cierra restos de un
+  arranque anterior de la estación, lanza `deeptutor start --detach` y espera a backend y
+  frontend; si se agota la espera muestra el final de `launcher.log`.
+- `atril parar`: `deeptutor stop` y cierre de los procesos huérfanos de la estación en los
+  puertos de DeepTutor; los procesos ajenos se señalan y no se tocan.
+- `atril estado`: instalación, servicios, huérfanos, parches y Ollama (versión, modelo de
+  embedding, modelos ajenos cargados en VRAM y contexto frente a `OLLAMA_CONTEXT_LENGTH`).
+  Termina con código 1 si hay errores.
+- `atril parches [--comprobar]`: aplica de forma idempotente los parches de `atril.toml`
+  (`paginas-citas`) y detecta cuándo el código de DeepTutor ha cambiado.
+- Dependencia `psutil`, para localizar procesos por puerto y cerrar árboles de procesos de
+  forma portable.
+
+### Changed
+
+- `[deeptutor] parches` solo admite parches conocidos por atril.
+- `DEEPTUTOR_HOME` es la raíz de la estación (como en los scripts actuales); DeepTutor crea
+  `data/` dentro. Se corrige la documentación.
+
 ## [0.1.2] - 2026-11-03
 
 ### Changed

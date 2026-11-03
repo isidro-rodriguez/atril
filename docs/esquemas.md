@@ -17,7 +17,7 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 | `[deeptutor]` | `repo` | URL | `https://github.com/HKUDS/DeepTutor` | |
 | | `rama` | texto | `"dev"` | |
 | | `puertos` | `{ backend, frontend }` | `8001`, `3782` | Distintos, 1–65535 |
-| | `parches` | lista de slugs | `[]` | Parches incluidos en atril |
+| | `parches` | lista de nombres | `[]` | Parches incluidos en atril (`paginas-citas`) |
 | `[ollama]` | `url` | URL | `http://localhost:11434` | |
 | | `embedding` | texto | **obligatorio** | |
 | | `dimension` | entero ≥ 1 | **obligatorio** | |
