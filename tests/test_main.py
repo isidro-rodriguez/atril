@@ -22,7 +22,8 @@ def test_validate_ok(station_dir: Path) -> None:
     result = runner.invoke(app, ["--estacion", str(station_dir), "validar"])
 
     assert result.exit_code == 0, result.output
-    assert "normativa: 2 KB, 3 fuentes" in result.output
+    row = next(line for line in result.output.splitlines() if "normativa" in line)
+    assert [cell.strip() for cell in row.strip("│ ").split("│")][2:] == ["2", "3"]
     assert "Configuración válida." in result.output
 
 

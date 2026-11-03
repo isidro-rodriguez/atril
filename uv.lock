@@ -22,11 +22,12 @@ wheels = [
 
 [[package]]
 name = "atril"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "acodo" },
     { name = "psutil" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -43,6 +44,7 @@ dev = [
 requires-dist = [
     { name = "acodo", specifier = ">=0.5.1,<1" },
     { name = "psutil", specifier = ">=7" },
+    { name = "rich", specifier = ">=14" },
     { name = "typer", specifier = ">=0.20" },
 ]
 

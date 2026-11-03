@@ -5,10 +5,12 @@ import webbrowser
 from typing import Annotated
 
 import typer
+from rich.markup import escape
+from rich.panel import Panel
 
 from atril import ollama
 from atril.checks import Finding, error, info, ok, warning
-from atril.commands._common import fail, get_station, show, title
+from atril.commands._common import console, fail, get_station, show, success
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
 from atril.patches import PATCHES, PatchState
@@ -37,7 +39,7 @@ def start(
     dt = _installed(station)
 
     if dt.ready():
-        typer.echo(f"DeepTutor ya está en marcha: {dt.frontend_url}")
+        console.print(f"DeepTutor ya está en marcha: [link]{dt.frontend_url}[/]")
         _open(dt, no_browser)
         return
 
@@ -54,14 +56,17 @@ def start(
         )
         dt.kill(orphans.own)
 
-    typer.echo("Arrancando DeepTutor...")
-    if dt.start() != 0:
+    with console.status("Arrancando DeepTutor..."):
+        started = dt.start() == 0
+    if not started:
         _fail_with_log(dt, "'deeptutor start' ha terminado con error.")
-    if not dt.wait(dt.ready, timeout, on_tick=lambda: typer.echo(".", nl=False)):
-        typer.echo()
+    with console.status(
+        "Esperando a backend y frontend (tras actualizar, compila el frontend)..."
+    ):
+        ready = dt.wait(dt.ready, timeout)
+    if not ready:
         _fail_with_log(dt, f"DeepTutor no responde tras {timeout} s.")
-    typer.echo()
-    typer.secho(f"Listo: {dt.frontend_url}", fg=typer.colors.GREEN)
+    success(f"Listo: {dt.frontend_url}")
     _open(dt, no_browser)
 
 
@@ -70,8 +75,9 @@ def stop(ctx: typer.Context) -> None:
     station = get_station(ctx)
     dt = _installed(station)
 
-    typer.echo("Deteniendo DeepTutor...")
-    if dt.stop() != 0:
+    with console.status("Deteniendo DeepTutor..."):
+        stopped = dt.stop() == 0
+    if not stopped:
         show([warning("'deeptutor stop' ha terminado con error; se sigue.")])
     time.sleep(2)
 
@@ -82,8 +88,10 @@ def stop(ctx: typer.Context) -> None:
     if orphans.foreign:
         show(_foreign_findings(orphans.foreign))
 
-    if dt.wait(lambda: not dt.backend_up() and not dt.frontend_up(), timeout=10):
-        typer.secho("DeepTutor detenido.", fg=typer.colors.GREEN)
+    with console.status("Comprobando que los puertos quedan libres..."):
+        down = dt.wait(lambda: not dt.backend_up() and not dt.frontend_up(), timeout=10)
+    if down:
+        success("DeepTutor detenido.")
     else:
         fail("algo sigue respondiendo en los puertos de DeepTutor.")
 
@@ -93,16 +101,15 @@ def status(ctx: typer.Context) -> None:
     station = get_station(ctx)
     dt = DeepTutor(station)
 
-    title("DeepTutor")
-    clean = show(_service_findings(dt))
+    with console.status("Consultando DeepTutor y Ollama..."):
+        service = _service_findings(dt)
+        ollama_findings = ollama.check(
+            ollama.get_status(station.ollama.url), station.ollama
+        )
+    clean = show(service, "DeepTutor")
     if station.deeptutor.patches:
-        title("Parches")
-        clean = show(_patch_findings(station)) and clean
-    title("Ollama")
-    clean = (
-        show(ollama.check(ollama.get_status(station.ollama.url), station.ollama))
-        and clean
-    )
+        clean = show(_patch_findings(station), "Parches") and clean
+    clean = show(ollama_findings, "Ollama") and clean
     if not clean:
         raise typer.Exit(1)
 
@@ -116,7 +123,7 @@ def patches(
     """Aplica los parches de atril.toml sobre app/ (idempotente)."""
     station = get_station(ctx)
     if not station.deeptutor.patches:
-        typer.echo("atril.toml no declara parches.")
+        console.print("atril.toml no declara parches.")
         return
 
     findings: list[Finding] = []
@@ -132,7 +139,9 @@ def patches(
             findings.append(_patch_finding(name, after))
     clean = show(findings)
     if changed:
-        typer.echo("Reinicia DeepTutor para que los cambios surtan efecto.")
+        console.print(
+            "[yellow]Reinicia DeepTutor para que los cambios surtan efecto.[/]"
+        )
     if not clean:
         raise typer.Exit(1)
 
@@ -155,8 +164,14 @@ def _fail_with_log(dt: DeepTutor, message: str) -> None:
     """Muestra el final del log del lanzador y termina con error."""
     lines = dt.launcher_log_tail()
     if lines:
-        typer.echo(f"--- últimas líneas de {dt.station.launcher_log} ---")
-        typer.echo("\n".join(lines))
+        console.print(
+            Panel(
+                escape("\n".join(lines)),
+                title=escape(str(dt.station.launcher_log)),
+                title_align="left",
+                border_style="red",
+            )
+        )
     fail(message)
 
 
@@ -233,12 +248,12 @@ def _ensure_ollama(station: Station) -> list[Finding]:
     config = station.ollama
     current = ollama.get_status(config.url)
     if not current.running and (app := ollama.app_path()):
-        typer.echo("Abriendo Ollama...")
         ollama.launch_app(app)
         deadline = time.monotonic() + OLLAMA_START_TIMEOUT
-        while not current.running and time.monotonic() < deadline:
-            time.sleep(2)
-            current = ollama.get_status(config.url)
+        with console.status("Abriendo Ollama..."):
+            while not current.running and time.monotonic() < deadline:
+                time.sleep(2)
+                current = ollama.get_status(config.url)
     findings = ollama.check(current, config)
     if not current.running:
         findings.append(warning("Sin Ollama, el RAG no funcionará."))

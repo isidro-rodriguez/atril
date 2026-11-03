@@ -5,6 +5,17 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.2.1] - 2026-11-03
+
+### Changed
+
+- La CLI usa Rich en lugar de texto plano: ayuda agrupada en paneles (Configuración,
+  DeepTutor), tabla de temarios en `validar`, secciones con símbolos y colores en `estado`,
+  indicadores de espera en `arrancar` y `parar`, y el final de `launcher.log` en un panel.
+  El texto externo (rutas, mensajes con `[[fuente]]`) se escapa para que Rich no lo
+  interprete como markup.
+- `rich` pasa a ser dependencia explícita (ya venía con Typer).
+
 ## [0.2.0] - 2026-11-03
 
 ### Added

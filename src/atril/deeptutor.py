@@ -83,7 +83,6 @@ class DeepTutor:
         condition: Callable[[], bool],
         timeout: float,
         interval: float = 3.0,
-        on_tick: Callable[[], None] | None = None,
     ) -> bool:
         """Espera a que ``condition`` se cumpla, como mucho ``timeout`` segundos."""
         deadline = time.monotonic() + timeout
@@ -92,8 +91,6 @@ class DeepTutor:
                 return True
             if time.monotonic() >= deadline:
                 return False
-            if on_tick:
-                on_tick()
             time.sleep(interval)
 
     def orphans(self) -> Orphans:

@@ -49,8 +49,8 @@
 
 - Every `__init__.py` must include a short docstring describing the module or package.
 - The project uses `uv` as dependency manager and build backend.
-- Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` and `psutil` (ports, command lines
-  and process trees, portable and testable on Linux CI). Anything else needs a justification
+- Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` with `rich` (CLI output) and
+  `psutil` (ports, command lines and process trees, portable and testable on Linux CI). Anything else needs a justification
   (stdlib first). Raise the `acodo` lower bound only when a newer API is needed.
 - `README.md` must stay minimal: what it is, installation, usage, quality commands and links.
   Put any extra explanation in this file instead.
@@ -72,6 +72,11 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Configuration errors raise `atril.config.ConfigError` with a Spanish message naming the file,
   table and key. Commands catch it, print it in red and exit with code 1.
 - Every schema change updates `docs/esquemas.md`, `docs/ejemplos/` and the tests.
+- **CLI output uses Rich**, never `print`/`typer.echo`: the shared `console`/`err_console` from
+  `commands._common`, `show()` for findings, `success()`/`fail()`, `console.status()` spinners for
+  waits, `rich.table.Table` for listings and `Panel` for log excerpts. Always `escape()` external
+  text (paths, config messages with `[[fuente]]`, command lines). Commands are grouped with
+  `rich_help_panel` and help strings may use Rich markup.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;
   a command exits with code 1 when any finding is an error.
 - Only kill processes whose command line contains the station root; never touch others.
