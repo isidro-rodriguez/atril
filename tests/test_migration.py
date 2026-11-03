@@ -58,7 +58,9 @@ def old_station(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     shutil.copy(EXAMPLES / "atril.toml", root / "atril.toml")
     text = (root / "atril.toml").read_text(encoding="utf-8")
     start, end = text.index("[deeptutor]"), text.index("[ollama]")
-    (root / "atril.toml").write_text(text[:start] + "[deeptutor]\n\n" + text[end:])
+    (root / "atril.toml").write_text(
+        text[:start] + "[deeptutor]\n\n" + text[end:], encoding="utf-8"
+    )
     return root
 
 
@@ -80,7 +82,7 @@ def test_apply_migrates_everything(old_station: Path) -> None:
     assert (
         syllabus_dir / "espacio" / ".deeptutor" / "data" / "user" / "chat_history.db"
     ).is_file()
-    assert (syllabus_dir / "prompt.md").read_text() == "Eres un tutor"
+    assert (syllabus_dir / "prompt.md").read_text(encoding="utf-8") == "Eres un tutor"
     cte = syllabus_dir / "fuentes" / "01_edificacion_CTE"
     assert sorted(p.name for p in cte.iterdir()) == [
         "CTE_DB-SI.pdf",
