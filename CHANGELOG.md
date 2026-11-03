@@ -5,6 +5,13 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.1.2] - 2026-11-03
+
+### Changed
+
+- Requiere `acodo>=0.5.1`, cuyos `has_only_keys` y `has_required_keys` son genéricos en el
+  tipo de llave; se elimina el `cast` que hacía falta en `Table.close()`.
+
 ## [0.1.1] - 2026-11-03
 
 ### Changed

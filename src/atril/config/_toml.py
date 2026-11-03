@@ -1,9 +1,8 @@
 """Lectura estricta de ficheros TOML con mensajes de error en español."""
 
 import tomllib
-from collections.abc import Hashable, Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from acodo.utils import has_only_keys
 
@@ -113,9 +112,6 @@ class Table:
 
     def close(self) -> None:
         """Falla si la tabla contiene claves que no se han leído."""
-        # cast: Mapping es invariante en la clave y acodo 0.5 declara
-        # Mapping[Hashable, Any], que no admite dict[str, Any] en ty.
-        data = cast("Mapping[Hashable, Any]", self._data)
-        if not has_only_keys(data, self._used):
+        if not has_only_keys(self._data, self._used):
             unknown = sorted(set(self._data) - self._used)
             raise self.error(f"claves desconocidas: {', '.join(unknown)}.")
