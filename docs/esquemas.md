@@ -35,9 +35,9 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 `atril instalar` traslada a DeepTutor `[deeptutor.llm]`, `busqueda`, `[ollama]` y los puertos
 (`deeptutor config apply`), y `[indexado]` (ajustes internos de parser y chunks). Sustituye a
 `setup.json`.
-| `[backup]` | `retencion` | `{ diarias, semanales, mensuales }` | `7`, `4`, `12` | `restic forget --keep-*` |
-| | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`) |
-| `[backup.destinos.<nombre>]` | `repo` | texto | **obligatorio** | Repositorio restic; al menos uno |
+| `[backup]` | `retencion` | `{ diarias, semanales, mensuales }` | `7`, `4`, `12` | `restic forget --keep-*`; no todo a 0 |
+| | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`); nombres de carpeta distintos |
+| `[backup.destinos.<nombre>]` | `repo` | texto | **obligatorio** | Repositorio restic; al menos uno; nunca dentro de la estación |
 
 La contraseña de restic **nunca** va en `atril.toml`: `RESTIC_PASSWORD`,
 `RESTIC_PASSWORD_FILE` o `RESTIC_PASSWORD_COMMAND`. Requiere restic 0.17 o posterior (y rclone
@@ -72,8 +72,8 @@ Ruta: `temarios\<id>\temario.toml`. El id del temario es el nombre de la carpeta
 |---|---|---|---|---|
 | `pdf` | `kb add` | Opcional: sin ella es **manual** (se coloca a mano) | Obligatoria | Obligatorio si no hay `url` |
 | `markdown` | `kb add --docs-dir` | Prohibida | Obligatoria | Prohibido |
-| `github` | `kb add-github-source` | Obligatoria | Prohibida | Prohibido |
-| `web` | `kb add-web-source` | Obligatoria | Prohibida | Prohibido |
+| `github` (experimental) | `kb add-github-source` | Obligatoria | Prohibida | Prohibido |
+| `web` (experimental) | `kb add-web-source` | Obligatoria | Prohibida | Prohibido |
 
 ### Ficheros de fuentes
 
@@ -81,7 +81,7 @@ Ruta: `temarios\<id>\temario.toml`. El id del temario es el nombre de la carpeta
 |---|---|
 | `fuentes\<carpeta>\<archivo>` | Versión vigente, con nombre estable (sin fecha) |
 | `fuentes\historico\<carpeta>\<nombre>.<AAAA-MM-DD>.pdf` | Versiones anteriores (fecha de su descarga) |
-| `fuentes\registro.json` | Hash SHA-256, tamaño, URL, fecha de descarga y de última comprobación |
+| `fuentes\registro.json` | Hash SHA-256, tamaño, URL, fecha de descarga y de última comprobación. Si está dañado, atril se detiene y no lo sobrescribe |
 
 `atril fuentes comprobar` revisa las fuentes según `comprobar` (`semanal`: 7 días, `mensual`: 30)
 desde su última comprobación; `--todas` o ids explícitos fuerzan la revisión.

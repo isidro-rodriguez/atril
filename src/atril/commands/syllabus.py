@@ -17,7 +17,14 @@ from rich.progress import (
 from rich.table import Table
 
 from atril.checks import info, warning
-from atril.commands._common import console, fail, get_station, get_syllabus, show
+from atril.commands._common import (
+    console,
+    fail,
+    get_station,
+    get_syllabus,
+    load_or_fail,
+    show,
+)
 from atril.config import ConfigError, Syllabus, load_syllabi
 from atril.config.syllabus import Source
 from atril.sources import Outcome, Result, SourceManager, is_due
@@ -73,18 +80,20 @@ def list_syllabi(ctx: typer.Context) -> None:
         return
 
     table = Table("Temario", "Nombre", title="Temarios", title_justify="left")
-    for column in ("KB", "Fuentes", "Presentes", "Faltan"):
+    for column in ("KB", "Fuentes", "Presentes", "Manuales", "Faltan"):
         table.add_column(column, justify="right")
     for syllabus in syllabi:
-        manager = SourceManager(syllabus)
+        manager = load_or_fail(lambda s=syllabus: SourceManager(s))
         states = [manager.local_state(source) for source in syllabus.sources]
-        missing = sum(state in {"falta", "manual"} for state in states)
+        manual = states.count("manual")
+        missing = states.count("falta")
         table.add_row(
             syllabus.id,
             escape(syllabus.name),
             str(len(syllabus.knowledge_bases)),
             str(len(states)),
-            str(sum(state != "falta" for state in states)),
+            str(len(states) - manual - missing),
+            str(manual),
             f"[yellow]{missing}[/]" if missing else "0",
         )
     console.print(table)
@@ -95,7 +104,7 @@ def list_syllabi(ctx: typer.Context) -> None:
 def coverage(ctx: typer.Context, syllabus_id: SyllabusId) -> None:
     """Muestra, KB a KB, qué fuentes están en disco y cuándo se comprobaron."""
     syllabus = get_syllabus(ctx, syllabus_id)
-    manager = SourceManager(syllabus)
+    manager = load_or_fail(lambda: SourceManager(syllabus))
     for kb in syllabus.knowledge_bases:
         kind = "vinculante" if kb.binding else "no vinculante"
         table = Table(
@@ -130,7 +139,7 @@ def download_sources(
 ) -> None:
     """Descarga las fuentes que faltan (no toca las que ya están en disco)."""
     syllabus = get_syllabus(ctx, syllabus_id)
-    manager = SourceManager(syllabus)
+    manager = load_or_fail(lambda: SourceManager(syllabus))
     results = []
     with _progress() as progress:
         for source in _select(syllabus, source_ids):
@@ -157,7 +166,7 @@ def check_sources(
     Por defecto revisa solo las que tocan según su frecuencia ([bold]comprobar[/]).
     """
     syllabus = get_syllabus(ctx, syllabus_id)
-    manager = SourceManager(syllabus)
+    manager = load_or_fail(lambda: SourceManager(syllabus))
     now = get_now()
     candidates = [source for source in _select(syllabus, source_ids) if source.url]
     explicit = bool(source_ids) or check_all

@@ -42,7 +42,7 @@ DT_REPORT = {
             "error": "timeout",
         },
     ],
-    "trace": {"¿Sector?": [["DBSI.pdf", "11", 0.03], ["DBSUA.pdf", "", 0.01]]},
+    "trace": {"¿Sector?": [[["DBSI.pdf", "11", 0.03], ["DBSUA.pdf", "", 0.01]]]},
 }
 
 runner = CliRunner()
@@ -58,6 +58,20 @@ def test_report_from_deeptutor() -> None:
     ]
     assert report.cases[1].hits[0] == Hit("DBSI.pdf", "11", 0.03)
     assert report.metrics == {"recall@5": 0.5, "mrr": 0.25, "queries_failed": 0}
+
+
+def test_repeated_query_keeps_each_trace() -> None:
+    data = {
+        "queries": [
+            {"case_id": "a", "query": "¿Rampa?", "matched_gold": [True]},
+            {"case_id": "b", "query": "¿Rampa?", "matched_gold": [True]},
+        ],
+        "trace": {"¿Rampa?": [[["uno.pdf", "1", 0.5]], [["dos.pdf", "2", 0.4]]]},
+    }
+
+    report = EvalReport.from_deeptutor(data, "kb", "x.jsonl", 5)
+
+    assert [case.hits[0].title for case in report.cases] == ["uno.pdf", "dos.pdf"]
 
 
 def test_save_load_and_previous(tmp_path: Path) -> None:

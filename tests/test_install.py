@@ -130,7 +130,7 @@ def test_python_env_creates_venv_and_installs(
     findings = _installer(station_dir).python_env(docling=True)
 
     names = [command[1:4] for command in recorder.commands]
-    assert names[0] == ["venv", "--seed", "--python"]
+    assert names[0] == ["venv", "--clear", "--seed"]
     assert recorder.commands[1][-2:] == ["-r", "requirements/full.txt"]
     assert recorder.commands[2][-3:] == ["-e", ".", "--no-deps"]
     assert recorder.commands[3][-1] == "claude-agent-sdk>=0.2.174,<0.3"
@@ -218,19 +218,93 @@ def test_update_checkout(
 ) -> None:
     heads = iter(["aaa1 viejo", "bbb2 nuevo"])
     installer = _installer(station_dir)
+    _origin(recorder)
     monkeypatch.setattr(Installer, "head", lambda self: next(heads))
 
     assert installer.update_checkout() == ("aaa1 viejo", "bbb2 nuevo")
-    tail = [command[3:] for command in recorder.commands[1:]]
+    tail = [c[3:] for c in recorder.commands if c[3] in {"fetch", "reset"}]
     assert tail == [
         ["fetch", "--depth", "1", "origin", "dev"],
         ["reset", "--hard", "FETCH_HEAD"],
     ]
 
 
+def _origin(
+    recorder: Recorder,
+    url: str = "git@github.com:hkuds/DeepTutor.git",
+    branch: str = "dev",
+) -> None:
+    recorder.outputs["remote get-url"] = url + "\n"
+    recorder.outputs["branch --show-current"] = branch + "\n"
+
+
+@pytest.mark.parametrize(
+    ("url", "branch", "message"),
+    [
+        ("https://github.com/otro/DeepTutor", "dev", "sigue"),
+        ("https://github.com/HKUDS/DeepTutor.git", "main", "rama"),
+    ],
+)
+def test_update_checkout_refuses_other_origin(
+    station_dir: Path, recorder: Recorder, url: str, branch: str, message: str
+) -> None:
+    _origin(recorder, url, branch)
+
+    with pytest.raises(StepError, match=message):
+        _installer(station_dir).update_checkout()
+    assert not any(c[3] in {"fetch", "reset"} for c in recorder.commands)
+
+
+def test_same_remote() -> None:
+    assert install.same_remote(
+        "ssh://git@github.com/HKUDS/DeepTutor.git",
+        "https://github.com/hkuds/deeptutor/",
+    )
+    assert not install.same_remote(
+        "https://github.com/HKUDS/DeepTutor", "https://github.com/HKUDS/DeepTutor-x"
+    )
+
+
+def test_python_env_recreates_venv_with_other_version(
+    station_dir: Path, recorder: Recorder
+) -> None:
+    write(load_station(station_dir).venv_python, "")
+    recorder.outputs["sys.version_info"] = "3.12\n"
+
+    findings = _installer(station_dir).python_env(docling=False)
+
+    assert ["venv", "--clear", "--seed"] in [c[1:4] for c in recorder.commands]
+    assert "3.12" in findings[0].message
+
+
+def test_python_env_keeps_matching_venv(station_dir: Path, recorder: Recorder) -> None:
+    write(load_station(station_dir).venv_python, "")
+    recorder.outputs["sys.version_info"] = "3.13\n"
+
+    _installer(station_dir).python_env(docling=False)
+
+    assert not any(c[1] == "venv" for c in recorder.commands)
+
+
+def test_version_finding(tmp_path: Path) -> None:
+    assert install.version_finding(tmp_path).level is Level.WARNING
+    write(tmp_path / "deeptutor" / "__version__.py", '__version__ = "1.7.1"\n')
+    assert install.version_finding(tmp_path).level is Level.OK
+    write(tmp_path / "deeptutor" / "__version__.py", "__version__ = '2.0.0'\n")
+    assert "2.0.0" in install.version_finding(tmp_path).message
+
+
+def test_doctor_rejects_unknown_json(station_dir: Path, recorder: Recorder) -> None:
+    recorder.outputs["doctor"] = '{"resultado": "ok"}'
+
+    with pytest.raises(StepError, match="formato esperado"):
+        _installer(station_dir).doctor()
+
+
 def test_update_checkout_refuses_dirty_tree(
     station_dir: Path, recorder: Recorder
 ) -> None:
+    _origin(recorder)
     recorder.outputs["status"] = " M deeptutor/x.py\n"
 
     with pytest.raises(StepError, match="cambios locales"):

@@ -7,7 +7,7 @@ import pytest
 from support import write
 
 from atril import knowledge, net
-from atril.config import load_station, load_syllabus
+from atril.config import StateFileError, load_station, load_syllabus
 from atril.config.syllabus import Syllabus
 from atril.knowledge import (
     IndexedSource,
@@ -75,6 +75,14 @@ def test_ledger_roundtrip(syllabus: Syllabus) -> None:
     assert reloaded.kbs["kb-b"].sources["x"] == IndexedSource("x.pdf", "h", "t", 1.5)
     text = ledger_path(syllabus).read_text(encoding="utf-8")
     assert text.index("kb-a") < text.index("kb-b")
+
+
+@pytest.mark.parametrize("text", ["[]x", '{"kb": {"a": {"fuentes": {"x": 1}}}}'])
+def test_damaged_ledger_raises(syllabus: Syllabus, text: str) -> None:
+    write(ledger_path(syllabus), text)
+
+    with pytest.raises(StateFileError):
+        Ledger(ledger_path(syllabus))
 
 
 def test_markdown_digest_tracks_content(tmp_path: Path) -> None:

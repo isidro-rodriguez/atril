@@ -8,6 +8,7 @@ sustituyen.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -74,6 +75,13 @@ print(json.dumps(before))
 
 Se ejecuta con el Python de ``app/`` porque usa la API interna de DeepTutor.
 """
+
+
+TESTED_DEEPTUTOR = ("1.7",)
+"""Versiones (mayor.menor) de DeepTutor con las que se ha probado atril."""
+
+_VERSION_FILE = "deeptutor/__version__.py"
+"""Fichero de ``app/`` con la versión de DeepTutor."""
 
 
 class StepError(Exception):
@@ -186,6 +194,49 @@ def setup_payload(station: Station) -> dict[str, Any]:
     return payload
 
 
+def same_remote(first: str, second: str) -> bool:
+    """Dos URL de git apuntan al mismo repo (https, ssh, con o sin ``.git``).
+
+    Examples:
+        >>> same_remote("git@github.com:HKUDS/DeepTutor.git",
+        ...             "https://github.com/HKUDS/DeepTutor")
+        True
+    """
+    return _remote_key(first) == _remote_key(second)
+
+
+def _remote_key(url: str) -> str:
+    """Forma comparable de una URL de git: ``host/ruta`` en minúsculas."""
+    text = url.strip().rstrip("/").removesuffix(".git").lower()
+    text = re.sub(r"^[a-z+]+://", "", text)
+    text = re.sub(r"^[^@/]+@", "", text)
+    return re.sub(r"^([^/:]+):(?!\d)", r"\1/", text)
+
+
+def deeptutor_version(app_dir: Path) -> str | None:
+    """Versión de DeepTutor del checkout (``None`` si no se encuentra)."""
+    path = app_dir / _VERSION_FILE
+    if not path.is_file():
+        return None
+    match = re.search(
+        r"__version__\s*=\s*[\"']([^\"']+)", path.read_text(encoding="utf-8")
+    )
+    return match.group(1) if match else None
+
+
+def version_finding(app_dir: Path) -> Finding:
+    """Avisa si la versión de DeepTutor no es una de las probadas con atril."""
+    version = deeptutor_version(app_dir)
+    if version is None:
+        return warning(f"No se encuentra la versión de DeepTutor ({_VERSION_FILE}).")
+    if version.startswith(tuple(f"{tested}." for tested in TESTED_DEEPTUTOR)):
+        return ok(f"DeepTutor {version}.")
+    return warning(
+        f"DeepTutor {version}: atril está probado con "
+        f"{', '.join(TESTED_DEEPTUTOR)}; revisa el diagnóstico y los parches."
+    )
+
+
 def doctor_findings(report: Mapping[str, Any]) -> list[Finding]:
     """Convierte el JSON de ``deeptutor doctor --format json`` en comprobaciones."""
     findings = []
@@ -255,6 +306,7 @@ class Installer:
             StepError: Si hay cambios locales o git falla.
         """
         git = tool("git")
+        self._check_origin(git)
         dirty = capture([git, "-C", str(self.app), "status", "--porcelain"]).strip()
         if dirty:
             files = ", ".join(line[3:] for line in dirty.splitlines()[:5])
@@ -270,21 +322,76 @@ class Installer:
         )
         return before, self.head().strip()
 
+    def _check_origin(self, git: str) -> None:
+        """Exige que ``app/`` siga el repo y la rama de ``atril.toml``.
+
+        ``reset --hard`` dejaría ``app/`` en otra rama o en otro repo sin avisar.
+        """
+        dt = self.station.deeptutor
+        app = str(self.app)
+        origin = capture([git, "-C", app, "remote", "get-url", "origin"]).strip()
+        if not same_remote(origin, dt.repo):
+            raise StepError(
+                f"app/ sigue {origin}, pero atril.toml dice {dt.repo}; "
+                "corrige uno de los dos antes de actualizar."
+            )
+        branch = capture([git, "-C", app, "branch", "--show-current"]).strip()
+        if branch != dt.branch:
+            raise StepError(
+                f"app/ está en la rama {branch or '(ninguna)'!r}, pero atril.toml "
+                f"dice {dt.branch!r}; cámbiala a mano antes de actualizar."
+            )
+
     # --- Python ------------------------------------------------------------
 
+    def venv_version(self) -> str | None:
+        """Versión ``mayor.menor`` del Python de ``app/.venv`` (``None`` si falta)."""
+        if not self.station.venv_python.is_file():
+            return None
+        try:
+            output = capture(
+                [
+                    str(self.station.venv_python),
+                    "-c",
+                    "import sys; print('%d.%d' % sys.version_info[:2])",
+                ]
+            )
+        except StepError:
+            return None
+        return output.strip() or None
+
+    def venv_matches(self) -> bool:
+        """``app/.venv`` existe con la versión de Python de ``atril.toml``."""
+        current = self.venv_version()
+        return current is not None and _same_python(
+            current, self.station.deeptutor.python
+        )
+
     def python_env(self, *, docling: bool) -> list[Finding]:
-        """Crea ``app/.venv`` si falta e instala DeepTutor y los paquetes extra."""
+        """Crea ``app/.venv`` si falta e instala DeepTutor y los paquetes extra.
+
+        Si el entorno existe con otra versión de Python que la de
+        ``atril.toml``, se recrea (``uv venv --clear``).
+        """
         uv = tool("uv")
         python = str(self.station.venv_python)
         findings = []
-        if not self.station.venv_python.is_file():
-            version = self.station.deeptutor.python
+        version = self.station.deeptutor.python
+        current = self.venv_version()
+        if current is None or not _same_python(current, version):
             self._run(
-                [uv, "venv", "--seed", "--python", version, ".venv"],
+                [uv, "venv", "--clear", "--seed", "--python", version, ".venv"],
                 "uv venv",
                 cwd=self.app,
             )
-            findings.append(ok(f"Entorno creado con Python {version}."))
+            if current is None:
+                findings.append(ok(f"Entorno creado con Python {version}."))
+            else:
+                findings.append(
+                    warning(
+                        f"Entorno recreado: tenía Python {current}, pide {version}."
+                    )
+                )
         pip = [uv, "pip", "install", "--python", python]
         self._run(
             [*pip, "-r", "requirements/full.txt"], "requirements/full.txt", cwd=self.app
@@ -366,7 +473,13 @@ class Installer:
             cwd=self.app,
             env=self.env,
         )
-        before = json.loads(output.strip().splitlines()[-1])
+        try:
+            before = json.loads(output.strip().splitlines()[-1])
+        except (IndexError, ValueError) as exc:
+            raise StepError(
+                "los ajustes internos de DeepTutor no responden como se esperaba "
+                "(¿ha cambiado su API?)."
+            ) from exc
         findings = [
             ok(
                 f"Parser {indexing.parser}; chunks {indexing.chunk_size}/"
@@ -392,9 +505,16 @@ class Installer:
             check=False,
         )
         start = output.find("{")
-        if start < 0:
-            raise StepError("'deeptutor doctor' no ha devuelto JSON.")
-        return doctor_findings(json.loads(output[start:]))
+        try:
+            report = json.loads(output[start:]) if start >= 0 else None
+        except ValueError:
+            report = None
+        if not isinstance(report, dict) or not isinstance(report.get("checks"), list):
+            raise StepError(
+                "'deeptutor doctor --format json' no devuelve el formato esperado; "
+                "puede que DeepTutor haya cambiado (ejecútalo a mano para verlo)."
+            )
+        return doctor_findings(report)
 
     # --- interno -----------------------------------------------------------
 
@@ -403,3 +523,8 @@ class Installer:
         code = run_command(command, cwd=cwd, env=self.env)
         if code != 0:
             raise StepError(f"{what} ha fallado (código {code}).")
+
+
+def _same_python(current: str, wanted: str) -> bool:
+    """``current`` (``3.13``) cumple la versión pedida (``3.13`` o ``3.13.5``)."""
+    return wanted == current or wanted.startswith(f"{current}.")

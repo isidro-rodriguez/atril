@@ -8,10 +8,12 @@ La contraseña de restic viene del entorno (``RESTIC_PASSWORD``,
 ``RESTIC_PASSWORD_FILE`` o ``RESTIC_PASSWORD_COMMAND``), nunca de ``atril.toml``.
 """
 
+import contextlib
 import json
 import os
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +40,9 @@ EXIT_NO_REPOSITORY = 10
 EXIT_WRONG_PASSWORD = 12
 """Código de restic cuando la contraseña no abre el repositorio."""
 
+EXIT_INCOMPLETE = 3
+"""Código de ``restic backup``: snapshot creado, pero faltan ficheros ilegibles."""
+
 REMOTE_PREFIXES = ("rclone:", "sftp:", "s3:", "b2:", "azure:", "gs:", "rest:", "swift:")
 """Repositorios que no son una carpeta local."""
 
@@ -55,6 +60,13 @@ class Summary:
     files_changed: int
     data_added: int
     seconds: float
+    unread: tuple[str, ...] = ()
+    """Errores de lectura: el snapshot existe pero está incompleto."""
+
+    @property
+    def incomplete(self) -> bool:
+        """``True`` si restic no pudo leer algún fichero."""
+        return bool(self.unread)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,42 +183,50 @@ class Restic:
         command = self._command(*args, *(str(path) for path in paths))
         summary: dict[str, Any] = {}
         errors: list[str] = []
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        for line in process.stdout or ():
-            try:
-                message = json.loads(line)
-            except ValueError:
-                continue
-            kind = message.get("message_type")
-            if kind == "status" and progress:
-                progress(
-                    float(message.get("percent_done", 0)),
-                    int(message.get("bytes_done", 0)),
-                    int(message.get("total_bytes", 0)),
-                )
-            elif kind == "summary":
-                summary = message
-            elif kind == "error":
-                errors.append(str(message.get("error", {}).get("message", message)))
-        stderr = process.stderr.read() if process.stderr else ""
-        process.wait()
-        # Código 3: snapshot hecho, pero algún fichero no se pudo leer.
-        if process.returncode not in {0, 3} or not summary:
-            detail = (errors or stderr.strip().splitlines() or ["?"])[-1]
+        # stderr a un fichero: con dos tuberías, restic podría bloquearse si
+        # llenase la de stderr mientras se lee stdout.
+        with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as log:
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=log,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            for line in process.stdout or ():
+                try:
+                    message = json.loads(line)
+                except ValueError:
+                    continue
+                kind = message.get("message_type")
+                if kind == "status" and progress:
+                    progress(
+                        float(message.get("percent_done", 0)),
+                        int(message.get("bytes_done", 0)),
+                        int(message.get("total_bytes", 0)),
+                    )
+                elif kind == "summary":
+                    summary = message
+                elif kind == "error":
+                    errors.append(_error_text(message))
+            process.wait()
+            log.seek(0)
+            stderr = log.read()
+        code = process.returncode
+        if code not in {0, EXIT_INCOMPLETE} or not summary:
+            detail = (errors or stderr.strip().splitlines() or [f"código {code}"])[-1]
             raise BackupError(f"{self.target.name}: {detail}")
+        unread = tuple(errors) if code == EXIT_INCOMPLETE else ()
+        if code == EXIT_INCOMPLETE and not unread:
+            unread = tuple((stderr.strip().splitlines() or ["ficheros sin leer"])[-1:])
         return Summary(
             snapshot=str(summary.get("snapshot_id", ""))[:8],
             files_new=int(summary.get("files_new", 0)),
             files_changed=int(summary.get("files_changed", 0)),
             data_added=int(summary.get("data_added", 0)),
             seconds=float(summary.get("total_duration", 0)),
+            unread=unread,
         )
 
     def forget(self, daily: int, weekly: int, monthly: int) -> None:
@@ -249,16 +269,28 @@ class Restic:
         self._run("restore", snapshot, "--target", str(target))
 
 
-def make_bundles(station: Station, git: str = "git") -> list[tuple[str, str]]:
+@dataclass(frozen=True, slots=True)
+class BundleResult:
+    """Resultado de empaquetar un repo de git."""
+
+    name: str
+    error: str = ""
+    """Vacío si el bundle se ha creado."""
+    required: bool = False
+    """Repo declarado en ``repos_git``: si falla, el backup queda incompleto."""
+
+
+def make_bundles(station: Station, git: str = "git") -> list[BundleResult]:
     """Crea un git bundle de cada repo.
 
-    Returns:
-        Pares (nombre, resultado) para informar; un repo sin commits o inaccesible
-        se anota y se sigue.
+    Un fallo no detiene el resto: se anota en el resultado. El git de un temario
+    sin commits no importa; un repo de ``repos_git`` que falla deja el backup
+    incompleto.
     """
     folder = bundles_dir(station)
     folder.mkdir(parents=True, exist_ok=True)
     results = []
+    declared = set(station.backup.git_repos)
     for name, repo in git_repos(station).items():
         target = folder / f"{name}.bundle"
         result = subprocess.run(
@@ -269,11 +301,9 @@ def make_bundles(station: Station, git: str = "git") -> list[tuple[str, str]]:
             errors="replace",
             check=False,
         )
-        if result.returncode == 0:
-            results.append((name, "ok"))
-        else:
-            lines = result.stderr.strip().splitlines()
-            results.append((name, lines[-1] if lines else "error"))
+        lines = result.stderr.strip().splitlines()
+        failure = "" if result.returncode == 0 else (lines[-1] if lines else "error")
+        results.append(BundleResult(name, failure, required=repo in declared))
     return results
 
 
@@ -293,23 +323,69 @@ def find_restored_root(target: Path) -> Path | None:
     return None
 
 
+RESTORED_ITEMS = ("atril.toml", "data", "temarios")
+"""Lo que una restauración sustituye en la estación."""
+
+
 def swap_in(station: Station, restored: Path, keep: Path) -> list[str]:
     """Sustituye ``atril.toml``, ``data/`` y ``temarios/`` por los restaurados.
 
-    Lo que había se mueve a ``keep`` (no se borra nada).
+    Lo que había se mueve a ``keep`` (no se borra nada). Si un movimiento falla
+    (p. ej. un fichero bloqueado en Windows), se deshacen los anteriores y la
+    estación queda como estaba.
 
     Returns:
         Los elementos sustituidos.
+
+    Raises:
+        BackupError: Si el intercambio falla; el mensaje dice si se ha deshecho.
     """
     keep.mkdir(parents=True, exist_ok=False)
+    done: list[tuple[Path, Path]] = []
     replaced = []
-    for name in ("atril.toml", "data", "temarios"):
-        source = restored / name
-        if not source.exists():
-            continue
-        current = station.root / name
-        if current.exists():
-            shutil.move(current, keep / name)
-        shutil.move(source, current)
-        replaced.append(name)
+    try:
+        for name in RESTORED_ITEMS:
+            source = restored / name
+            if not source.exists():
+                continue
+            current = station.root / name
+            if current.exists():
+                shutil.move(current, keep / name)
+                done.append((current, keep / name))
+            shutil.move(source, current)
+            done.append((source, current))
+            replaced.append(name)
+    except OSError as exc:
+        problems = _undo(done)
+        if not problems:
+            with contextlib.suppress(OSError):
+                keep.rmdir()
+        if problems:
+            raise BackupError(
+                f"el intercambio ha fallado ({exc}) y no se ha podido deshacer del "
+                f"todo: {'; '.join(problems)}. Lo anterior está en {keep}."
+            ) from exc
+        raise BackupError(
+            f"el intercambio ha fallado ({exc}); se ha deshecho y la estación "
+            "está como antes."
+        ) from exc
     return replaced
+
+
+def _undo(moves: list[tuple[Path, Path]]) -> list[str]:
+    """Deshace movimientos en orden inverso; devuelve los que fallan."""
+    problems = []
+    for origin, destination in reversed(moves):
+        try:
+            shutil.move(destination, origin)
+        except OSError as exc:
+            problems.append(f"{destination} → {origin}: {exc}")
+    return problems
+
+
+def _error_text(message: dict[str, Any]) -> str:
+    """Texto de un mensaje ``error`` de ``restic backup --json``."""
+    detail = message.get("error", {})
+    text = detail.get("message", message) if isinstance(detail, dict) else detail
+    item = message.get("item")
+    return f"{item}: {text}" if item else str(text)

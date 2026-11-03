@@ -51,10 +51,11 @@ async def search(query, *, kb_name, kb_base_dir=None, mode=None, top_k=5,
         source["content"] = source.get("evidence_text") or source.get("content") or ""
         sources.append(source)
     result["sources"] = sources
-    trace[query] = [
+    # Lista por pregunta: un dataset puede repetir la misma pregunta.
+    trace.setdefault(query, []).append([
         [s.get("title", ""), s.get("page_label") or s.get("page") or "", s.get("score")]
         for s in sources[:top_k]
-    ]
+    ])
     return result
 
 def progress(index, total, evaluation):
@@ -117,14 +118,15 @@ class EvalReport:
         cls, data: dict[str, Any], kb: str, dataset: str, k: int
     ) -> "EvalReport":
         """Construye el informe a partir del JSON del evaluador de DeepTutor."""
-        trace = data.get("trace") or {}
+        # Cada pregunta repetida consume su traza en orden.
+        traces = {text: iter(runs) for text, runs in (data.get("trace") or {}).items()}
         cases = []
         for query in data.get("queries", []):
             matched = query.get("matched_gold") or []
             rank = next((n for n, hit in enumerate(matched, 1) if hit), None)
+            run = next(traces.get(str(query.get("query", "")), iter(())), [])
             hits = tuple(
-                Hit(str(title), str(page), score)
-                for title, page, score in trace.get(query.get("query", ""), [])
+                Hit(str(title), str(page), score) for title, page, score in run
             )
             cases.append(
                 EvalCase(

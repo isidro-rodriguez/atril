@@ -1,5 +1,6 @@
 """Lectura estricta de ficheros TOML con mensajes de error en español."""
 
+import json
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,44 @@ class ConfigError(Exception):
     """
 
 
+class StateFileError(ConfigError):
+    """Fichero de estado JSON de atril (``registro.json``, ``indexado.json``) dañado.
+
+    Nunca se sobrescribe automáticamente: perdería el historial de hashes.
+    """
+
+
 _MISSING: Any = object()
+
+
+def load_state(path: Path, section: str) -> dict[str, Any]:
+    """Carga un fichero de estado JSON con una sección de objetos por id.
+
+    Args:
+        path: Fichero; si no existe, se devuelve la sección vacía.
+        section: Clave que debe ser un objeto de objetos (``fuentes``, ``kb``).
+
+    Returns:
+        El contenido de ``section``.
+
+    Raises:
+        StateFileError: Si no es JSON válido o no tiene la forma esperada.
+    """
+    if not path.is_file():
+        return {}
+    hint = "corrígelo o recupéralo de git o del backup; atril no lo sobrescribe."
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise StateFileError(f"{path}: no se puede leer ({exc}); {hint}") from exc
+    content = data.get(section, {}) if isinstance(data, dict) else None
+    if not isinstance(content, dict) or not all(
+        isinstance(value, dict) for value in content.values()
+    ):
+        raise StateFileError(
+            f"{path}: '{section}' no tiene el formato esperado; {hint}"
+        )
+    return content
 
 
 def load_toml(path: Path) -> dict[str, Any]:

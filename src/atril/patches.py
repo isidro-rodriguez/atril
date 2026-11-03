@@ -1,8 +1,10 @@
 """Parches locales de atril sobre el código de DeepTutor (``app/``).
 
-Cada parche es una sustitución de texto idempotente en un fichero: si el texto
-nuevo ya está, el parche está aplicado; si está el original, se puede aplicar;
-si no está ninguno, el código de DeepTutor ha cambiado y hay que revisarlo.
+Cada parche es una sustitución de texto idempotente en un fichero. Solo se
+reconocen dos estados limpios: el original una vez y el nuevo ninguna
+(pendiente), o al revés (aplicado). Cualquier otra combinación (ninguno, ambos
+o repetidos) significa que el código de DeepTutor ha cambiado y hay que revisar
+el parche; nunca se fuerza.
 """
 
 from dataclasses import dataclass
@@ -16,7 +18,7 @@ class PatchState(StrEnum):
     APPLIED = "aplicado"
     PENDING = "pendiente"
     CHANGED = "código cambiado"
-    """No aparece ni el texto original ni el parcheado: hay que revisar el parche."""
+    """El texto original y el parcheado no aparecen una sola vez: hay que revisarlo."""
     NO_FILE = "sin fichero"
 
 
@@ -36,9 +38,12 @@ class Patch:
         if not path.is_file():
             return PatchState.NO_FILE
         text = _read(path)
-        if self.new in text:
+        new = text.count(self.new)
+        # Si ``new`` contiene ``old``, sus apariciones no cuentan como originales.
+        old = text.replace(self.new, "").count(self.old)
+        if (old, new) == (0, 1):
             return PatchState.APPLIED
-        if self.old in text:
+        if (old, new) == (1, 0):
             return PatchState.PENDING
         return PatchState.CHANGED
 

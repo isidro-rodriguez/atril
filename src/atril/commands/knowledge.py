@@ -18,6 +18,7 @@ from atril.commands._common import (
     find_kb,
     get_station,
     get_syllabus,
+    load_or_fail,
     show,
     success,
 )
@@ -89,7 +90,7 @@ def index(
     if not dt.installed:
         fail("DeepTutor no está instalado; usa atril instalar.")
 
-    ledger = Ledger(ledger_path(syllabus))
+    ledger = load_or_fail(lambda: Ledger(ledger_path(syllabus)))
     plans = {kb.id: plan(syllabus, kb, ledger) for kb in kbs}
     for kb in kbs:
         _show_plan(kb, plans[kb.id])
@@ -136,7 +137,7 @@ def reindex(
     if not show(_embedding_preflight(station), "Ollama"):
         fail("corrige el embedding antes de reindexar.")
 
-    ledger = Ledger(ledger_path(syllabus))
+    ledger = load_or_fail(lambda: Ledger(ledger_path(syllabus)))
     items = plan(syllabus, kb, ledger)
     removed = [item for item in items if item.state is PlanState.REMOVED]
     changed = [item for item in items if item.state is PlanState.CHANGED]

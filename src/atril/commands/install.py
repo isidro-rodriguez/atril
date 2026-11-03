@@ -38,6 +38,7 @@ def install_command(ctx: typer.Context, no_docling: NoDocling = False) -> None:
     if not show(install.check_tools(), "Herramientas"):
         fail("instala las herramientas que faltan y vuelve a ejecutar.")
     _step("Código", installer.clone)
+    show([install.version_finding(station.app_dir)])
     _step("Python", lambda: installer.python_env(docling=not no_docling))
     _step("Frontend", installer.frontend)
     _step("Modelo de embedding", installer.embedding_model)
@@ -62,8 +63,10 @@ def update_command(
 ) -> None:
     """Actualiza DeepTutor a la última versión de su rama y reaplica los parches.
 
-    Para DeepTutor si está en marcha, deshace los parches, trae la rama, reinstala
-    dependencias (el frontend solo si cambia su lockfile) y vuelve a aplicarlos.
+    Para DeepTutor si está en marcha, comprueba que [bold]app/[/] sigue el repo y la
+    rama de atril.toml, deshace los parches, trae la rama, reinstala dependencias
+    (el frontend solo si cambia su lockfile), reaplica la configuración y los
+    parches, y termina con el diagnóstico.
     """
     station = get_station(ctx)
     dt = DeepTutor(station)
@@ -79,18 +82,24 @@ def update_command(
     lock_before = installer.frontend_lock_hash()
     with console.status("Trayendo la última versión..."):
         before, after = _step_value(installer.update_checkout)
-    if before == after:
-        show([info(f"Ya estaba en la última versión: {before}")], "Código")
-    else:
-        show([ok(f"{before} → {after}")], "Código")
+    changed = before != after
+    message = f"{before} → {after}" if changed else f"Ya en la última versión: {before}"
+    show([ok(message) if changed else info(message)], "Código")
+    show([install.version_finding(station.app_dir)])
+    if changed or not installer.venv_matches():
         _step("Python", lambda: installer.python_env(docling=not no_docling))
+    if changed:
         lock_changed = installer.frontend_lock_hash() != lock_before
         _step("Frontend", lambda: installer.frontend(force=lock_changed))
+    _step("Configuración de DeepTutor", installer.configure)
+    _step("Parser y chunks", installer.runtime_settings)
 
     if not show(_apply_patches(station), "Parches"):
         fail(
             "algún parche ya no encaja con el código nuevo; revísalo antes de arrancar."
         )
+    if not show(_step_value(installer.doctor), "Diagnóstico"):
+        fail("DeepTutor actualizado con errores; revisa los puntos marcados.")
     success("DeepTutor actualizado.")
     if was_running and not no_restart:
         launch(dt, timeout=900)

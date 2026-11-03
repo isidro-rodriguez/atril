@@ -5,6 +5,42 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.8.0] - 2026-11-03
+
+Mejoras de la revisión externa (`revision_GPT.md`) sobre operaciones destructivas y estado.
+
+### Changed
+
+- `atril backup` distingue un backup **incompleto** (restic con ficheros sin leer, código 3, o un
+  repo de `repos_git` que no se empaqueta): termina con código 1, nunca dice "Backup terminado" y
+  no aplica la retención, para que un snapshot incompleto no desplace a uno completo.
+- `atril backup restaurar` exige `--forzar-otra-ruta` para un snapshot hecho desde otra ruta
+  (las KB guardan rutas absolutas); `--si` ya no basta.
+- `atril actualizar` comprueba que `app/` sigue el repo y la rama de `atril.toml` antes del
+  `reset --hard`, reaplica la configuración de DeepTutor, el parser y los chunks, y termina con
+  `deeptutor doctor`. Si el venv tiene otra versión de Python, lo recrea.
+- `atril instalar` y `atril actualizar` avisan si la versión de DeepTutor no es una probada (1.7).
+- Parches: solo son estados limpios el original una vez (pendiente) o el nuevo una vez
+  (aplicado); texto repetido o ambos a la vez cuentan como código cambiado.
+- `atril temario lista` separa Presentes, Manuales y Faltan (antes una fuente manual contaba
+  como presente y como pendiente).
+- Se retira `atril accesos` del plan: atril ya es una CLI en el `PATH`.
+
+### Fixed
+
+- Restauración: si el intercambio falla a medias (p. ej. un fichero bloqueado en Windows), se
+  deshacen los movimientos y la estación queda como estaba.
+- `restic backup` escribe stderr en un fichero temporal: con dos tuberías podía bloquearse.
+- `registro.json` o `indexado.json` dañados dan un error claro y no se sobrescriben.
+- La evaluación conserva la traza de cada pregunta aunque el dataset repita el texto.
+- Un id de temario que no es un slug (p. ej. `../x`) se rechaza en la CLI.
+- JSON inesperado de `deeptutor doctor` o de los ajustes internos da un mensaje explicativo.
+
+### Added
+
+- Validaciones de `atril.toml`: repositorio restic dentro de la estación, retención 0/0/0 y dos
+  `repos_git` con el mismo nombre de carpeta (sus bundles se pisarían).
+
 ## [0.7.1] - 2026-11-03
 
 ### Fixed

@@ -5,11 +5,12 @@ texto que viene de fuera (rutas, mensajes de configuración con ``[[fuente]]``,
 líneas de comandos) se escapa para que Rich no lo interprete como markup.
 """
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import NoReturn
 
 import typer
+from acodo.utils import valid_slug
 from rich.console import Console
 from rich.markup import escape
 
@@ -62,6 +63,10 @@ def get_station(ctx: typer.Context) -> Station:
 def get_syllabus(ctx: typer.Context, syllabus_id: str) -> Syllabus:
     """Carga un temario por id; termina con error si no existe o no es válido."""
     station = get_station(ctx)
+    if not valid_slug(syllabus_id):
+        fail(
+            f"id de temario no válido: {syllabus_id!r} (minúsculas, cifras y guiones)."
+        )
     root = station.syllabi_dir / syllabus_id
     if not (root / "temario.toml").is_file():
         found = sorted(
@@ -88,6 +93,14 @@ def find_kb(ctx: typer.Context, kb_id: str) -> tuple[Syllabus, KnowledgeBase]:
                 return syllabus, kb
     known = ", ".join(kb.id for s in syllabi for kb in s.knowledge_bases) or "ninguna"
     fail(f"no existe la KB {kb_id!r} en ningún temario (disponibles: {known}).")
+
+
+def load_or_fail[T](factory: Callable[[], T]) -> T:
+    """Ejecuta ``factory``; un fichero de estado o de configuración dañado termina."""
+    try:
+        return factory()
+    except ConfigError as exc:
+        fail(str(exc))
 
 
 def show(findings: Iterable[Finding], title: str | None = None) -> bool:

@@ -27,6 +27,7 @@ import psutil
 from acodo.utils import get_file_hash
 
 from atril import net
+from atril.config._toml import StateFileError, load_state
 from atril.config.station import Station
 from atril.config.syllabus import KnowledgeBase, Source, SourceKind, Syllabus
 from atril.processes import kill_tree
@@ -150,17 +151,25 @@ class Ledger:
     VERSION = 1
 
     def __init__(self, path: Path) -> None:
-        """Carga el registro (vacío si no existe)."""
+        """Carga el registro (vacío si no existe).
+
+        Raises:
+            StateFileError: Si el fichero está dañado.
+        """
         self.path = path
         self.kbs: dict[str, KbLedger] = {}
-        if path.is_file():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            for kb_id, entry in data.get("kb", {}).items():
+        try:
+            for kb_id, entry in load_state(path, "kb").items():
                 sources = {
                     key: IndexedSource(**value)
                     for key, value in entry.get("fuentes", {}).items()
                 }
                 self.kbs[kb_id] = KbLedger(bool(entry.get("reindexar")), sources)
+        except (AttributeError, TypeError) as exc:
+            raise StateFileError(
+                f"{path}: entrada con formato inesperado ({exc}); corrígelo o "
+                "recupéralo de git o del backup; atril no lo sobrescribe."
+            ) from exc
 
     def kb(self, kb_id: str) -> KbLedger:
         """Registro de una KB (se crea vacío si no existe)."""

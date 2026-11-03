@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from support import write
 from test_sources import PDF_V1, PDF_V2, FakeWeb
 from typer.testing import CliRunner
 
@@ -38,6 +39,7 @@ def test_download_then_list_and_coverage(station_dir: Path, web: FakeWeb) -> Non
         "2",
         "3",
         "2",
+        "0",
         "1",
     ]
 
@@ -82,3 +84,14 @@ def test_unknown_syllabus_and_source(station_dir: Path) -> None:
     result = _invoke(station_dir, "fuentes", "descargar", "normativa", "nada")
     assert result.exit_code == 1
     assert "fuentes desconocidas" in result.output
+
+
+def test_invalid_syllabus_id_and_damaged_registry(station_dir: Path) -> None:
+    bad = _invoke(station_dir, "temario", "cobertura", "../fuera")
+    assert bad.exit_code == 1
+    assert "id de temario no válido" in bad.output
+
+    write(station_dir / "temarios" / "normativa" / "fuentes" / "registro.json", "{")
+    damaged = _invoke(station_dir, "temario", "lista")
+    assert damaged.exit_code == 1
+    assert "registro.json" in damaged.output

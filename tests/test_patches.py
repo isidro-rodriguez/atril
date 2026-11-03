@@ -19,6 +19,20 @@ def test_states(tmp_path: Path) -> None:
     write(tmp_path / "pkg/mod.py", "x = other()\n")
     assert PATCH.state(tmp_path) is PatchState.CHANGED
 
+    # Solo una aparición exacta es un estado limpio.
+    for text in ("old()\nold()\n", "new()\nnew()\n", "old()\nnew()\n"):
+        write(tmp_path / "pkg/mod.py", text)
+        assert PATCH.state(tmp_path) is PatchState.CHANGED
+
+
+def test_new_text_containing_old(tmp_path: Path) -> None:
+    patch = Patch("demo", "Demo", "m.py", "f(a)", "f(a) or g()")
+
+    write(tmp_path / "m.py", "x = f(a) or g()\n")
+    assert patch.state(tmp_path) is PatchState.APPLIED
+    assert patch.revert(tmp_path) is PatchState.PENDING
+    assert (tmp_path / "m.py").read_text() == "x = f(a)\n"
+
 
 def test_apply_is_idempotent_and_keeps_crlf(tmp_path: Path) -> None:
     file = tmp_path / "pkg" / "mod.py"

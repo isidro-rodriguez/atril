@@ -218,10 +218,18 @@ def load_station(root: Path) -> Station:
         deeptutor=_deeptutor(top.get_table("deeptutor")),
         ollama=_ollama(top.get_table("ollama")),
         indexing=_indexing(top.get_table("indexado", required=False)),
-        backup=_backup(top.get_table("backup")),
+        backup=_backup(top.get_table("backup"), root.resolve()),
     )
     top.close()
     return station
+
+
+def _inside(path: Path, root: Path) -> bool:
+    """``path`` es ``root`` o está dentro (comparando rutas, no texto)."""
+    if not path.is_absolute():
+        return False
+    resolved = path.resolve()
+    return resolved == root or root in resolved.parents
 
 
 def _url(table: Table, key: str, default: str | None = None) -> str:
@@ -304,14 +312,20 @@ def _indexing(table: Table) -> IndexingConfig:
     return config
 
 
-def _backup(table: Table) -> BackupConfig:
-    """Tabla ``[backup]``."""
+def _backup(table: Table, root: Path) -> BackupConfig:
+    """Tabla ``[backup]``; ``root`` es la raíz de la estación."""
     targets_table = table.get_table("destinos")
     targets = []
     for name, target in targets_table.get_named_tables():
         if not valid_slug(name):
             raise targets_table.error(f"nombre de destino no válido: {name!r}.")
-        targets.append(BackupTarget(name=name, repo=target.get_str("repo")))
+        repo = target.get_str("repo")
+        if _inside(Path(repo), root):
+            raise target.error(
+                f"el repositorio {repo!r} está dentro de la estación: se copiaría "
+                "a sí mismo y se perdería con ella."
+            )
+        targets.append(BackupTarget(name=name, repo=repo))
         target.close()
     if not targets:
         raise targets_table.error("declara al menos un destino.")
@@ -322,12 +336,22 @@ def _backup(table: Table) -> BackupConfig:
         weekly=keep.get_int("semanales", 4, minimum=0),
         monthly=keep.get_int("mensuales", 12, minimum=0),
     )
+    if not (retention.daily or retention.weekly or retention.monthly):
+        raise keep.error("la retención 0/0/0 borraría todos los snapshots.")
     keep.close()
 
     repos = table.get_str_list("repos_git", [])
+    names: set[str] = set()
     for repo in repos:
         if not valid_path(repo, absolute=True):
             raise table.error(f"'repos_git' exige rutas absolutas: {repo!r}.")
+        name = Path(repo).name.lower()
+        if name in names:
+            raise table.error(
+                f"'repos_git' tiene dos repos llamados {Path(repo).name!r}: "
+                "sus bundles se pisarían."
+            )
+        names.add(name)
 
     config = BackupConfig(
         targets=tuple(targets),

@@ -50,7 +50,6 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | KB | `atril kb indexar <t> [kb]` · `atril kb reindexar <kb>` · `atril kb evaluar <kb>` |
 | Backup | `atril backup` · `atril backup comprobar` · `atril backup restaurar` |
 | Configuración | `atril validar` (fase 0) |
-| Otros | `atril accesos` (accesos directos) |
 
 ## Fases
 
@@ -59,7 +58,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 2. ✅ Temarios: fuentes (descarga/actualización con hash e histórico), KB (indexado y reindexado), evaluación con texto completo e informes comparados en `eval\informes\`.
 3. ✅ Backup y restauración (`atril backup`, `backup comprobar`, `backup restaurar`). La restauración va a `<estación>.restaurar-<fecha>` y después se intercambia; lo actual queda en `<estación>.previo-<fecha>`.
 4. ✅ Migración de la estructura actual con `scripts\migrar_estacion.py` (plan por defecto, `--aplicar` para ejecutar; no borra nada, todo lo sobrante va a `_legado\`): `deeptutor_app` → `app` (venv apartado y recreado con `atril instalar`), `materia_normativa` → `temarios\normativa\espacio` (el historial de chats viaja con la carpeta; el catálogo de espacios de DT se actualiza), fuentes con nombre estable y registros (`registro.json`, `indexado.json`) generados por hash contra `raw\` de cada KB, de modo que no hay que reindexar. Aplicada el 2026-11-03: `kb evaluar norm-edificacion-cte` repite recall@5 1,000 y MRR 0,986.
-5. Publicación en PyPI y accesos directos.
+5. ✅ Publicación en PyPI (`publish.yml`). Los accesos directos se retiran: `atril` ya es una CLI en el `PATH`.
 6. TUI (opcional).
 
 ## Estado actual de la instalación (a 2026-11-03)
@@ -68,7 +67,24 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 - LLM: `claude_code` (Claude Code + plan Pro, OAuth), modelo `claude-code/opus`. Embedding: Ollama `qwen3-embedding:8b`, 4096 dim. Chunks 1024/150. Parser: Docling (sin `format-video`).
 - KB: `norm-edificacion-cte` (13 PDF vinculantes; eval 35 preguntas: recall@5 1,0, MRR 0,986) y `norm-edificacion-cte-guias` (4 guías). Pendientes: REBT, administrativo, urbanismo (Ley 4/2017 Canarias), Código Estructural (2000 págs, de noche). Fase 2 manual: reglamentos canarios 2018, PIOT/PGO, guía REBT, ISO 9001/14001/45001.
 - Qwen 3.5 9B (Ollama) solo para usos triviales, no normativa.
-- Pendiente: indexar `norm-estructuras` (Código Estructural, de noche); colocar las fuentes manuales (ISO, decretos de Canarias 2018, PIOT/PGO, guía REBT); revisar `revision_GPT.md` (P1 #2 corregido en 0.7.1); fase 5 (`atril accesos`).
+- Pendiente: indexar `norm-estructuras` (Código Estructural, de noche); colocar las fuentes manuales (ISO, decretos de Canarias 2018, PIOT/PGO, guía REBT); fuentes `github`/`web` sin uso real todavía (experimentales).
+
+## Revisión externa (`revision_GPT.md`), aplicada en 0.7.1 y 0.8.0
+
+| Riesgo | Decisión |
+|---|---|
+| Backup con ficheros sin leer (restic 3) o bundle de `repos_git` fallido | **Incompleto**: código 1, sin retención (no desplaza a un snapshot completo) |
+| `actualizar` con otro remoto u otra rama en `app/` | Se aborta antes del `reset --hard` |
+| Intercambio de restauración a medias | Se deshace; si no puede, lo dice y lo previo queda en `.previo-<fecha>` |
+| Snapshot de otra ruta | Exige `--forzar-otra-ruta` (no basta `--si`) |
+| `registro.json`/`indexado.json` dañados | Error claro; nunca se sobrescriben |
+| Parche con el texto repetido o ambos presentes | `código cambiado`; nunca se fuerza |
+| venv con otra versión de Python | `uv venv --clear` y reinstalación |
+| `actualizar` sin reaplicar ajustes | Reaplica `config apply`, parser y chunks, y pasa `doctor` |
+| Repo restic dentro de la estación, retención 0/0/0, bundles con el mismo nombre | Errores de configuración |
+| Preguntas repetidas en la evaluación | Traza por pregunta en orden |
+| Versión de DT no probada / JSON de DT distinto | Aviso / error explicativo |
+| Fuentes `github`/`web` | Experimentales: sin batería de pruebas hasta tener un uso real |
 
 ## Lecciones de la instalación previa
 

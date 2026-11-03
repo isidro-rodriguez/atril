@@ -89,8 +89,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Only kill processes with an **argument that is a path inside the station root**, compared as
   paths (`processes._normalize`), never as substrings: `D:\DeepTutorBackup` is not inside
   `D:\DeepTutor`. Never touch other processes.
-- Patches are idempotent text replacements registered in `atril.patches.PATCHES`; a patch whose
-  original and patched text are both missing is an error (DeepTutor changed), never forced.
+- Patches are idempotent text replacements registered in `atril.patches.PATCHES`. Only two states
+  are clean: original once and patched absent (pending), or the reverse (applied); anything else
+  means DeepTutor changed and is an error, never forced.
 - Tests never wait for real time or call real services: fake `time.sleep`/`time.monotonic`,
   `ollama.get_status`, `DeepTutor` methods and `install.run_command`/`install.capture`.
 - `deeptutor doctor` does not accept `--home`; pass it explicitly only to `init`, `config`,
@@ -98,7 +99,11 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - DeepTutor settings come from `atril.toml` (no `setup.json`): `config apply` for LLM, embedding,
   search and ports; `install._SETTINGS_SCRIPT`, run with `app/`'s Python, for parser and chunks.
 - `app/` is a shallow clone: update with `fetch --depth 1` + `reset --hard FETCH_HEAD`, only on a
-  clean tree and after reverting patches.
+  clean tree, after reverting patches and after checking that `origin` and the current branch match
+  `atril.toml` (abort otherwise). `actualizar` reapplies `config apply`, parser/chunks and `doctor`;
+  a venv with another Python version is recreated (`uv venv --clear`).
+- State files (`registro.json`, `indexado.json`) that fail to parse raise `StateFileError` and are
+  never overwritten.
 - Sources keep a **stable file name** (`archivo` or the URL's last segment, no date): versions go
   to `fuentes/historico/`, and `fuentes/registro.json` (text, sorted) records hash and dates.
   Downloads write `.part`/`.nuevo` first and require the `%PDF-` header; a failed download never
@@ -118,10 +123,12 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   compared with the latest previous report for the same KB, dataset and `k`.
 - Backups use restic (>= 0.17: exit code 10 = no repository, 12 = wrong password). They copy
   `atril.toml`, `data/` and `temarios/` (never `app/`) plus git bundles in `data/atril/bundles/`,
-  stop DeepTutor first (SQLite) and restart it after. A local repo whose parent folder is missing
-  is a disconnected disk: skipped with a warning, or an error if requested explicitly. Restore
+  stop DeepTutor first (SQLite) and restart it after. restic exit code 3 (unreadable files) or a
+  failed `repos_git` bundle make the backup **incomplete**: exit code 1 and no retention
+  (`forget`). A local repo whose parent folder is missing is a disconnected disk: skipped with a warning, or an error if requested explicitly. Restore
   goes to `<root>.restaurar-<ts>` next to the station, then swaps in; the current content moves to
-  `<root>.previo-<ts>` and is never deleted. The restic password only comes from the environment.
+  `<root>.previo-<ts>` and is never deleted. A failed swap is rolled back; a snapshot taken from
+  another path requires `--forzar-otra-ruta`. The restic password only comes from the environment.
 
 ## Project rules (load-bearing)
 

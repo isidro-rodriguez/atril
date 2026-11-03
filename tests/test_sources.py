@@ -6,7 +6,7 @@ import pytest
 from support import write
 
 from atril import sources
-from atril.config import load_syllabus
+from atril.config import StateFileError, load_syllabus
 from atril.config.syllabus import Syllabus
 from atril.sources import (
     DownloadError,
@@ -219,3 +219,14 @@ def test_registry_file_is_sorted_text(tmp_path: Path) -> None:
     text = (tmp_path / "registro.json").read_text(encoding="utf-8")
     assert text.index('"a"') < text.index('"b"')
     assert text.endswith("\n")
+
+
+@pytest.mark.parametrize(
+    "text", ["{roto", '{"fuentes": []}', '{"fuentes": {"a": {"otra": 1}}}']
+)
+def test_damaged_registry_is_never_overwritten(tmp_path: Path, text: str) -> None:
+    path = write(tmp_path / "registro.json", text)
+
+    with pytest.raises(StateFileError, match="no lo sobrescribe"):
+        Registry(path)
+    assert path.read_text(encoding="utf-8") == text

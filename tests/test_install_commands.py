@@ -4,7 +4,7 @@ import pytest
 from support import write
 from typer.testing import CliRunner
 
-from atril.checks import info, ok
+from atril.checks import error, info, ok
 from atril.commands import install as commands
 from atril.config import load_station
 from atril.deeptutor import DeepTutor
@@ -31,6 +31,7 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     for step in ("configure", "runtime_settings", "doctor"):
         monkeypatch.setattr(Installer, step, lambda self, s=step: [ok(s)])
     monkeypatch.setattr(Installer, "python_env", lambda self, docling: [ok("python")])
+    monkeypatch.setattr(Installer, "venv_matches", lambda self: True)
     return station_dir
 
 
@@ -82,9 +83,34 @@ def test_update_same_version(station: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
     assert result.exit_code == 0, result.output
     assert "paginas-citas: deshecho." in result.output
-    assert "Ya estaba en la última versión" in result.output
+    assert "Ya en la última versión" in result.output
     assert "paginas-citas: aplicado." in result.output
+    assert "runtime_settings" in result.output and "doctor" in result.output
     assert PATCH.new in (load_station(station).app_dir / PATCH.file).read_text()
+
+
+def test_update_recreates_venv_with_other_python(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Installer, "update_checkout", lambda self: ("a1 x", "a1 x"))
+    monkeypatch.setattr(Installer, "venv_matches", lambda self: False)
+
+    result = _invoke(station, "actualizar")
+
+    assert result.exit_code == 0, result.output
+    assert "python" in result.output
+
+
+def test_update_fails_on_doctor_error(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Installer, "update_checkout", lambda self: ("a1 x", "a1 x"))
+    monkeypatch.setattr(Installer, "doctor", lambda self: [error("LLM: sin clave")])
+
+    result = _invoke(station, "actualizar")
+
+    assert result.exit_code == 1
+    assert "LLM: sin clave" in result.output
 
 
 def test_update_new_version_restarts(

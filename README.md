@@ -32,8 +32,7 @@ atril --estacion D:\Desarrollo\DeepTutor validar   # o ATRIL_ESTACION, o desde l
 | Temarios | `temario lista` · `temario cobertura <t>` | 2 ✅ |
 | Fuentes | `fuentes descargar <t> [ids]` · `fuentes comprobar <t> [ids] [--todas]` | 2 ✅ |
 | KB | `kb indexar <t> [kb]` · `kb reindexar <kb>` · `kb evaluar <kb> [-k 5] [--detalle]` | 2 ✅ |
-| Backup | `backup [-d destino]` · `backup comprobar [--datos 5%]` · `backup restaurar -d destino` | 3 ✅ |
-| Otros | `accesos` | 5 |
+| Backup | `backup [-d destino]` · `backup comprobar [--datos 5%]` · `backup restaurar -d destino [--forzar-otra-ruta]` | 3 ✅ |
 
 Configuración: [`docs/esquemas.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](https://github.com/isidro-rodriguez/atril/blob/main/docs/ejemplos/).
 

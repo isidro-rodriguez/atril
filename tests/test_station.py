@@ -39,12 +39,28 @@ def test_defaults(tmp_path: Path) -> None:
         ("[indexado]\nchunk = 100\nsolape = 100", "'solape' debe ser menor"),
         ("[indexado]\nchunk = true", "tipo no válido"),
         ("[backup]\nrepos_git = ['repos/atril']", "exige rutas absolutas"),
+        (
+            "[backup.retencion]\ndiarias = 0\nsemanales = 0\nmensuales = 0",
+            "0/0/0",
+        ),
+        (
+            "[backup]\nrepos_git = ['D:/a/atril', 'E:/b/Atril']",
+            "dos repos llamados",
+        ),
     ],
 )
 def test_invalid_station(tmp_path: Path, extra: str, message: str) -> None:
     write(tmp_path / "atril.toml", MINIMAL_STATION + extra)
 
     with pytest.raises(ConfigError, match=message):
+        load_station(tmp_path)
+
+
+def test_backup_repo_inside_station(tmp_path: Path) -> None:
+    inside = (tmp_path / "data" / "restic").as_posix()
+    write(tmp_path / "atril.toml", MINIMAL_STATION.replace("E:\\restic-atril", inside))
+
+    with pytest.raises(ConfigError, match="dentro de la estación"):
         load_station(tmp_path)
 
 

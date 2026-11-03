@@ -12,7 +12,7 @@ from rich.table import Table
 
 from atril import backup
 from atril.backup import BackupError, Restic, Snapshot, Summary
-from atril.checks import Finding, error, info, ok, warning
+from atril.checks import Finding, Level, error, info, ok, warning
 from atril.commands._common import console, fail, get_station, show, success
 from atril.commands.deeptutor import launch, shutdown
 from atril.config.station import BackupTarget, Station
@@ -59,12 +59,19 @@ def run_backup(
     if was_running:
         shutdown(dt)
     try:
-        show(_bundle_findings(station), "Repos de git")
+        bundles = _bundle_findings(station)
+        show(bundles, "Repos de git")
         results = [_backup_one(station, target, executable) for target in reachable]
     finally:
         if was_running and not no_restart:
             launch(dt, timeout=900)
     _show_summaries(results)
+    incomplete = [t.name for t, s in results if s.incomplete]
+    if incomplete or any(f.level is Level.ERROR for f in bundles):
+        problems = [f"faltan ficheros en {', '.join(incomplete)}"] if incomplete else []
+        if any(f.level is Level.ERROR for f in bundles):
+            problems.append("algún repo de repos_git no se ha empaquetado")
+        fail(f"backup INCOMPLETO: {'; '.join(problems)}. Revisa los avisos.")
     success("Backup terminado.")
 
 
@@ -110,6 +117,14 @@ def restore(
         str, typer.Option("--snapshot", "-s", help="Id del snapshot.")
     ] = "latest",
     yes: Annotated[bool, typer.Option("--si", help="No pide confirmación.")] = False,
+    other_path: Annotated[
+        bool,
+        typer.Option(
+            "--forzar-otra-ruta",
+            help="Restaura un snapshot hecho desde otra ruta (las KB guardan rutas "
+            "absolutas y habrá que revisarlas).",
+        ),
+    ] = False,
 ) -> None:
     """Restaura [bold]atril.toml[/], [bold]data/[/] y [bold]temarios/[/] en su ruta.
 
@@ -137,6 +152,11 @@ def restore(
     _show_snapshots([chosen])
     findings = _path_findings(station, chosen)
     show(findings)
+    if any(f.level is Level.WARNING for f in findings) and not other_path:
+        fail(
+            "el snapshot es de otra ruta; si es lo que quieres, repite con "
+            "--forzar-otra-ruta."
+        )
 
     stamp = time.strftime("%Y%m%d-%H%M%S")
     staging = station.root.with_name(f"{station.root.name}.restaurar-{stamp}")
@@ -230,10 +250,15 @@ def _bundle_findings(station: Station) -> list[Finding]:
         return [info("No hay repos de git que empaquetar.")]
     if shutil.which("git") is None:
         return [warning("git no está en el PATH: se copia sin bundles.")]
-    return [
-        ok(f"{name}.bundle") if result == "ok" else warning(f"{name}: {result}")
-        for name, result in backup.make_bundles(station)
-    ]
+    findings = []
+    for result in backup.make_bundles(station):
+        if not result.error:
+            findings.append(ok(f"{result.name}.bundle"))
+        elif result.required:
+            findings.append(error(f"{result.name}: {result.error}"))
+        else:
+            findings.append(warning(f"{result.name}: {result.error}"))
+    return findings
 
 
 def _backup_one(
@@ -258,6 +283,21 @@ def _backup_one(
                 progress.update(task, completed=done, total=total or None)
 
             summary = restic.backup(backup.backup_paths(station), update)
+        if summary.incomplete:
+            # Un snapshot incompleto no debe desplazar a uno completo en la
+            # retención: no se aplica hasta el siguiente backup correcto.
+            show(
+                [
+                    warning(f"{target.name}: no se pudo leer {item}")
+                    for item in summary.unread
+                ]
+                + [
+                    warning(
+                        f"{target.name}: snapshot incompleto; retención no aplicada."
+                    )
+                ]
+            )
+            return target, summary
         with console.status(f"Aplicando la retención en {escape(target.name)}..."):
             restic.forget(keep.daily, keep.weekly, keep.monthly)
     except BackupError as exc:
