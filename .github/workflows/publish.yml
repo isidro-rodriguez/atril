@@ -1,0 +1,97 @@
+name: Publish atril to PyPI
+
+# Se publica al subir a main un cambio en el paquete. La versión sale de
+# `pyproject.toml`; si ya existe el tag `vX.Y.Z` no se vuelve a publicar.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'README.md'
+      - 'LICENSE'
+  workflow_dispatch: { }
+
+concurrency:
+  group: publish-atril
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Comprobar versión
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      exists: ${{ steps.meta.outputs.exists }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Leer versión y comprobar si ya está publicada
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          TAG="v${VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" > /dev/null 2>&1; then
+            EXISTS=true
+            echo "::warning::${TAG} ya existe: si has cambiado atril, sube la versión en pyproject.toml."
+          else
+            EXISTS=false
+          fi
+          {
+            echo "version=${VERSION}"
+            echo "tag=${TAG}"
+            echo "exists=${EXISTS}"
+          } >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Construir y publicar atril ${{ needs.check.outputs.version }}
+    needs: check
+    if: needs.check.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # crear tag y release
+      id-token: write # publicación de confianza en PyPI (OIDC), sin token
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instalar uv y Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.13'
+
+      - name: Sincronizar dependencias
+        run: uv sync --locked
+
+      - name: Comprobaciones de calidad
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run ty check --error-on-warning
+          uv run pytest
+
+      - name: Construir atril
+        run: uv build
+
+      - name: Comprobar metadatos
+        run: uvx twine check dist/*
+
+      # Trusted publisher configurado en PyPI para este repo y este workflow.
+      - name: Publicar en PyPI
+        run: uv publish --trusted-publishing always dist/*
+
+      - name: Crear tag y release en GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ needs.check.outputs.tag }}" dist/* \
+            --target "${GITHUB_SHA}" \
+            --title "atril ${{ needs.check.outputs.version }}" \
+            --generate-notes

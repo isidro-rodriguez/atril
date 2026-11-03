@@ -17,7 +17,7 @@
 
 ```bash
 .
-├── .github/                # GitHub Actions CI and Dependabot
+├── .github/                # CI (ci.yaml), PyPI publishing (publish.yml) and Dependabot
 ├── .local/                 # Private local files (backups), not tracked by git
 ├── .pre-commit-config.yaml # pre-commit/pre-push hooks (ruff, ty, pytest)
 ├── CLAUDE.md               # This file
@@ -240,6 +240,14 @@ A task is done when:
 - `uv run pytest` passes without errors.
 - Documentation and README updated if API or usage changes.
 - Project version bumped in `pyproject.toml` and `CHANGELOG.md` updated (required before push).
+
+## Publishing
+
+`publish.yml` publishes to PyPI (trusted publishing, no token) on every push to `main` that
+touches `src/`, `pyproject.toml`, `README.md` or `LICENSE`, unless the tag `vX.Y.Z` of the
+current version already exists; it then creates that tag and a GitHub release. So a push that
+changes the package **must** bump the version, or nothing is published. `README.md` is the PyPI
+page: use absolute GitHub URLs for links.
 
 ## Versioning and changelog (pre-push)
 

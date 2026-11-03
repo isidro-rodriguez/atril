@@ -35,7 +35,7 @@ atril --estacion D:\Desarrollo\DeepTutor validar   # o ATRIL_ESTACION, o desde l
 | Backup | `backup [-d destino]` · `backup comprobar [--datos 5%]` · `backup restaurar -d destino` | 3 ✅ |
 | Otros | `accesos` | 5 |
 
-Configuración: [`docs/esquemas.md`](docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](docs/ejemplos/).
+Configuración: [`docs/esquemas.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](https://github.com/isidro-rodriguez/atril/blob/main/docs/ejemplos/).
 
 ## ✅ Calidad
 
@@ -50,10 +50,10 @@ Con [Poe the Poet](https://poethepoet.natn.io/): `poe check` · `poe fix` · `po
 
 ## Enlaces
 
-- Decisiones de diseño: [`docs/decisiones.md`](docs/decisiones.md)
+- Decisiones de diseño: [`docs/decisiones.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/decisiones.md)
 - Plantilla base: <https://github.com/isidro-rodriguez/acodo-template>
 - Acodo: <https://github.com/isidro-rodriguez/acodo>
 
 ## Licencia
 
-[MIT](LICENSE).
+[MIT](https://github.com/isidro-rodriguez/atril/blob/main/LICENSE).
