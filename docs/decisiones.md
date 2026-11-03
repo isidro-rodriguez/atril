@@ -47,7 +47,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | DeepTutor | `atril instalar` · `atril actualizar` · `atril arrancar` · `atril parar` · `atril estado` · `atril parches` |
 | Temarios | `atril temario lista` · `atril temario cobertura <t>` |
 | Fuentes | `atril fuentes descargar <t>` · `atril fuentes comprobar <t>` |
-| KB | `atril kb indexar <t> [kb]` · `atril kb reindexar <kb>` · `atril kb evaluar <kb>` |
+| KB | `atril kb estado [t] [kb]` · `atril kb indexar <t> [kb]` · `atril kb reindexar <kb>` · `atril kb evaluar <kb>` |
 | Backup | `atril backup` · `atril backup comprobar` · `atril backup restaurar` |
 | Configuración | `atril validar` (fase 0) |
 

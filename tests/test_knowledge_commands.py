@@ -291,3 +291,47 @@ def test_reindex_unknown_or_missing_kb(station: Path) -> None:
     result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
     assert result.exit_code == 1
     assert "aún no existe" in result.output
+
+
+@pytest.fixture
+def wide(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Consola de 120 columnas, como el terminal de destino."""
+    monkeypatch.setattr(commands.console, "width", 120)
+
+
+def test_status_shows_counts_and_changes_nothing(
+    station: Path, monkeypatch: pytest.MonkeyPatch, wide: None
+) -> None:
+    _record_adds(monkeypatch)
+    _invoke(station, "kb", "indexar", "normativa", "norm-edificacion-cte")
+    ledger_file = ledger_path(load_syllabus(station / "temarios" / "normativa"))
+    before = ledger_file.read_bytes()
+    monkeypatch.setattr(Indexer, "add", lambda *a, **k: pytest.fail("no indexa"))
+
+    result = _invoke(station, "kb", "estado")
+
+    assert result.exit_code == 0, result.output
+    rows = {
+        line.split("│")[1].strip(): [c.strip() for c in line.split("│")[2:-1]]
+        for line in result.output.splitlines()
+        if line.startswith("│")
+    }
+    assert rows["norm-edificacion-cte"][:6] == ["2", "2", "0", "0", "0", "0"]
+    assert rows["norm-edificacion-cte-guias"][:3] == ["1", "0", "1"]
+    assert rows["norm-edificacion-cte-guias"][6] == "sin crear"
+    assert "por indexar guia-cte-si" in result.output
+    assert ledger_file.read_bytes() == before
+
+
+def test_status_reports_running_run(station: Path, wide: None) -> None:
+    kb_dir = load_station(station).kb_dir("norm-edificacion-cte")
+    write(
+        kb_dir / ".indexing-run.json",
+        json.dumps({"task_id": "t1", "state": "running", "phase": "embedding"}),
+    )
+
+    result = _invoke(station, "kb", "estado", "normativa", "norm-edificacion-cte")
+
+    assert result.exit_code == 0, result.output
+    # El proceso dueño no existe: un run "running" huérfano cuenta como interrumpido.
+    assert "interrumpido" in result.output

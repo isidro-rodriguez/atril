@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.10.0] - 2026-11-03
+
+### Added
+
+- `atril kb estado [temario] [kb] [--detalle]`: tabla por KB con las fuentes indexadas,
+  nuevas, cambiadas, sin fichero y retiradas (cada una cuenta en una sola columna), y el
+  estado del último indexado de DeepTutor (en marcha, completado, interrumpido...). Solo lee:
+  hasta ahora, la única forma de verlo era `kb indexar`, que además se ponía a indexar.
+
 ## [0.9.0] - 2026-11-03
 
 ### Added

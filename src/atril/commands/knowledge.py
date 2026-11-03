@@ -1,4 +1,4 @@
-"""Comandos de KB: ``atril kb indexar`` y ``atril kb reindexar``."""
+"""Comandos de KB: ``atril kb estado``, ``indexar``, ``reindexar`` y ``evaluar``."""
 
 import time
 from pathlib import Path
@@ -23,6 +23,7 @@ from atril.commands._common import (
     success,
 )
 from atril.commands.deeptutor import launch, shutdown
+from atril.config import ConfigError, load_syllabi
 from atril.config.station import Station
 from atril.config.syllabus import KnowledgeBase, Syllabus
 from atril.deeptutor import DeepTutor
@@ -67,6 +68,122 @@ _STATE_STYLE = {
 
 REINDEX_START_TIMEOUT = 60.0
 """Segundos que se espera a que DeepTutor publique el run del reindexado."""
+
+
+_STATE_COLUMNS = (
+    ("Indexadas", PlanState.INDEXED),
+    ("Nuevas", PlanState.NEW),
+    ("Cambiadas", PlanState.CHANGED),
+    ("Faltan", PlanState.MISSING),
+    ("Retiradas", PlanState.REMOVED),
+)
+"""Columnas de ``kb estado``: cada fuente cuenta en una sola."""
+
+
+@kb_app.command("estado")
+def status(
+    ctx: typer.Context,
+    syllabus_id: Annotated[
+        str | None,
+        typer.Argument(metavar="TEMARIO", help="Id del temario; por defecto, todos."),
+    ] = None,
+    kb_id: Annotated[
+        str | None,
+        typer.Argument(metavar="KB", help="KB del temario; por defecto, todas."),
+    ] = None,
+    detail: Annotated[
+        bool, typer.Option("--detalle", help="Muestra también cada fuente de cada KB.")
+    ] = False,
+) -> None:
+    """Muestra qué fuentes están indexadas en cada KB, sin modificar nada.
+
+    Compara los ficheros con [bold]fuentes/indexado.json[/] y añade el estado del
+    último indexado de DeepTutor (p. ej. uno en marcha).
+    """
+    station = get_station(ctx)
+    if syllabus_id is None:
+        try:
+            syllabi, _ = load_syllabi(station.syllabi_dir)
+        except ConfigError as exc:
+            fail(str(exc))
+    else:
+        syllabi = [get_syllabus(ctx, syllabus_id)]
+    if kb_id is not None and len(syllabi) != 1:
+        fail("indica el temario para elegir una KB.")
+
+    table = Table(title="Indexado", title_justify="left")
+    widest = max((len(kb.id) for s in syllabi for kb in s.knowledge_bases), default=2)
+    table.add_column("KB", no_wrap=True, min_width=widest)
+    table.add_column("Total", justify="right")
+    for column, _ in _STATE_COLUMNS:
+        table.add_column(column, justify="right")
+    table.add_column("DeepTutor")
+    findings: list[Finding] = []
+    for syllabus in syllabi:
+        kbs = _kbs(syllabus, kb_id)
+        ledger = load_or_fail(lambda s=syllabus: Ledger(ledger_path(s)))
+        for kb in kbs:
+            items = plan(syllabus, kb, ledger)
+            if detail:
+                _show_plan(kb, items)
+            counts = [
+                sum(i.state is state for i in items) for _, state in _STATE_COLUMNS
+            ]
+            table.add_row(
+                escape(kb.id),
+                str(len(items) - counts[-1]),
+                *(
+                    _count(n, state)
+                    for n, (_, state) in zip(counts, _STATE_COLUMNS, strict=True)
+                ),
+                _run_state(station, kb),
+            )
+            new = [i.source_id for i in items if i.state is PlanState.NEW]
+            if new:
+                findings.append(
+                    info(
+                        f"{kb.id}: por indexar {', '.join(new)}; ejecuta atril kb "
+                        f"indexar {syllabus.id} {kb.id}"
+                    )
+                )
+        findings.extend(_pending(syllabus, kbs, ledger))
+    console.print(table)
+    show(findings or [ok("Todas las fuentes con fichero están indexadas.")])
+
+
+_RUN_LABELS = {
+    "running": "en marcha",
+    "completed": "completado",
+    "failed": "fallido",
+    "interrupted": "interrumpido",
+    "cancelled": "cancelado",
+    "partial": "parcial",
+}
+"""Estados de ``.indexing-run.json`` en español."""
+
+
+def _count(number: int, state: PlanState) -> str:
+    """Celda de recuento, coloreada si no es cero."""
+    if not number:
+        return "0"
+    return f"[{_STATE_STYLE[state]}]{number}[/]"
+
+
+def _run_state(station: Station, kb: KnowledgeBase) -> str:
+    """Último indexado de DeepTutor para la KB, en una celda."""
+    kb_dir = station.kb_dir(kb.id)
+    if not kb_dir.is_dir():
+        return "[dim]sin crear[/]"
+    run = KbRun.load(kb_dir)
+    if run is None:
+        return "[dim]sin registro[/]"
+    state = run.state
+    label = escape(_RUN_LABELS.get(state, state) or "?")
+    if state == "running":
+        return f"[cyan]{label}[/] · {escape(run.describe(time.time()))}"
+    if state in RETRY_STATES:
+        return f"[bold yellow]{label}[/]"
+    return label
 
 
 @kb_app.command("indexar")
@@ -366,6 +483,14 @@ def _index_one(
 
 def _show_pending(syllabus: Syllabus, kbs: list[KnowledgeBase], ledger: Ledger) -> None:
     """Avisa de KB que necesitan reindexarse y de fuentes sin fichero."""
+    if findings := _pending(syllabus, kbs, ledger):
+        show(findings, "Pendiente")
+
+
+def _pending(
+    syllabus: Syllabus, kbs: list[KnowledgeBase], ledger: Ledger
+) -> list[Finding]:
+    """KB que necesitan reindexarse y fuentes sin fichero."""
     findings: list[Finding] = []
     for kb in kbs:
         items = plan(syllabus, kb, ledger)
@@ -388,8 +513,7 @@ def _show_pending(syllabus: Syllabus, kbs: list[KnowledgeBase], ledger: Ledger) 
             findings.append(
                 warning(f"{kb.id}: hay {reason}; ejecuta atril kb reindexar {kb.id}")
             )
-    if findings:
-        show(findings, "Pendiente")
+    return findings
 
 
 # --- reindexado ----------------------------------------------------------------

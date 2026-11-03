@@ -45,6 +45,7 @@ atril fuentes comprobar <t>      # busca versiones nuevas; la anterior va al his
 ### Bases de conocimiento
 
 ```bash
+atril kb estado [t] [kb]         # qué fuentes están indexadas (solo lee)
 atril kb indexar <t> [kb]        # añade a las KB las fuentes nuevas, una a una
 atril kb reindexar <kb>          # sustituye fuentes cambiadas y purga las retiradas
 atril kb evaluar <kb> [-k 5]     # mide la recuperación y la compara con el informe anterior
