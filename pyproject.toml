@@ -1,0 +1,109 @@
+[project]
+name = "atril"
+version = "0.1.0"
+description = "Gestiona una instalación local de DeepTutor y sus temarios"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Natural Language :: Spanish",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+
+dependencies = [
+  "acodo>=0.4,<1",
+  "typer>=0.20",
+]
+
+[project.urls]
+Repository = "https://github.com/isidro-rodriguez/atril"
+Changelog = "https://github.com/isidro-rodriguez/atril/blob/main/CHANGELOG.md"
+
+[project.scripts]
+atril = "atril.main:main"
+
+[dependency-groups]
+dev = [
+  "pre-commit>=4.7.0",
+  "pytest>=9.1.1",
+  "pytest-cov>=7.1.0",
+  "ruff>=0.17.1",
+  "ty>=0.0.89",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.14.0"]
+build-backend = "uv_build"
+
+# --- pytest coverage ---------------------------------------------------------
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["*/tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+exclude_also = ["pragma: no cover", "if TYPE_CHECKING:", "if __name__ == .__main__.:"]
+
+# --- Poe the Poet (opcional) -------------------------------------------------
+# Atajos para quien tenga `poe` instalado globalmente (`uv tool install poethepoet`).
+# No es dependencia del proyecto: todo se puede ejecutar también con `uv run`.
+[tool.poe]
+executor.type = "uv"
+
+[tool.poe.tasks.check]
+help = "Formato, lint, tipos y tests (lo mismo que la CI)"
+sequence = [
+  "ruff format --check .",
+  "ruff check .",
+  "ty check",
+  "pytest",
+]
+default_item_type = "cmd"
+
+[tool.poe.tasks.fix]
+help = "Aplica el formato y las correcciones automáticas de Ruff"
+sequence = ["ruff format .", "ruff check --fix ."]
+default_item_type = "cmd"
+
+[tool.poe.tasks.backup]
+help = "Copia de seguridad del repositorio con git bundle"
+cmd = "python scripts/backup.py"
+
+# --- pytest ------------------------------------------------------------------
+[tool.pytest.ini_options]
+addopts = ["-ra", "--strict-markers", "--import-mode=importlib", "--doctest-modules"]
+testpaths = ["tests", "src"]
+pythonpath = ["tests"]
+
+# --- Astral Ruff -------------------------------------------------------------
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "C4", "PERF", "PTH", "RUF", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["atril"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+# --- Astral ty ---------------------------------------------------------------
+[tool.ty.environment]
+python-version = "3.13"
+extra-paths = ["tests"]
+
+[tool.ty.src]
+include = ["src", "tests"]

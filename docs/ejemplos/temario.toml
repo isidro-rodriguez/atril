@@ -1,0 +1,41 @@
+# temarios\normativa\temario.toml — el id del temario es el nombre de su carpeta.
+
+[temario]
+nombre = "Normativa de construcción y gestión integrada"
+prompt = "prompt.md"                            # por defecto
+dominios_web = ["boe.es", "codigotecnico.org"]  # búsqueda web permitida
+
+# Cada fuente pertenece a una sola KB; las KB la seleccionan por patrones de id.
+[[kb]]
+id = "norm-edificacion-cte"
+vinculante = true
+fuentes = ["cte-*", "loe"]
+evaluacion = "eval/cte-v2.jsonl"   # opcional, relativa al temario
+
+[[kb]]
+id = "norm-edificacion-cte-guias"
+vinculante = false
+fuentes = ["guia-cte-*"]
+descripcion = "Guías de aplicación del CTE (no vinculantes)"
+
+[[fuente]]
+id = "cte-db-si"
+tipo = "pdf"
+titulo = "CTE DB-SI Seguridad en caso de incendio"
+url = "https://www.codigotecnico.org/pdf/Documentos/SI/DBSI.pdf"
+carpeta = "01_edificacion_CTE"     # bajo fuentes\; archivo = DBSI.pdf (de la URL)
+comprobar = "mensual"              # nunca (defecto) | semanal | mensual
+
+[[fuente]]
+id = "loe"
+tipo = "pdf"
+url = "https://www.boe.es/buscar/pdf/1999/BOE-A-1999-21567-consolidado.pdf"
+archivo = "LOE.pdf"
+carpeta = "01_edificacion_CTE"
+comprobar = "mensual"
+
+[[fuente]]
+id = "guia-cte-si"
+tipo = "pdf"                       # sin url: se coloca a mano en fuentes\
+archivo = "guia-db-si.pdf"
+carpeta = "02_guias_CTE"

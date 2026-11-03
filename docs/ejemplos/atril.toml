@@ -1,0 +1,31 @@
+# atril.toml — configuración de la estación (D:\Desarrollo\DeepTutor\atril.toml).
+# La raíz de la estación es la carpeta que contiene este fichero; su estructura
+# es fija: app\ (DeepTutor), data\ (DEEPTUTOR_HOME) y temarios\<id>\.
+
+[deeptutor]
+repo = "https://github.com/HKUDS/DeepTutor"   # por defecto
+rama = "dev"                                  # por defecto
+puertos = { backend = 8001, frontend = 3782 } # por defecto
+parches = ["paginas-citas"]                   # parches incluidos en atril
+
+[ollama]
+url = "http://localhost:11434"                # por defecto
+embedding = "qwen3-embedding:8b"
+dimension = 4096
+contexto = 8192    # = OLLAMA_CONTEXT_LENGTH y ventana declarada en DeepTutor
+
+[indexado]         # tabla opcional; estos son los valores por defecto
+parser = "docling"
+chunk = 1024
+solape = 150
+
+[backup]
+# La contraseña de restic se toma de RESTIC_PASSWORD o RESTIC_PASSWORD_FILE.
+retencion = { diarias = 7, semanales = 4, mensuales = 12 } # por defecto
+repos_git = ['D:\Desarrollo\Repositorios\atril'] # además del git de cada temario
+
+[backup.destinos.disco]
+repo = 'E:\restic-atril'
+
+[backup.destinos.drive]
+repo = "rclone:gdrive:Atril/restic"
