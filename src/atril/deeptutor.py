@@ -4,6 +4,7 @@ DeepTutor no es dependencia de atril: se ejecuta el ``deeptutor`` del entorno
 virtual de ``app/`` con ``DEEPTUTOR_HOME`` apuntando a la raíz de la estación.
 """
 
+import json
 import os
 import subprocess
 import time
@@ -12,7 +13,7 @@ from dataclasses import dataclass
 
 from atril import net
 from atril.config.station import Station
-from atril.processes import PortOwner, kill_tree, port_owners
+from atril.processes import PortOwner, is_alive, kill_tree, port_owners
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,14 +50,17 @@ class DeepTutor:
         }
 
     def run(self, *args: str) -> int:
-        """Ejecuta ``deeptutor <args> --home <raíz>`` y devuelve el código de salida."""
-        command = [
-            str(self.station.deeptutor_cli),
-            *args,
-            "--home",
-            str(self.station.root),
-        ]
+        """Ejecuta ``deeptutor <args>`` con el entorno de la estación.
+
+        Los subcomandos que lo admiten reciben ``--home`` explícito; ``doctor`` no lo
+        acepta y se apoya en ``DEEPTUTOR_HOME``.
+        """
+        command = [str(self.station.deeptutor_cli), *args]
         return subprocess.run(command, env=self.env(), check=False).returncode
+
+    def _home(self) -> tuple[str, str]:
+        """Opción ``--home <raíz>``."""
+        return ("--home", str(self.station.root))
 
     def backend_up(self) -> bool:
         """El backend responde en ``/health/ready``."""
@@ -72,11 +76,11 @@ class DeepTutor:
 
     def start(self) -> int:
         """Lanza DeepTutor en segundo plano, sin abrir el navegador."""
-        return self.run("start", "--detach", "--no-browser")
+        return self.run("start", *self._home(), "--detach", "--no-browser")
 
     def stop(self) -> int:
         """Detiene el lanzador de DeepTutor (puede dejar huérfanos)."""
-        return self.run("stop")
+        return self.run("stop", *self._home())
 
     def wait(
         self,
@@ -105,6 +109,19 @@ class DeepTutor:
         """Cierra los procesos indicados y sus descendientes."""
         for pid in {owner.pid for owner in owners}:
             kill_tree(pid)
+
+    def launcher_alive(self) -> bool | None:
+        """Indica si vive el lanzador de ``launcher.json``.
+
+        Returns:
+            ``None`` si no hay estado legible (no se sabe), o si vive su PID.
+        """
+        try:
+            state = json.loads(self.station.launcher_state.read_text(encoding="utf-8"))
+            pid = int(state["pid"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+        return is_alive(pid)
 
     def launcher_log_tail(self, lines: int = 25) -> list[str]:
         """Últimas líneas del log del lanzador (vacío si no existe)."""

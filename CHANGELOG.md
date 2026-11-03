@@ -5,6 +5,37 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.3.0] - 2026-11-03
+
+### Added
+
+- `atril instalar [--sin-docling]`: sustituye a `instalar.ps1` e `instalar-docling.ps1`.
+  Comprueba herramientas, clona la rama (superficial, con rutas largas solo en ese repo),
+  crea `app/.venv`, instala DeepTutor, paquetes extra y Docling, instala el frontend, descarga
+  el modelo de embedding, aplica la configuración (`init` y `config apply`), fija parser y
+  chunks, aplica los parches y muestra `deeptutor doctor`. Es re-ejecutable.
+- `atril actualizar [--sin-docling] [--sin-arrancar]`: para DeepTutor si está en marcha,
+  deshace los parches, trae la última versión de la rama, reinstala dependencias (el frontend
+  solo si cambia su lockfile), reaplica los parches y vuelve a arrancar.
+- `atril.toml`: `[deeptutor] python`, `paquetes`, `busqueda` y `[deeptutor.llm]`, e
+  `[indexado] descargar_modelos`; `parser` se valida contra los motores de DeepTutor. Con
+  ellos `atril.toml` sustituye a `setup.json`.
+- Aviso al cambiar los chunks: las KB existentes los conservan hasta reindexarlas.
+
+### Changed
+
+- `--home` solo se pasa a los subcomandos de DeepTutor que lo admiten (`doctor` no).
+- `arrancar` deja de esperar en cuanto muere el lanzador de DeepTutor (`launcher.json`), por
+  ejemplo si falla la compilación del frontend, y muestra el log; antes esperaba hasta agotar
+  el tiempo (10 min).
+- `parar` no llama a `deeptutor stop` si no hay lanzador en marcha (evita un aviso falso), pero
+  sigue cerrando huérfanos.
+
+### Fixed
+
+- `deeptutor doctor` sale con código 1 cuando falla algún check, aunque emite el JSON; atril
+  lo trataba como fallo del comando en lugar de mostrar el diagnóstico.
+
 ## [0.2.1] - 2026-11-03
 
 ### Changed

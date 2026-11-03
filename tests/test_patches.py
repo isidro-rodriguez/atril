@@ -40,3 +40,11 @@ def test_apply_does_not_touch_changed_code(tmp_path: Path) -> None:
 def test_registry_names_match_keys() -> None:
     assert all(name == patch.name for name, patch in PATCHES.items())
     assert "paginas-citas" in PATCHES
+
+
+def test_revert(tmp_path: Path) -> None:
+    write(tmp_path / "pkg/mod.py", "x = new()\n")
+
+    assert PATCH.revert(tmp_path) is PatchState.PENDING
+    assert (tmp_path / "pkg/mod.py").read_text() == "x = old()\n"
+    assert PATCH.revert(tmp_path) is PatchState.PENDING

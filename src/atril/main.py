@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from atril import __version__
-from atril.commands import config, deeptutor
+from atril.commands import config, deeptutor, install
 from atril.commands._common import console
 
 app = typer.Typer(
@@ -57,6 +57,8 @@ _CONFIG = "Configuración"
 _DEEPTUTOR = "DeepTutor"
 
 app.command("validar", rich_help_panel=_CONFIG)(config.validate)
+app.command("instalar", rich_help_panel=_DEEPTUTOR)(install.install_command)
+app.command("actualizar", rich_help_panel=_DEEPTUTOR)(install.update_command)
 app.command("arrancar", rich_help_panel=_DEEPTUTOR)(deeptutor.start)
 app.command("parar", rich_help_panel=_DEEPTUTOR)(deeptutor.stop)
 app.command("estado", rich_help_panel=_DEEPTUTOR)(deeptutor.status)

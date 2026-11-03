@@ -169,6 +169,7 @@ def test_stop_kills_own_orphans(station: Path, monkeypatch: pytest.MonkeyPatch) 
     own = PortOwner(8001, 7, "python.exe", f"{station}/app/.venv/python")
     killed: list[tuple[PortOwner, ...]] = []
     monkeypatch.setattr(DeepTutor, "stop", lambda self: 0)
+    monkeypatch.setattr(DeepTutor, "launcher_alive", lambda self: True)
     monkeypatch.setattr(DeepTutor, "orphans", lambda self: Orphans((own,), ()))
     monkeypatch.setattr(DeepTutor, "kill", lambda self, owners: killed.append(owners))
     _services(monkeypatch, backend=False, frontend=False)
@@ -193,3 +194,42 @@ def test_deeptutor_env_and_orphan_split(
     assert dt.orphans() == Orphans((own,), (foreign,))
     assert dt.env()["DEEPTUTOR_HOME"] == str(loaded.root)
     assert dt.health_url == "http://127.0.0.1:8001/health/ready"
+
+
+def test_start_fails_fast_when_launcher_dies(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loaded = load_station(station)
+    write(loaded.launcher_log, "Build failed because of webpack errors\n")
+    write(loaded.launcher_state, '{"pid": 999999, "status": "starting"}')
+    monkeypatch.setattr(DeepTutor, "start", lambda self: 0)
+    monkeypatch.setattr(DeepTutor, "ready", lambda self: False)
+    monkeypatch.setattr(dt_module, "is_alive", lambda pid: False)
+
+    result = _invoke(station, "arrancar", "--espera", "600")
+
+    assert result.exit_code == 1
+    assert "ha terminado sin arrancar" in result.output
+    assert "Build failed" in result.output
+
+
+def test_launcher_alive(station: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dt = DeepTutor(load_station(station))
+    assert dt.launcher_alive() is None
+
+    write(dt.station.launcher_state, '{"pid": 42}')
+    monkeypatch.setattr(dt_module, "is_alive", lambda pid: pid == 42)
+    assert dt.launcher_alive() is True
+
+
+def test_stop_when_already_stopped(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(DeepTutor, "stop", lambda self: pytest.fail("no debe llamarse"))
+    monkeypatch.setattr(DeepTutor, "launcher_alive", lambda self: None)
+    _services(monkeypatch, backend=False, frontend=False)
+
+    result = _invoke(station, "parar")
+
+    assert result.exit_code == 0, result.output
+    assert "No hay lanzador" in result.output

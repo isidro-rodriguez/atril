@@ -16,15 +16,25 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 |---|---|---|---|---|
 | `[deeptutor]` | `repo` | URL | `https://github.com/HKUDS/DeepTutor` | |
 | | `rama` | texto | `"dev"` | |
+| | `python` | texto | `"3.13"` | Versión para `app\.venv` |
 | | `puertos` | `{ backend, frontend }` | `8001`, `3782` | Distintos, 1–65535 |
 | | `parches` | lista de nombres | `[]` | Parches incluidos en atril (`paginas-citas`) |
+| | `paquetes` | lista de requisitos | `[]` | Extra en `app\.venv` (p. ej. `claude-agent-sdk`) |
+| | `busqueda` | texto | — | Proveedor de búsqueda de DT (`duckduckgo`) |
+| `[deeptutor.llm]` (opcional) | `proveedor` | texto | — | Junto con `modelo`; sin claves en el fichero |
+| | `modelo` | texto | — | |
 | `[ollama]` | `url` | URL | `http://localhost:11434` | |
 | | `embedding` | texto | **obligatorio** | |
 | | `dimension` | entero ≥ 1 | **obligatorio** | |
 | | `contexto` | entero ≥ 1 | `8192` | = `OLLAMA_CONTEXT_LENGTH` y ventana en DT |
-| `[indexado]` (opcional) | `parser` | texto | `"docling"` | DT usa `text_only` por defecto |
+| `[indexado]` (opcional) | `parser` | `text_only` · `docling` · `mineru` · `markitdown` · `pymupdf4llm` · `liteparse` · `tika` | `"docling"` | DT usa `text_only` por defecto |
 | | `chunk` | entero ≥ 1 | `1024` | |
 | | `solape` | entero ≥ 0 | `150` | Menor que `chunk` |
+| | `descargar_modelos` | booleano | `true` | Docling/MinerU descargan sus modelos |
+
+`atril instalar` traslada a DeepTutor `[deeptutor.llm]`, `busqueda`, `[ollama]` y los puertos
+(`deeptutor config apply`), y `[indexado]` (ajustes internos de parser y chunks). Sustituye a
+`setup.json`.
 | `[backup]` | `retencion` | `{ diarias, semanales, mensuales }` | `7`, `4`, `12` | `restic forget --keep-*` |
 | | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`) |
 | `[backup.destinos.<nombre>]` | `repo` | texto | **obligatorio** | Repositorio restic; al menos uno |

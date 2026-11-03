@@ -1,12 +1,19 @@
 # atril.toml — configuración de la estación (D:\Desarrollo\DeepTutor\atril.toml).
-# La raíz de la estación es la carpeta que contiene este fichero; su estructura
-# es fija: app\ (DeepTutor), data\ (DEEPTUTOR_HOME) y temarios\<id>\.
+# La raíz de la estación es la carpeta que contiene este fichero y el DEEPTUTOR_HOME;
+# su estructura es fija: app\ (DeepTutor), data\ (datos de DT) y temarios\<id>\.
 
 [deeptutor]
 repo = "https://github.com/HKUDS/DeepTutor"   # por defecto
 rama = "dev"                                  # por defecto
 puertos = { backend = 8001, frontend = 3782 } # por defecto
+python = "3.13"                               # por defecto
 parches = ["paginas-citas"]                   # parches incluidos en atril
+paquetes = ["claude-agent-sdk>=0.2.174,<0.3"] # extra para el LLM claude_code
+busqueda = "duckduckgo"                       # proveedor de búsqueda web de DT
+
+[deeptutor.llm]    # opcional; solo proveedores sin clave en fichero (OAuth)
+proveedor = "claude_code"
+modelo = "claude-code/opus"
 
 [ollama]
 url = "http://localhost:11434"                # por defecto
@@ -15,9 +22,10 @@ dimension = 4096
 contexto = 8192    # = OLLAMA_CONTEXT_LENGTH y ventana declarada en DeepTutor
 
 [indexado]         # tabla opcional; estos son los valores por defecto
-parser = "docling"
+parser = "docling" # text_only | docling | mineru | markitdown | pymupdf4llm | ...
 chunk = 1024
 solape = 150
+descargar_modelos = true  # permite a Docling/MinerU descargar sus modelos
 
 [backup]
 # La contraseña de restic se toma de RESTIC_PASSWORD o RESTIC_PASSWORD_FILE.

@@ -92,3 +92,38 @@ def test_unknown_patch(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="parche desconocido: 'otro'"):
         load_station(tmp_path)
+
+
+def test_install_defaults(tmp_path: Path) -> None:
+    write(tmp_path / "atril.toml", MINIMAL_STATION)
+
+    station = load_station(tmp_path)
+
+    assert station.deeptutor.python == "3.13"
+    assert station.deeptutor.packages == ()
+    assert station.deeptutor.llm is None
+    assert station.deeptutor.search is None
+    assert station.indexing.download_models is True
+
+
+def test_example_install_keys(station_dir: Path) -> None:
+    dt = load_station(station_dir).deeptutor
+
+    assert dt.llm is not None
+    assert (dt.llm.provider, dt.llm.model) == ("claude_code", "claude-code/opus")
+    assert dt.search == "duckduckgo"
+    assert dt.packages == ("claude-agent-sdk>=0.2.174,<0.3",)
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ("[deeptutor.llm]\nproveedor = 'claude_code'", "'proveedor' y 'modelo'"),
+        ("[indexado]\nparser = 'pdfminer'", "parser desconocido"),
+    ],
+)
+def test_invalid_install_keys(tmp_path: Path, extra: str, message: str) -> None:
+    write(tmp_path / "atril.toml", MINIMAL_STATION + extra)
+
+    with pytest.raises(ConfigError, match=message):
+        load_station(tmp_path)

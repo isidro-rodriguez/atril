@@ -32,10 +32,11 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── scripts/backup.py       # git bundle of this repo (`poe backup`)
 ├── src/atril/
-│   ├── commands/           # CLI commands by area (config, deeptutor); `_common` helpers
+│   ├── commands/           # CLI commands by area (config, deeptutor, install); `_common` helpers
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
+│   ├── install.py          # Install/update steps (git, uv, npm, ollama, deeptutor config)
 │   ├── net.py              # Minimal urllib helpers (is_up, get_json)
 │   ├── ollama.py           # Ollama status and checks
 │   ├── patches.py          # Patch registry and idempotent apply
@@ -83,7 +84,13 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Patches are idempotent text replacements registered in `atril.patches.PATCHES`; a patch whose
   original and patched text are both missing is an error (DeepTutor changed), never forced.
 - Tests never wait for real time or call real services: fake `time.sleep`/`time.monotonic`,
-  `ollama.get_status` and `DeepTutor` methods.
+  `ollama.get_status`, `DeepTutor` methods and `install.run_command`/`install.capture`.
+- `deeptutor doctor` does not accept `--home`; pass it explicitly only to `init`, `config`,
+  `start` and `stop`, and rely on `DEEPTUTOR_HOME` (from `DeepTutor.env()`) for the rest.
+- DeepTutor settings come from `atril.toml` (no `setup.json`): `config apply` for LLM, embedding,
+  search and ports; `install._SETTINGS_SCRIPT`, run with `app/`'s Python, for parser and chunks.
+- `app/` is a shallow clone: update with `fetch --depth 1` + `reset --hard FETCH_HEAD`, only on a
+  clean tree and after reverting patches.
 
 ## Project rules (load-bearing)
 

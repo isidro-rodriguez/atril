@@ -56,6 +56,20 @@ class Patch:
             return PatchState.APPLIED
         return state
 
+    def revert(self, app_dir: Path) -> PatchState:
+        """Deshace el parche si está aplicado (antes de actualizar con git).
+
+        Returns:
+            El estado final: ``PENDING`` si se ha deshecho o ya lo estaba; si no,
+            ``CHANGED`` o ``NO_FILE`` (no se toca nada).
+        """
+        state = self.state(app_dir)
+        if state is PatchState.APPLIED:
+            path = app_dir / self.file
+            path.write_bytes(_read(path).replace(self.new, self.old, 1).encode("utf-8"))
+            return PatchState.PENDING
+        return state
+
 
 def _read(path: Path) -> str:
     """Lee en UTF-8 conservando los finales de línea originales."""

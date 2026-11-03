@@ -55,6 +55,11 @@ def _describe(port: int, pid: int) -> PortOwner:
         return PortOwner(port, pid, "", "")
 
 
+def is_alive(pid: int) -> bool:
+    """Indica si existe un proceso con ese PID."""
+    return psutil.pid_exists(pid)
+
+
 def kill_tree(pid: int) -> None:
     """Cierra ``pid`` y todos sus descendientes; ignora los que ya no existen."""
     try:

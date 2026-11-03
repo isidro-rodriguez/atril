@@ -55,8 +55,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 ## Fases
 
 0. ✅ Cerrar esquemas `atril.toml` y `temario.toml`; esqueleto desde `acodo-template`; `atril validar`.
-1. ✅ Núcleo: config, control de DT (arrancar/parar/estado, huérfanos, parches), comprobación de Ollama.
-   1b. `instalar` y `actualizar` (portar `instalar.ps1`, `instalar-docling.ps1`, `setup.json`).
+1. ✅ Núcleo: config, control de DT (instalar/actualizar/arrancar/parar/estado, huérfanos, parches), comprobación de Ollama. `atril.toml` sustituye a `setup.json`.
 2. Temarios: fuentes (descarga/actualización con hash e histórico), KB, evaluación.
 3. Backup y restauración.
 4. Migración de la estructura actual (`deeptutor_app` → `app`, `materia_normativa` → `temarios\normativa`).

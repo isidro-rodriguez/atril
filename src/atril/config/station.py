@@ -23,6 +23,23 @@ STATION_FILE = "atril.toml"
 DEEPTUTOR_REPO = "https://github.com/HKUDS/DeepTutor"
 """Repositorio de DeepTutor por defecto."""
 
+PARSERS = frozenset(
+    {"text_only", "docling", "mineru", "markitdown", "pymupdf4llm", "liteparse", "tika"}
+)
+"""Parsers de documentos de DeepTutor (``document_parsing.engine``)."""
+
+
+@dataclass(frozen=True, slots=True)
+class LlmConfig:
+    """Tabla ``[deeptutor.llm]``: proveedor y modelo de chat de DeepTutor.
+
+    Solo admite proveedores sin clave en el fichero (p. ej. ``claude_code`` con
+    OAuth); las claves de API nunca van en ``atril.toml``.
+    """
+
+    provider: str
+    model: str
+
 
 @dataclass(frozen=True, slots=True)
 class DeepTutorConfig:
@@ -30,9 +47,15 @@ class DeepTutorConfig:
 
     repo: str
     branch: str
+    python: str
     backend_port: int
     frontend_port: int
     patches: tuple[str, ...]
+    packages: tuple[str, ...]
+    """Paquetes extra que se instalan en ``app/.venv`` (``uv pip install``)."""
+    llm: LlmConfig | None
+    search: str | None
+    """Proveedor de búsqueda web de DeepTutor (``duckduckgo``...)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +79,8 @@ class IndexingConfig:
     parser: str
     chunk_size: int
     chunk_overlap: int
+    download_models: bool
+    """Permite que el parser descargue sus modelos locales (Docling, MinerU)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,9 +139,21 @@ class Station:
         return self.data_dir / "user" / "runtime" / "launcher.log"
 
     @property
+    def launcher_state(self) -> Path:
+        """Estado del lanzador en segundo plano (``pid``, ``status``)."""
+        return self.data_dir / "user" / "runtime" / "launcher.json"
+
+    @property
     def syllabi_dir(self) -> Path:
         """Carpeta de temarios."""
         return self.root / "temarios"
+
+    @property
+    def venv_python(self) -> Path:
+        """Python del entorno virtual de ``app/``."""
+        if sys.platform == "win32":
+            return self.app_dir / ".venv" / "Scripts" / "python.exe"
+        return self.app_dir / ".venv" / "bin" / "python"
 
     @property
     def deeptutor_cli(self) -> Path:
@@ -199,12 +236,24 @@ def _deeptutor(table: Table) -> DeepTutorConfig:
             known = ", ".join(sorted(PATCHES))
             raise table.error(f"parche desconocido: {patch!r} (disponibles: {known}).")
 
+    llm_table = table.get_table("llm", required=False)
+    provider = llm_table.get_str("proveedor", None)
+    model = llm_table.get_str("modelo", None)
+    llm_table.close()
+    if (provider is None) != (model is None):
+        raise llm_table.error("declara a la vez 'proveedor' y 'modelo'.")
+    llm = LlmConfig(provider, model) if provider and model else None
+
     config = DeepTutorConfig(
         repo=_url(table, "repo", DEEPTUTOR_REPO),
         branch=table.get_str("rama", "dev"),
+        python=table.get_str("python", "3.13"),
         backend_port=backend,
         frontend_port=frontend,
         patches=tuple(patches),
+        packages=tuple(table.get_str_list("paquetes", [])),
+        llm=llm,
+        search=table.get_str("busqueda", None),
     )
     table.close()
     return config
@@ -228,7 +277,13 @@ def _indexing(table: Table) -> IndexingConfig:
         parser=table.get_str("parser", "docling"),
         chunk_size=table.get_int("chunk", 1024),
         chunk_overlap=table.get_int("solape", 150, minimum=0),
+        download_models=table.get_bool("descargar_modelos", True),
     )
+    if config.parser not in PARSERS:
+        raise table.error(
+            f"parser desconocido: {config.parser!r} "
+            f"(disponibles: {', '.join(sorted(PARSERS))})."
+        )
     if config.chunk_overlap >= config.chunk_size:
         raise table.error("'solape' debe ser menor que 'chunk'.")
     table.close()
@@ -275,6 +330,7 @@ __all__ = [
     "ConfigError",
     "DeepTutorConfig",
     "IndexingConfig",
+    "LlmConfig",
     "OllamaConfig",
     "Retention",
     "Station",

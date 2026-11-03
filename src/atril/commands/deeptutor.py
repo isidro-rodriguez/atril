@@ -37,14 +37,27 @@ def start(
     """Arranca DeepTutor (y Ollama si hace falta) y abre el navegador."""
     station = get_station(ctx)
     dt = _installed(station)
-
     if dt.ready():
         console.print(f"DeepTutor ya está en marcha: [link]{dt.frontend_url}[/]")
-        _open(dt, no_browser)
-        return
+    else:
+        launch(dt, timeout)
+    if not no_browser:
+        webbrowser.open(dt.frontend_url)
 
-    show(_patch_findings(station))
-    show(_ensure_ollama(station))
+
+def stop(ctx: typer.Context) -> None:
+    """Detiene DeepTutor y cierra sus procesos huérfanos."""
+    shutdown(_installed(get_station(ctx)))
+
+
+def launch(dt: DeepTutor, timeout: int) -> None:
+    """Arranca DeepTutor y espera a que responda; termina con error si no lo hace.
+
+    Abre Ollama si hace falta, avisa de parches pendientes y cierra restos de un
+    arranque anterior de la estación. Se niega si los puertos son de otro programa.
+    """
+    show(_patch_findings(dt.station))
+    show(_ensure_ollama(dt.station))
 
     orphans = dt.orphans()
     if orphans.foreign:
@@ -63,23 +76,28 @@ def start(
     with console.status(
         "Esperando a backend y frontend (tras actualizar, compila el frontend)..."
     ):
-        ready = dt.wait(dt.ready, timeout)
-    if not ready:
+        # Se deja de esperar si el lanzador muere (p. ej. falla el build del frontend).
+        ready = dt.wait(lambda: dt.ready() or dt.launcher_alive() is False, timeout)
+    if not dt.ready():
+        if ready:
+            _fail_with_log(dt, "el lanzador de DeepTutor ha terminado sin arrancar.")
         _fail_with_log(dt, f"DeepTutor no responde tras {timeout} s.")
     success(f"Listo: {dt.frontend_url}")
-    _open(dt, no_browser)
 
 
-def stop(ctx: typer.Context) -> None:
-    """Detiene DeepTutor y cierra sus procesos huérfanos."""
-    station = get_station(ctx)
-    dt = _installed(station)
-
-    with console.status("Deteniendo DeepTutor..."):
-        stopped = dt.stop() == 0
-    if not stopped:
-        show([warning("'deeptutor stop' ha terminado con error; se sigue.")])
-    time.sleep(2)
+def shutdown(dt: DeepTutor) -> None:
+    """Detiene DeepTutor y sus huérfanos; termina con error si no se liberan."""
+    idle = (
+        dt.launcher_alive() is not True and not dt.backend_up() and not dt.frontend_up()
+    )
+    if idle:
+        show([info("No hay lanzador de DeepTutor en marcha.")])
+    else:
+        with console.status("Deteniendo DeepTutor..."):
+            stopped = dt.stop() == 0
+        if not stopped:
+            show([warning("'deeptutor stop' ha terminado con error; se sigue.")])
+        time.sleep(2)
 
     orphans = dt.orphans()
     if orphans.own:
@@ -136,7 +154,7 @@ def patches(
             changed = True
             findings.append(ok(f"{name}: aplicado ahora."))
         else:
-            findings.append(_patch_finding(name, after))
+            findings.append(patch_finding(name, after))
     clean = show(findings)
     if changed:
         console.print(
@@ -152,12 +170,6 @@ def _installed(station: Station) -> DeepTutor:
     if not dt.installed:
         fail(f"no se encuentra {station.deeptutor_cli}; instala DeepTutor en app/.")
     return dt
-
-
-def _open(dt: DeepTutor, no_browser: bool) -> None:
-    """Abre el frontend en el navegador salvo que se pida lo contrario."""
-    if not no_browser:
-        webbrowser.open(dt.frontend_url)
 
 
 def _fail_with_log(dt: DeepTutor, message: str) -> None:
@@ -220,7 +232,7 @@ def _service_findings(dt: DeepTutor) -> list[Finding]:
     return findings
 
 
-def _patch_finding(name: str, state: PatchState) -> Finding:
+def patch_finding(name: str, state: PatchState) -> Finding:
     """Comprobación de un parche según su estado."""
     match state:
         case PatchState.APPLIED:
@@ -238,7 +250,7 @@ def _patch_finding(name: str, state: PatchState) -> Finding:
 def _patch_findings(station: Station) -> list[Finding]:
     """Estado de los parches configurados."""
     return [
-        _patch_finding(name, PATCHES[name].state(station.app_dir))
+        patch_finding(name, PATCHES[name].state(station.app_dir))
         for name in station.deeptutor.patches
     ]
 
