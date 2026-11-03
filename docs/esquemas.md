@@ -31,10 +31,13 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 | | `chunk` | entero ≥ 1 | `1024` | |
 | | `solape` | entero ≥ 0 | `150` | Menor que `chunk` |
 | | `descargar_modelos` | booleano | `true` | Docling/MinerU descargan sus modelos |
+| | `lote_embedding` | entero ≥ 1 | `10` | Fragmentos por petición de embedding; lotes pequeños = ráfagas de GPU cortas |
+| | `pausa_embedding` | entero ≥ 0 | `0` | Milisegundos mínimos entre el inicio de dos peticiones de embedding; con un lote pequeño deja huecos libres a la GPU |
 | | `hilos` | entero ≥ 0 | `0` | Hilos de CPU del parser y el troceado al indexar; `0` = sin límite. No cambia el resultado, solo el ritmo |
 
 `atril instalar` traslada a DeepTutor `[deeptutor.llm]`, `busqueda`, `[ollama]` y los puertos
-(`deeptutor config apply`), y `[indexado]` (ajustes internos de parser y chunks). Sustituye a
+(`deeptutor config apply`), y `[indexado]` (ajustes internos de parser, chunks y ritmo del
+embedding). `atril kb indexar` vuelve a aplicar `[indexado]` antes de empezar. Sustituye a
 `setup.json`.
 | `[backup]` | `retencion` | `{ diarias, semanales, mensuales }` | `7`, `4`, `12` | `restic forget --keep-*`; no todo a 0 |
 | | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`); nombres de carpeta distintos |

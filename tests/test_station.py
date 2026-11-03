@@ -30,6 +30,7 @@ def test_defaults(tmp_path: Path) -> None:
     assert station.indexing.parser == "docling"
     assert (station.indexing.chunk_size, station.indexing.chunk_overlap) == (1024, 150)
     assert station.backup.retention.daily == 7
+    assert (station.indexing.batch_size, station.indexing.pause_ms) == (10, 0)
 
 
 @pytest.mark.parametrize(

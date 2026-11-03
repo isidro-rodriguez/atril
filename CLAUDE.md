@@ -97,7 +97,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - `deeptutor doctor` does not accept `--home`; pass it explicitly only to `init`, `config`,
   `start` and `stop`, and rely on `DEEPTUTOR_HOME` (from `DeepTutor.env()`) for the rest.
 - DeepTutor settings come from `atril.toml` (no `setup.json`): `config apply` for LLM, embedding,
-  search and ports; `install._SETTINGS_SCRIPT`, run with `app/`'s Python, for parser and chunks.
+  search and ports; `install._SETTINGS_SCRIPT`, run with `app/`'s Python, for parser, chunks and
+  embedding pace (`batch_size`/`batch_delay` of the active embedding profile, which `config apply`
+  rewrites); `kb indexar` reapplies it before indexing.
 - `app/` is a shallow clone: update with `fetch --depth 1` + `reset --hard FETCH_HEAD`, only on a
   clean tree, after reverting patches and after checking that `origin` and the current branch match
   `atril.toml` (abort otherwise). `actualizar` reapplies `config apply`, parser/chunks and `doctor`;

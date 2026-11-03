@@ -208,6 +208,8 @@ def test_runtime_settings_warns_on_chunk_change(
         "chunk_size": 1024,
         "chunk_overlap": 150,
         "download_models": True,
+        "batch_size": 10,
+        "batch_delay": 0.0,
     }
     assert [f.level for f in findings] == [Level.OK, Level.WARNING]
     assert "512/50 → 1024/150" in findings[1].message

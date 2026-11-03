@@ -27,6 +27,8 @@ chunk = 1024
 solape = 150
 descargar_modelos = true  # permite a Docling/MinerU descargar sus modelos
 hilos = 0          # hilos de CPU al indexar; 0 = sin límite (p. ej. la mitad de núcleos)
+lote_embedding = 10   # fragmentos por petición de embedding (menos = ráfagas de GPU cortas)
+pausa_embedding = 0   # ms mínimos entre peticiones de embedding; deja respirar a la GPU
 
 [backup]
 # La contraseña de restic se toma de RESTIC_PASSWORD o RESTIC_PASSWORD_FILE.

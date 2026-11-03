@@ -51,6 +51,9 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         commands.ollama, "probe_embedding", lambda config: [ok("embed")]
     )
+    monkeypatch.setattr(
+        commands.Installer, "runtime_settings", lambda self: [ok("ajustes aplicados")]
+    )
     return station_dir
 
 

@@ -83,6 +83,10 @@ class IndexingConfig:
     """Permite que el parser descargue sus modelos locales (Docling, MinerU)."""
     threads: int = 0
     """Hilos de CPU para el parser y el troceado; 0 = sin límite."""
+    batch_size: int = 10
+    """Fragmentos por petición de embedding (lote pequeño = ráfagas de GPU cortas)."""
+    pause_ms: int = 0
+    """Intervalo mínimo entre peticiones de embedding, en milisegundos."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,6 +307,8 @@ def _indexing(table: Table) -> IndexingConfig:
         chunk_overlap=table.get_int("solape", 150, minimum=0),
         download_models=table.get_bool("descargar_modelos", True),
         threads=table.get_int("hilos", 0, minimum=0),
+        batch_size=table.get_int("lote_embedding", 10),
+        pause_ms=table.get_int("pausa_embedding", 0, minimum=0),
     )
     if config.parser not in PARSERS:
         raise table.error(

@@ -34,6 +34,7 @@ from atril.evaluation import (
     reports_dir,
     run_evaluation,
 )
+from atril.install import Installer, StepError
 from atril.knowledge import (
     POLL_SECONDS,
     RETRY_STATES,
@@ -224,6 +225,7 @@ def index(
 
     if not show(_embedding_preflight(station), "Ollama"):
         fail("corrige el embedding antes de indexar.")
+    _apply_settings(station, dt)
 
     indexer = Indexer(station, dt.env())
     for number, (kb, item) in enumerate(todo, 1):
@@ -517,6 +519,18 @@ def _pending(
 
 
 # --- reindexado ----------------------------------------------------------------
+
+
+def _apply_settings(station: Station, dt: DeepTutor) -> None:
+    """Aplica ``[indexado]`` a DeepTutor (parser, chunks y ritmo del embedding).
+
+    Así un cambio en ``atril.toml`` vale para este indexado sin reinstalar.
+    """
+    try:
+        findings = Installer(station, dt.env()).runtime_settings()
+    except StepError as exc:
+        fail(str(exc))
+    show(findings, "Ajustes de indexado")
 
 
 def _embedding_preflight(station: Station) -> list[Finding]:

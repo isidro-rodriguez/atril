@@ -69,9 +69,21 @@ for name in ("docling", "mineru"):
         }
 dp["engines"] = engines
 service.save_document_parsing(dp)
+from deeptutor.services.config import get_model_catalog_service
+def throttle(catalog):
+    embedding = catalog["services"]["embedding"]
+    for profile in embedding.get("profiles", []):
+        if profile.get("id") == embedding.get("active_profile_id"):
+            profile["batch_size"] = want["batch_size"]
+            profile["batch_delay"] = want["batch_delay"]
+get_model_catalog_service().update(throttle)
 print(json.dumps(before))
 """
-"""Ajustes de DeepTutor que ``config apply`` no cubre (parser y chunks).
+"""Ajustes de DeepTutor que ``config apply`` no cubre.
+
+Parser, chunks y el ritmo del embedding (lote y pausa del perfil activo, que
+``config apply`` reescribe). Se ejecuta con el Python de ``app/`` porque usa la
+API interna de DeepTutor.
 
 Se ejecuta con el Python de ``app/`` porque usa la API interna de DeepTutor.
 """
@@ -467,6 +479,8 @@ class Installer:
             "chunk_size": indexing.chunk_size,
             "chunk_overlap": indexing.chunk_overlap,
             "download_models": indexing.download_models,
+            "batch_size": indexing.batch_size,
+            "batch_delay": indexing.pause_ms / 1000,
         }
         output = capture(
             [str(self.station.venv_python), "-c", _SETTINGS_SCRIPT, json.dumps(want)],
@@ -483,7 +497,12 @@ class Installer:
         findings = [
             ok(
                 f"Parser {indexing.parser}; chunks {indexing.chunk_size}/"
-                f"{indexing.chunk_overlap}."
+                f"{indexing.chunk_overlap}; embedding en lotes de {indexing.batch_size}"
+                + (
+                    f" con pausa de {indexing.pause_ms} ms."
+                    if indexing.pause_ms
+                    else "."
+                )
             )
         ]
         old_chunks = (before.get("chunk_size"), before.get("chunk_overlap"))

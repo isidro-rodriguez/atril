@@ -5,6 +5,20 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.12.0] - 2026-11-03
+
+### Added
+
+- `[indexado] lote_embedding` y `pausa_embedding`: tamaño de lote e intervalo mínimo (ms) entre
+  peticiones de embedding, aplicados al perfil activo de DeepTutor (`batch_size`/`batch_delay`).
+  Con la GPU al 100 %, lotes pequeños con pausa dejan huecos al escritorio; los vectores son los
+  mismos, solo cambia el ritmo.
+
+### Changed
+
+- `atril kb indexar` vuelve a aplicar `[indexado]` a DeepTutor antes de empezar: un cambio en
+  `atril.toml` vale sin reinstalar.
+
 ## [0.11.0] - 2026-11-03
 
 ### Added
