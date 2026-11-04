@@ -13,7 +13,9 @@ atril instalar                   # instala DeepTutor en app\
 atril arrancar                   # arranca DeepTutor y abre el navegador
 ```
 
-Fuera de la estación, indica su ruta con `--estacion <ruta>` o la variable `ATRIL_ESTACION`.
+La primera vez que se ejecuta fuera de la estación, atril pregunta su ruta y la guarda en la
+variable de usuario `ATRIL_ESTACION`; después funciona desde cualquier carpeta. `--estacion <ruta>`
+la sustituye puntualmente.
 Ayuda de cada comando: `atril <comando> --help`.
 
 ### Configuración

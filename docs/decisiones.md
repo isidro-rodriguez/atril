@@ -88,6 +88,8 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 
 ## Lecciones de la instalación previa
 
+- Ubicación de la estación: en el primer uso fuera de ella, atril la pregunta y la guarda como variable de usuario `ATRIL_ESTACION` (`setx`), la misma que ya leía `--estacion`. Sin fichero ni carpeta en `%APPDATA%` para un solo valor.
+
 - El indexado puede dejar el equipo sin respuesta: el CLI de DT corre con prioridad baja de CPU y disco (no cambia el resultado), `[indexado] hilos` limita los hilos de PyTorch/Docling, y se avisa si el embedding no cabe entero en la VRAM (la parte en CPU satura el procesador). Con la GPU al 100 %, `lote_embedding` y `pausa_embedding` (perfil de embedding de DT: `batch_size`/`batch_delay`) dejan huecos para el escritorio.
 
 - Windows: `deeptutor start --detach` con `DETACHED_PROCESS` abre una consola vacía (el `python.exe` del venv es un redirector); parche `arranque-sin-ventana` (`CREATE_NO_WINDOW`).

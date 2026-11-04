@@ -5,6 +5,16 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.13.0] - 2026-11-04
+
+### Added
+
+- Primer uso fuera de la estación: si no hay `--estacion`, `ATRIL_ESTACION` ni `atril.toml` en la
+  carpeta actual o sus superiores y hay un terminal, atril pregunta la ruta, comprueba que
+  contiene `atril.toml` y la guarda como variable de usuario `ATRIL_ESTACION` (`setx` en Windows).
+  Así se puede usar desde cualquier carpeta sin un fichero de configuración propio. Sin terminal
+  (scripts, tareas programadas) sigue fallando con el mensaje de siempre.
+
 ## [0.12.1] - 2026-11-04
 
 ### Fixed

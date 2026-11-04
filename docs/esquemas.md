@@ -7,7 +7,8 @@ desconocida es un error (detecta erratas). Ejemplos completos en [`ejemplos/`](e
 
 La raíz de la estación es la carpeta que contiene `atril.toml`; no se declara dentro.
 atril la localiza, por orden: `--estacion`, variable `ATRIL_ESTACION`, o la carpeta actual
-y sus superiores.
+y sus superiores. Si no la encuentra y hay un terminal, la pregunta una vez y la guarda en
+`ATRIL_ESTACION` (Windows: `setx`, en el registro del usuario; sin fichero de configuración propio).
 
 Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`),
 `temarios\<id>\`.

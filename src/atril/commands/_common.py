@@ -5,6 +5,9 @@ texto que viene de fuera (rutas, mensajes de configuración con ``[[fuente]]``,
 líneas de comandos) se escapa para que Rich no lo interprete como markup.
 """
 
+import os
+import subprocess
+import sys
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import NoReturn
@@ -14,7 +17,7 @@ from acodo.utils import valid_slug
 from rich.console import Console
 from rich.markup import escape
 
-from atril.checks import Finding, Level
+from atril.checks import Finding, Level, info, ok, warning
 from atril.config import (
     ConfigError,
     Station,
@@ -46,10 +49,73 @@ def fail(message: str) -> NoReturn:
     raise typer.Exit(1)
 
 
+STATION_VARIABLE = "ATRIL_ESTACION"
+"""Variable de entorno con la raíz de la estación (la misma que ``--estacion``)."""
+
+
 def station_root(ctx: typer.Context) -> Path:
-    """Raíz de la estación: ``--estacion`` o búsqueda desde la carpeta actual."""
+    """Raíz de la estación: ``--estacion``/``ATRIL_ESTACION`` o la carpeta actual.
+
+    Si no se encuentra y hay un terminal, la pregunta una vez y la guarda.
+    """
     explicit: Path | None = ctx.obj
-    return explicit if explicit is not None else find_station(Path.cwd())
+    if explicit is not None:
+        return explicit
+    try:
+        return find_station(Path.cwd())
+    except ConfigError:
+        if not _interactive():
+            raise
+        ctx.obj = _ask_station()  # el resto del comando no vuelve a preguntar
+        return ctx.obj
+
+
+def _interactive() -> bool:
+    """Hay alguien al teclado (no un script ni una tarea programada)."""
+    return sys.stdin.isatty()
+
+
+def _ask_station() -> Path:
+    """Pregunta la raíz de la estación, la comprueba y la guarda para siempre."""
+    console.print(
+        "No se encuentra [bold]atril.toml[/] en la carpeta actual. Indica la "
+        "estación una vez y se recordará."
+    )
+    for _ in range(3):
+        answer = typer.prompt("Carpeta de la estación (la que contiene atril.toml)")
+        root = Path(answer.strip().strip('"')).expanduser().resolve()
+        if (root / "atril.toml").is_file():
+            os.environ[STATION_VARIABLE] = str(root)
+            show([persist_station(root)])
+            return root
+        err_console.print(f"[red]No hay atril.toml en {escape(str(root))}.[/]")
+    fail("no se ha indicado una estación válida.")
+
+
+def persist_station(root: Path) -> Finding:
+    """Guarda ``ATRIL_ESTACION`` en el entorno del usuario.
+
+    En Windows usa ``setx`` (registro del usuario, sin ficheros propios de
+    atril); vale para los terminales que se abran después. En otros sistemas,
+    indica la línea que hay que añadir al perfil de la shell.
+    """
+    if os.name != "nt":
+        return info(f"Añade a tu perfil de shell: export {STATION_VARIABLE}={root}")
+    result = subprocess.run(
+        ["setx", STATION_VARIABLE, str(root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return warning(
+            f"No se ha podido guardar {STATION_VARIABLE}; hazlo tú con: "
+            f'setx {STATION_VARIABLE} "{root}"'
+        )
+    return ok(
+        f"Estación guardada en {STATION_VARIABLE}={root} (para cambiarla: "
+        f'setx {STATION_VARIABLE} "<ruta>" y abre otro terminal).'
+    )
 
 
 def get_station(ctx: typer.Context) -> Station:
