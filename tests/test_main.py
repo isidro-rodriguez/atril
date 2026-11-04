@@ -20,7 +20,7 @@ def test_version() -> None:
 
 
 def test_validate_ok(station_dir: Path) -> None:
-    result = runner.invoke(app, ["--estacion", str(station_dir), "validar"])
+    result = runner.invoke(app, ["validar"], env={"ATRIL_ESTACION": str(station_dir)})
 
     assert result.exit_code == 0, result.output
     row = next(line for line in result.output.splitlines() if "normativa" in line)
@@ -37,7 +37,7 @@ def test_validate_reads_env(station_dir: Path) -> None:
 def test_validate_error_exits_1(station_dir: Path) -> None:
     write(station_dir / "temarios" / "normativa" / "temario.toml", "[temario]\n")
 
-    result = runner.invoke(app, ["--estacion", str(station_dir), "validar"])
+    result = runner.invoke(app, ["validar"], env={"ATRIL_ESTACION": str(station_dir)})
 
     assert result.exit_code == 1
     assert "falta la clave obligatoria 'nombre'" in result.output
@@ -55,34 +55,68 @@ def test_module_runs() -> None:
     assert "validar" in result.stdout
 
 
-def test_first_run_asks_station_and_saves_it(
-    station_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.fixture
+def first_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    """Sin estación guardada, con terminal y sin escribir en el entorno real."""
     from atril.commands import _common
 
     saved: list[Path] = []
-    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("ATRIL_ESTACION", raising=False)
+    monkeypatch.setattr(_common, "saved_station", lambda: None)
     monkeypatch.setattr(_common, "_interactive", lambda: True)
     monkeypatch.setattr(
-        _common, "persist_station", lambda root: saved.append(root) or _common.ok("ok")
+        _common, "persist_station", lambda root: saved.append(root) or _common.ok("")
     )
+    return saved
 
-    result = CliRunner().invoke(
-        app, ["temario", "lista"], input=f"{tmp_path / 'nada'}\n{station_dir}\n"
-    )
+
+def test_first_run_offers_current_folder(
+    station_dir: Path, monkeypatch: pytest.MonkeyPatch, first_run: list[Path]
+) -> None:
+    monkeypatch.chdir(station_dir)
+
+    result = CliRunner().invoke(app, ["temario", "lista"], input="s\n")
 
     assert result.exit_code == 0, result.output
-    assert "No hay atril.toml" in result.output
-    assert saved == [station_dir.resolve()]
+    assert first_run == [station_dir]
     assert "normativa" in result.output
+
+
+def test_first_run_asks_location(
+    station_dir: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    first_run: list[Path],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["temario", "lista"], input=f"{station_dir}\ns\n")
+
+    assert result.exit_code == 0, result.output
+    assert first_run == [station_dir.resolve()]
+
+
+def test_first_run_initializes_new_station(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first_run: list[Path]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    new = tmp_path / "estacion-nueva"
+
+    result = CliRunner().invoke(app, ["validar"], input=f"{new}\ns\n")
+
+    assert result.exit_code == 0, result.output
+    assert (new / "atril.toml").is_file()
+    assert first_run == [new.resolve()]
 
 
 def test_without_terminal_does_not_ask(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.chdir(tmp_path)
+    from atril.commands import _common
+
     monkeypatch.delenv("ATRIL_ESTACION", raising=False)
+    monkeypatch.setattr(_common, "saved_station", lambda: None)
+    monkeypatch.chdir(tmp_path)
 
     result = CliRunner().invoke(app, ["validar"])
 

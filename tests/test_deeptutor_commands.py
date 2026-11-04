@@ -43,7 +43,7 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _invoke(station: Path, *args: str):
-    return runner.invoke(app, ["--estacion", str(station), *args])
+    return runner.invoke(app, [*args], env={"ATRIL_ESTACION": str(station)})
 
 
 def _services(monkeypatch: pytest.MonkeyPatch, backend: bool, frontend: bool) -> None:

@@ -7,15 +7,14 @@ y sus temarios: fuentes, bases de conocimiento (KB), evaluación y backup.
 
 ```bash
 uv tool install atril            # instalar (o actualizar: uv tool upgrade atril)
-cd D:\Desarrollo\DeepTutor       # la estación: la carpeta con atril.toml
-atril validar                    # comprueba atril.toml y los temarios
+atril validar                    # comprueba atril.toml y los temarios (la 1.ª vez, elige la estación)
 atril instalar                   # instala DeepTutor en app\
 atril arrancar                   # arranca DeepTutor y abre el navegador
 ```
 
-La primera vez que se ejecuta fuera de la estación, atril pregunta su ruta y la guarda en la
-variable de usuario `ATRIL_ESTACION`; después funciona desde cualquier carpeta. `--estacion <ruta>`
-la sustituye puntualmente.
+Hay una sola estación por equipo. En la primera ejecución atril ofrece la carpeta actual si
+tiene `atril.toml`; si no, pregunta la ruta y, si allí no hay `atril.toml`, ofrece crearla. La
+guarda en la variable de usuario `ATRIL_ESTACION` y después funciona desde cualquier carpeta.
 Ayuda de cada comando: `atril <comando> --help`.
 
 ### Configuración

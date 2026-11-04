@@ -23,7 +23,7 @@ def web(monkeypatch: pytest.MonkeyPatch) -> FakeWeb:
 
 
 def _invoke(station: Path, *args: str):
-    return runner.invoke(app, ["--estacion", str(station), *args])
+    return runner.invoke(app, [*args], env={"ATRIL_ESTACION": str(station)})
 
 
 def test_download_then_list_and_coverage(station_dir: Path, web: FakeWeb) -> None:

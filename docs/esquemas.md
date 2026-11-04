@@ -6,9 +6,11 @@ desconocida es un error (detecta erratas). Ejemplos completos en [`ejemplos/`](e
 ## `atril.toml` (estación)
 
 La raíz de la estación es la carpeta que contiene `atril.toml`; no se declara dentro.
-atril la localiza, por orden: `--estacion`, variable `ATRIL_ESTACION`, o la carpeta actual
-y sus superiores. Si no la encuentra y hay un terminal, la pregunta una vez y la guarda en
-`ATRIL_ESTACION` (Windows: `setx`, en el registro del usuario; sin fichero de configuración propio).
+Hay una sola estación por equipo, guardada en la variable de usuario `ATRIL_ESTACION`
+(Windows: `setx`, en el registro del usuario; sin fichero de configuración propio). En la
+primera ejecución, con un terminal, atril ofrece la carpeta actual si tiene `atril.toml`; si no,
+pregunta la ruta y, si allí no hay `atril.toml`, ofrece inicializarla con un `atril.toml` mínimo
+y `temarios\`.
 
 Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`),
 `temarios\<id>\`.

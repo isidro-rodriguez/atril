@@ -297,7 +297,9 @@ def cli(station: Station, monkeypatch: pytest.MonkeyPatch) -> dict[str, list]:
 
 
 def _invoke(station: Station, *args: str):
-    return runner.invoke(app, ["--estacion", str(station.root), "backup", *args])
+    return runner.invoke(
+        app, ["backup", *args], env={"ATRIL_ESTACION": str(station.root)}
+    )
 
 
 def test_backup_skips_disconnected_disk(station: Station, cli: dict[str, list]) -> None:

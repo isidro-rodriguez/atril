@@ -171,15 +171,15 @@ def test_evaluate_command_saves_and_compares(
         {"mrr": 0.5, "queries_failed": 1},
         {"mrr": 0.75, "queries_failed": 0},
     )
-    args = ["--estacion", str(evaluable), "kb", "evaluar", "norm-edificacion-cte"]
+    args = ["kb", "evaluar", "norm-edificacion-cte"]
 
-    first = runner.invoke(app, args)
+    first = runner.invoke(app, args, env={"ATRIL_ESTACION": str(evaluable)})
     assert first.exit_code == 1  # si-03 tiene error
     assert "rango 2" in first.output
     assert "DBSI.pdf p.11" in first.output
     assert "Anterior" not in first.output
 
-    second = runner.invoke(app, args)
+    second = runner.invoke(app, args, env={"ATRIL_ESTACION": str(evaluable)})
     assert "Anterior" in second.output
     assert "+0.250" in second.output
     assert "-1" in second.output
@@ -188,14 +188,14 @@ def test_evaluate_command_saves_and_compares(
 
 
 def test_evaluate_requires_kb_and_dataset(evaluable: Path) -> None:
-    args = ["--estacion", str(evaluable), "kb", "evaluar", "norm-edificacion-cte-guias"]
-    result = runner.invoke(app, args)
+    args = ["kb", "evaluar", "norm-edificacion-cte-guias"]
+    result = runner.invoke(app, args, env={"ATRIL_ESTACION": str(evaluable)})
     assert result.exit_code == 1
     assert "aún no existe" in result.output
 
     station = load_station(evaluable)
     write(station.kb_dir("norm-edificacion-cte-guias") / "metadata.json", "{}")
-    result = runner.invoke(app, args)
+    result = runner.invoke(app, args, env={"ATRIL_ESTACION": str(evaluable)})
     assert result.exit_code == 1
     assert "no declara 'evaluacion'" in result.output
 
@@ -208,7 +208,7 @@ def test_evaluate_with_explicit_dataset(
     dataset.write_text(json.dumps({"id": "x"}) + "\n")
 
     args = ["kb", "evaluar", "norm-edificacion-cte", "--dataset", str(dataset)]
-    result = runner.invoke(app, ["--estacion", str(evaluable), *args])
+    result = runner.invoke(app, [*args], env={"ATRIL_ESTACION": str(evaluable)})
 
     assert "Métricas" in result.output
     folder = load_station(evaluable).syllabi_dir / "normativa" / "eval" / "informes"

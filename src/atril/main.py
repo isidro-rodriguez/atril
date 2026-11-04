@@ -1,6 +1,5 @@
 """Entrada de la línea de comandos ``atril``."""
 
-from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -29,15 +28,6 @@ def _show_version(value: bool) -> None:
 @app.callback()
 def root(
     ctx: typer.Context,
-    station: Annotated[
-        Path | None,
-        typer.Option(
-            "--estacion",
-            envvar="ATRIL_ESTACION",
-            help="Raíz; por defecto, la carpeta (o superior) con [bold]atril.toml[/].",
-            file_okay=False,
-        ),
-    ] = None,
     version: Annotated[
         bool,
         typer.Option(
@@ -49,7 +39,7 @@ def root(
     ] = False,
 ) -> None:
     """Gestiona una instalación local de DeepTutor y sus temarios."""
-    ctx.obj = station
+    ctx.obj = None
 
 
 _CONFIG = "Configuración"

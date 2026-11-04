@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from support import MINIMAL_STATION, write
 
-from atril.config import ConfigError, find_station, load_station
+from atril.config import ConfigError, init_station, load_station
 
 
 def test_example_station_is_valid(station_dir: Path) -> None:
@@ -90,17 +90,14 @@ def test_missing_file(tmp_path: Path) -> None:
         load_station(tmp_path)
 
 
-def test_find_station_walks_up(tmp_path: Path) -> None:
-    write(tmp_path / "atril.toml", MINIMAL_STATION)
-    nested = tmp_path / "temarios" / "normativa"
-    nested.mkdir(parents=True)
+def test_init_station_creates_valid_template(tmp_path: Path) -> None:
+    root = tmp_path / "nueva"
+    init_station(root)
 
-    assert find_station(nested) == tmp_path.resolve()
-
-
-def test_find_station_fails_outside(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="--estacion"):
-        find_station(tmp_path)
+    assert load_station(root).ollama.dimension == 4096
+    assert (root / "temarios").is_dir()
+    with pytest.raises(ConfigError, match="no se sobrescribe"):
+        init_station(root)
 
 
 def test_unknown_patch(tmp_path: Path) -> None:

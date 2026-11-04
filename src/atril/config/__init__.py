@@ -3,7 +3,7 @@
 from atril.config._toml import ConfigError as ConfigError
 from atril.config._toml import StateFileError as StateFileError
 from atril.config.station import Station as Station
-from atril.config.station import find_station as find_station
+from atril.config.station import init_station as init_station
 from atril.config.station import load_station as load_station
 from atril.config.syllabus import Syllabus as Syllabus
 from atril.config.syllabus import load_syllabi as load_syllabi

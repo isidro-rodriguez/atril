@@ -22,11 +22,11 @@ from atril.config import (
     ConfigError,
     Station,
     Syllabus,
-    find_station,
     load_station,
     load_syllabi,
     load_syllabus,
 )
+from atril.config.station import STATION_FILE, init_station
 from atril.config.syllabus import KnowledgeBase
 
 console = Console(soft_wrap=True)
@@ -50,24 +50,41 @@ def fail(message: str) -> NoReturn:
 
 
 STATION_VARIABLE = "ATRIL_ESTACION"
-"""Variable de entorno con la raíz de la estación (la misma que ``--estacion``)."""
+"""Variable de usuario con la raíz de la única estación del equipo."""
 
 
 def station_root(ctx: typer.Context) -> Path:
-    """Raíz de la estación: ``--estacion``/``ATRIL_ESTACION`` o la carpeta actual.
-
-    Si no se encuentra y hay un terminal, la pregunta una vez y la guarda.
-    """
-    explicit: Path | None = ctx.obj
-    if explicit is not None:
-        return explicit
-    try:
-        return find_station(Path.cwd())
-    except ConfigError:
-        if not _interactive():
-            raise
-        ctx.obj = _ask_station()  # el resto del comando no vuelve a preguntar
+    """Raíz de la estación guardada; en la primera ejecución, la configura."""
+    if ctx.obj is not None:
         return ctx.obj
+    root = saved_station()
+    if root is None or not (root / STATION_FILE).is_file():
+        if not _interactive():
+            fail(
+                f"no hay estación configurada ({STATION_VARIABLE}); ejecuta atril "
+                "una vez en un terminal para indicarla."
+            )
+        root = _first_run()
+    ctx.obj = root  # el resto del comando no vuelve a leerla
+    return root
+
+
+def saved_station() -> Path | None:
+    """Estación guardada: del entorno o, en Windows, del registro del usuario.
+
+    ``setx`` no cambia el entorno de los terminales ya abiertos; por eso, si
+    falta en el entorno, se lee del registro.
+    """
+    value = os.environ.get(STATION_VARIABLE)
+    if not value and sys.platform == "win32":
+        import winreg
+
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+                value, _ = winreg.QueryValueEx(key, STATION_VARIABLE)
+        except OSError:
+            value = None
+    return Path(str(value)) if value else None
 
 
 def _interactive() -> bool:
@@ -75,29 +92,53 @@ def _interactive() -> bool:
     return sys.stdin.isatty()
 
 
-def _ask_station() -> Path:
-    """Pregunta la raíz de la estación, la comprueba y la guarda para siempre."""
-    console.print(
-        "No se encuentra [bold]atril.toml[/] en la carpeta actual. Indica la "
-        "estación una vez y se recordará."
-    )
-    for _ in range(3):
-        answer = typer.prompt("Carpeta de la estación (la que contiene atril.toml)")
-        root = Path(answer.strip().strip('"')).expanduser().resolve()
-        if (root / "atril.toml").is_file():
-            os.environ[STATION_VARIABLE] = str(root)
-            show([persist_station(root)])
-            return root
-        err_console.print(f"[red]No hay atril.toml en {escape(str(root))}.[/]")
-    fail("no se ha indicado una estación válida.")
+def _first_run() -> Path:
+    """Elige la estación (la carpeta actual u otra) o la inicializa, y la guarda."""
+    console.print("[bold]Primera ejecución de atril:[/] falta indicar la estación.")
+    cwd = Path.cwd()
+    if (cwd / STATION_FILE).is_file() and _yes(
+        f"¿Usar {cwd} como estación de atril?", default=True
+    ):
+        return _save(cwd)
+    answer = typer.prompt("Carpeta de la estación")
+    root = Path(answer.strip().strip('"')).expanduser().resolve()
+    if (root / STATION_FILE).is_file():
+        if _yes(f"¿Usar {root} como estación de atril?", default=True):
+            return _save(root)
+    elif _yes(f"No hay {STATION_FILE} en {root}. ¿Inicializar ahí la estación?"):
+        init_station(root)
+        show([info(f"Creado {root / STATION_FILE}: revísalo y ejecuta atril validar.")])
+        return _save(root)
+    fail("no se ha configurado ninguna estación.")
+
+
+def _yes(question: str, *, default: bool = False) -> bool:
+    """Pregunta sí/no en español (s/sí/n/no; Intro = valor por defecto)."""
+    hint = "S/n" if default else "s/N"
+    while True:
+        answer = typer.prompt(f"{question} [{hint}]", default="", show_default=False)
+        answer = answer.strip().lower()
+        if not answer:
+            return default
+        if answer in {"s", "si", "sí", "y", "yes"}:
+            return True
+        if answer in {"n", "no"}:
+            return False
+        err_console.print("Responde s o n.")
+
+
+def _save(root: Path) -> Path:
+    """Guarda la estación como variable de usuario y la usa ya en este proceso."""
+    os.environ[STATION_VARIABLE] = str(root)
+    show([persist_station(root)])
+    return root
 
 
 def persist_station(root: Path) -> Finding:
     """Guarda ``ATRIL_ESTACION`` en el entorno del usuario.
 
     En Windows usa ``setx`` (registro del usuario, sin ficheros propios de
-    atril); vale para los terminales que se abran después. En otros sistemas,
-    indica la línea que hay que añadir al perfil de la shell.
+    atril). En otros sistemas, indica la línea para el perfil de la shell.
     """
     if os.name != "nt":
         return info(f"Añade a tu perfil de shell: export {STATION_VARIABLE}={root}")
@@ -109,12 +150,11 @@ def persist_station(root: Path) -> Finding:
     )
     if result.returncode != 0:
         return warning(
-            f"No se ha podido guardar {STATION_VARIABLE}; hazlo tú con: "
+            f"No se ha podido guardar {STATION_VARIABLE}; hazlo con: "
             f'setx {STATION_VARIABLE} "{root}"'
         )
     return ok(
-        f"Estación guardada en {STATION_VARIABLE}={root} (para cambiarla: "
-        f'setx {STATION_VARIABLE} "<ruta>" y abre otro terminal).'
+        f"Estación guardada: {root} (para cambiarla: setx {STATION_VARIABLE} ...)."
     )
 
 

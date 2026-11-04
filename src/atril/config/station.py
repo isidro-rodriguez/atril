@@ -183,26 +183,34 @@ class Station:
         return self.app_dir / ".venv" / "bin" / "deeptutor"
 
 
-def find_station(start: Path) -> Path:
-    """Busca la raíz de la estación desde ``start`` hacia arriba.
+STATION_TEMPLATE = """\
+# atril.toml: configuración de la estación (referencia: docs/esquemas.md de atril).
 
-    Args:
-        start: Carpeta desde la que empezar (normalmente la actual).
+[deeptutor]
+# rama = "dev"
+# parches = ["paginas-citas", "arranque-sin-ventana"]
 
-    Returns:
-        La primera carpeta, de ``start`` hacia la raíz, que contiene ``atril.toml``.
+[ollama]
+embedding = "qwen3-embedding:8b"
+dimension = 4096
+
+[backup.destinos.disco]
+repo = 'E:\\restic-atril'  # cámbialo por tu disco o repositorio restic
+"""
+"""``atril.toml`` mínimo y válido para una estación nueva."""
+
+
+def init_station(root: Path) -> None:
+    """Crea la estación en ``root``: ``atril.toml`` mínimo y ``temarios/``.
 
     Raises:
-        ConfigError: Si ninguna la contiene.
+        ConfigError: Si ya existe ``atril.toml`` en ``root``.
     """
-    start = start.resolve()
-    for folder in (start, *start.parents):
-        if (folder / STATION_FILE).is_file():
-            return folder
-    raise ConfigError(
-        f"No se encuentra {STATION_FILE} en {start} ni en sus carpetas superiores. "
-        "Indica la estación con --estacion o la variable ATRIL_ESTACION."
-    )
+    path = root / STATION_FILE
+    if path.exists():
+        raise ConfigError(f"{path} ya existe; no se sobrescribe.")
+    (root / "temarios").mkdir(parents=True, exist_ok=True)
+    path.write_text(STATION_TEMPLATE, encoding="utf-8")
 
 
 def load_station(root: Path) -> Station:
@@ -381,6 +389,6 @@ __all__ = [
     "OllamaConfig",
     "Retention",
     "Station",
-    "find_station",
+    "init_station",
     "load_station",
 ]

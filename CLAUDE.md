@@ -8,7 +8,7 @@
 - User-facing error messages must be in Spanish. Exception names and internal identifiers must
   be in English.
 - **CLI commands, options, and configuration keys are in Spanish** (`atril kb indexar`,
-  `--estacion`, `[[fuente]]`): they are user-facing. Map them to English identifiers in code
+  `--detalle`, `[[fuente]]`): they are user-facing. Map them to English identifiers in code
   (`[[fuente]]` → `Source`, `temario` → `Syllabus`, `estación` → `Station`).
 - This file, `CLAUDE.md`, is written in English so the agent does not need to translate
   instructions.
@@ -69,6 +69,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - **DeepTutor never enters atril's `uv.lock`.** Control it through its CLI
   (`app/.venv/Scripts/deeptutor.exe`) and its API (`localhost:8001`) via `subprocess` and
   `urllib`. Only exception: full-text evaluation runs with `app/`'s Python.
+- **One station per computer**, stored in the user variable `ATRIL_ESTACION` (`setx` on Windows;
+  read from the registry if the current environment lacks it). No `--estacion` option and no
+  config file of atril's own; the first run picks, or initializes, the station.
 - **The station layout is fixed**: `<root>/atril.toml`, `app/`, `data/`, `temarios/<id>/`.
   `DEEPTUTOR_HOME` (`deeptutor --home`) is the station root; DeepTutor creates `data/` inside.
   Derive paths from `Station` / `Syllabus` properties, never hardcode them elsewhere.

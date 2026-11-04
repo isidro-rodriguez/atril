@@ -5,6 +5,22 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.14.0] - 2026-11-04
+
+### Changed
+
+- Una sola estación por equipo, guardada en la variable de usuario `ATRIL_ESTACION`. La primera
+  ejecución ofrece la carpeta actual si tiene `atril.toml`; si no, pregunta la ruta y, si allí
+  no hay `atril.toml`, ofrece inicializar la estación (`atril.toml` mínimo y `temarios/`). Las
+  preguntas se contestan con s/n.
+- En Windows, si el terminal se abrió antes del `setx`, la estación se lee del registro del
+  usuario: ya no vuelve a preguntar en el mismo terminal.
+
+### Removed
+
+- Opción `--estacion` y búsqueda de `atril.toml` en carpetas superiores: con una sola estación
+  por equipo sobraban.
+
 ## [0.13.0] - 2026-11-04
 
 ### Added
