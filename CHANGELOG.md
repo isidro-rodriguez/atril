@@ -5,6 +5,13 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.14.1] - 2026-11-04
+
+### Changed
+
+- README: instrucciones mínimas para instalar restic (y rclone para Google Drive) y guardar la
+  contraseña de los repositorios fuera de `atril.toml`.
+
 ## [0.14.0] - 2026-11-04
 
 ### Changed

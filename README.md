@@ -60,8 +60,22 @@ atril backup comprobar           # verifica los repositorios y lista sus último
 atril backup restaurar -d <d>    # restaura un snapshot; lo actual queda en <estación>.previo-*
 ```
 
-La contraseña de restic va en `RESTIC_PASSWORD` (o `_FILE` / `_COMMAND`), nunca en
-`atril.toml`.
+Requisitos, una sola vez (PowerShell):
+
+```powershell
+winget install restic.restic      # restic 0.17 o posterior (compruébalo con: restic version)
+winget install Rclone.Rclone      # solo para destinos rclone: (p. ej. Google Drive)
+rclone config                     # crea el remoto que usa el destino, p. ej. "gdrive"
+
+# Contraseña de los repositorios: en un fichero fuera de la estación, nunca en atril.toml
+Set-Content "$env:USERPROFILE\.restic-atril" "tu-contraseña" -NoNewline
+setx RESTIC_PASSWORD_FILE "$env:USERPROFILE\.restic-atril"
+```
+
+Abre un terminal nuevo para que se vean los cambios. También vale `RESTIC_PASSWORD` o
+`RESTIC_PASSWORD_COMMAND`. Guarda la contraseña también en otro sitio, por ejemplo en un gestor de
+contraseñas: sin ella los backups no se pueden restaurar. El repositorio de cada destino se crea
+solo en el primer `atril backup`.
 
 Configuración: [`docs/esquemas.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](https://github.com/isidro-rodriguez/atril/blob/main/docs/ejemplos/).
 
