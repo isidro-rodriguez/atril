@@ -5,6 +5,17 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.12.1] - 2026-11-04
+
+### Fixed
+
+- `atril kb indexar` mezclaba el run de un indexado anterior con el actual: avisaba de "sin
+  actividad desde hace N min" nada más empezar y, si el nuevo fallaba antes de crear su run,
+  mostraba el error del viejo. Ahora solo cuenta el run de este indexado y, si no hay, el motivo
+  sale del log de DeepTutor.
+- Si la KB no tiene índice listo porque un indexado anterior quedó a medias, el error dice que
+  hay que ejecutar `atril kb reindexar <kb>` en lugar de sugerir repetir el mismo comando.
+
 ## [0.12.0] - 2026-11-03
 
 ### Added

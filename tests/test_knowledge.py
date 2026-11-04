@@ -269,3 +269,30 @@ def test_add_limits_threads_and_lowers_priority(
     assert len(lowered) == 1
     log = sorted(station.logs_dir.glob("indexado-*.log"))[-1]
     assert "3 3" in log.read_text(encoding="utf-8")
+
+
+def test_add_ignores_stale_run_and_explains_reindex_required(
+    station_dir: Path,
+    syllabus: Syllabus,
+    monkeypatch: pytest.MonkeyPatch,
+    fast_poll: None,
+) -> None:
+    station = load_station(station_dir)
+    kb = syllabus.knowledge_bases[0]
+    # Run de un indexado anterior que se quedó colgado.
+    stale = {"task_id": "viejo", "state": "failed", "error": "no progress for 35263s"}
+    write(station.kb_dir(kb.id) / ".indexing-run.json", json.dumps(stale))
+    _run_with(
+        monkeypatch,
+        "import sys, time; time.sleep(0.05); print('Document upload failed: Knowledge "
+        "base has no ready llamaindex index; reindex required'); sys.exit(1)",
+    )
+    item = plan(syllabus, kb, Ledger(ledger_path(syllabus)))[0]
+    seen: list[object] = []
+
+    result = Indexer(station, env={}).add(kb.id, item, lambda run, t: seen.append(run))
+
+    assert not result.ok
+    assert f"atril kb reindexar {kb.id}" in result.detail
+    assert "35263" not in result.detail
+    assert seen and all(run is None for run in seen)

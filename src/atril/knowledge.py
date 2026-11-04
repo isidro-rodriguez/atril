@@ -41,6 +41,9 @@ POLL_SECONDS = 3.0
 RETRY_STATES = frozenset({"failed", "interrupted", "partial", "cancelled"})
 """Estados de un run que dejan el worker de DeepTutor atascado hasta reiniciarlo."""
 
+REINDEX_REQUIRED = "reindex required"
+"""Mensaje de DeepTutor cuando la KB no tiene un índice publicado."""
+
 _ALREADY_INDEXED = ("already indexed", "No new unique documents")
 """Mensajes de DeepTutor cuando el contenido ya está en la KB (cuenta como éxito)."""
 
@@ -357,28 +360,47 @@ class Indexer:
                 while process.poll() is None:
                     time.sleep(POLL_SECONDS)
                     if tick:
-                        tick(KbRun.load(kb_dir), time.monotonic() - started)
+                        tick(
+                            _new_run(kb_dir, previous_task), time.monotonic() - started
+                        )
             except BaseException:
                 kill_tree(process.pid)
                 raise
         minutes = (time.monotonic() - started) / 60
         output = out_log.read_text(encoding="utf-8", errors="replace")
-        run = KbRun.load(kb_dir)
+        run = _new_run(kb_dir, previous_task)
 
         # El documento puede quedar con otro nombre en raw/; basta con que haya un
         # run nuevo y completado.
-        completed = (
-            run is not None
-            and run.task_id != previous_task
-            and run.state == "completed"
-        )
+        completed = run is not None and run.state == "completed"
         duplicate = any(text in output for text in _ALREADY_INDEXED)
         if process.returncode == 0 and (completed or duplicate or remote):
             return AddResult(
                 True, minutes, "ya estaba (mismo contenido)" if duplicate else ""
             )
-        detail = (run.error if run else "") or f"código de salida {process.returncode}"
-        return AddResult(False, minutes, detail, out_log)
+        return AddResult(False, minutes, _failure(kb_id, run, output, process), out_log)
+
+
+def _new_run(kb_dir: Path, previous_task: str | None) -> KbRun | None:
+    """Run de este indexado; el que quedó de uno anterior no cuenta."""
+    run = KbRun.load(kb_dir)
+    return run if run is not None and run.task_id != previous_task else None
+
+
+def _failure(
+    kb_id: str, run: KbRun | None, output: str, process: subprocess.Popen[bytes]
+) -> str:
+    """Motivo de un fallo: el run de este indexado o, si no llegó a crearse, el log."""
+    if REINDEX_REQUIRED in output:
+        return (
+            "la KB no tiene un índice listo porque un indexado anterior quedó a "
+            f"medias; ejecuta antes atril kb reindexar {kb_id}"
+        )
+    if run is not None and run.error:
+        return run.error
+    code = f"código de salida {process.returncode}"
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    return f"{lines[-1]} ({code})" if lines else code
 
 
 # --- API de DeepTutor ----------------------------------------------------------
