@@ -1,6 +1,6 @@
 [project]
 name = "atril"
-version = "0.14.1"
+version = "0.15.0"
 description = "Gestiona una instalación local de DeepTutor y sus temarios"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -74,10 +74,6 @@ default_item_type = "cmd"
 help = "Aplica el formato y las correcciones automáticas de Ruff"
 sequence = ["ruff format .", "ruff check --fix ."]
 default_item_type = "cmd"
-
-[tool.poe.tasks.backup]
-help = "Copia de seguridad del repositorio con git bundle"
-cmd = "python scripts/backup.py"
 
 # --- pytest ------------------------------------------------------------------
 [tool.pytest.ini_options]

@@ -2,6 +2,7 @@
 
 import shutil
 import time
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -11,29 +12,23 @@ from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn
 from rich.table import Table
 
 from atril import backup
-from atril.backup import BackupError, Restic, Snapshot, Summary
-from atril.checks import Finding, Level, error, info, ok, warning
-from atril.commands._common import console, fail, get_station, show, success
+from atril.backup import Archive, BackupError
+from atril.checks import Finding, error, info, ok, warning
+from atril.commands._common import ask_yes, console, fail, get_station, show, success
 from atril.commands.deeptutor import launch, shutdown
-from atril.config.station import BackupTarget, Station
+from atril.config.station import Station
 from atril.deeptutor import DeepTutor
 
 backup_app = typer.Typer(
-    help="Copias de seguridad con restic (disco externo y Google Drive).",
+    help="Copias de seguridad comprimidas (zip o tar.xz) en una o varias carpetas.",
     invoke_without_command=True,
     rich_markup_mode="rich",
 )
-
-Targets = Annotated[
-    list[str] | None,
-    typer.Option("--destino", "-d", help="Destino de atril.toml; por defecto, todos."),
-]
 
 
 @backup_app.callback()
 def run_backup(
     ctx: typer.Context,
-    targets: Targets = None,
     no_restart: Annotated[
         bool,
         typer.Option(
@@ -41,68 +36,56 @@ def run_backup(
         ),
     ] = False,
 ) -> None:
-    """Copia la estación (sin [bold]app/[/]) en cada destino y aplica la retención.
+    """Copia la estación (sin [bold]app/[/]) en cada destino y borra las antiguas.
 
     Para DeepTutor durante la copia (sus bases SQLite deben estar cerradas) y lo
-    vuelve a arrancar después si estaba en marcha. Un disco externo
-    desconectado se salta con un aviso.
+    vuelve a arrancar después si estaba en marcha. La copia se comprime una vez,
+    se verifica y se copia al resto de destinos; un disco desconectado se salta.
     """
     if ctx.invoked_subcommand is not None:
         return
     station = get_station(ctx)
-    executable = _restic()
-    selected = _select(station, targets)
-    reachable = _reachable(selected, explicit=bool(targets))
+    folders = _reachable(station)
 
     dt = DeepTutor(station)
     was_running = dt.installed and (dt.backend_up() or dt.frontend_up())
     if was_running:
         shutdown(dt)
     try:
-        bundles = _bundle_findings(station)
-        show(bundles, "Repos de git")
-        results = [_backup_one(station, target, executable) for target in reachable]
+        result = _create(station, folders[0])
     finally:
         if was_running and not no_restart:
             launch(dt, timeout=900)
-    _show_summaries(results)
-    incomplete = [t.name for t, s in results if s.incomplete]
-    if incomplete or any(f.level is Level.ERROR for f in bundles):
-        problems = [f"faltan ficheros en {', '.join(incomplete)}"] if incomplete else []
-        if any(f.level is Level.ERROR for f in bundles):
-            problems.append("algún repo de repos_git no se ha empaquetado")
-        fail(f"backup INCOMPLETO: {'; '.join(problems)}. Revisa los avisos.")
-    success("Backup terminado.")
+
+    findings = [_verify(result.archive)]
+    findings += [_copy(result.archive, folder) for folder in folders[1:]]
+    findings += [warning(f"No se pudo leer {item}") for item in result.unread]
+    if not show(findings, "Copias") or result.incomplete:
+        fail("backup INCOMPLETO: no se borran copias antiguas. Revisa los avisos.")
+    keep = station.backup.keep
+    removed = [path for folder in folders for path in backup.prune(folder, keep)]
+    if removed:
+        show([info(f"Borradas {len(removed)} copias antiguas; se conservan {keep}.")])
+    size = parse_size(result.archive.stat().st_size)
+    success(
+        f"Backup terminado: {result.archive.name} ({size}, {result.files} ficheros)."
+    )
 
 
 @backup_app.command("comprobar")
-def check_backups(
-    ctx: typer.Context,
-    targets: Targets = None,
-    read_data: Annotated[
-        str | None,
-        typer.Option(
-            "--datos",
-            help="Lee también esta parte de los datos para verificarlos (p. ej. 5%).",
-        ),
-    ] = None,
-) -> None:
-    """Verifica la integridad de cada repositorio y lista sus últimos snapshots."""
+def check_backups(ctx: typer.Context) -> None:
+    """Lista las copias de cada destino y verifica la más reciente."""
     station = get_station(ctx)
-    executable = _restic()
     clean = True
-    for target in _reachable(_select(station, targets), explicit=bool(targets)):
-        restic = Restic(target, executable)
-        with console.status(f"Comprobando {escape(target.name)}..."):
-            try:
-                restic.check(read_data)
-                snapshots = restic.snapshots()
-                finding = ok(f"{target.name}: repositorio correcto.")
-            except BackupError as exc:
-                snapshots = []
-                finding = error(str(exc))
-        clean = show([finding], target.name) and clean
-        _show_snapshots(snapshots[-5:])
+    for folder in _reachable(station):
+        found = backup.archives(folder)
+        _show_archives(folder, found)
+        if not found:
+            clean = show([error(f"{folder}: sin copias.")]) and clean
+            continue
+        with console.status(f"Verificando {escape(found[-1].path.name)}..."):
+            finding = _verify(found[-1].path)
+        clean = show([finding]) and clean
     if not clean:
         raise typer.Exit(1)
 
@@ -110,262 +93,150 @@ def check_backups(
 @backup_app.command("restaurar")
 def restore(
     ctx: typer.Context,
-    target_name: Annotated[
-        str, typer.Option("--destino", "-d", help="Destino del que restaurar.")
-    ],
-    snapshot: Annotated[
-        str, typer.Option("--snapshot", "-s", help="Id del snapshot.")
-    ] = "latest",
+    archive_path: Annotated[
+        Path | None,
+        typer.Argument(
+            metavar="COPIA", help="Fichero de la copia; por defecto, la más reciente."
+        ),
+    ] = None,
     yes: Annotated[bool, typer.Option("--si", help="No pide confirmación.")] = False,
     other_path: Annotated[
         bool,
         typer.Option(
-            "--nueva-ruta",
-            help="Acepta un snapshot hecho desde otra ruta de estación.",
+            "--nueva-ruta", help="Acepta una copia hecha desde otra ruta de estación."
         ),
     ] = False,
 ) -> None:
-    """Restaura [bold]atril.toml[/], [bold]data/[/] y [bold]temarios/[/] en su ruta.
+    """Restaura [bold]atril.toml[/], [bold]data/[/] y [bold]temarios/[/] de una copia.
 
-    Restaura primero en una carpeta junto a la estación y después intercambia;
-    lo que había se conserva en [bold]<estación>.previo-<fecha>[/] (bórralo tú
+    Extrae primero en una carpeta junto a la estación y después intercambia; lo
+    que había se conserva en [bold]<estación>.previo-<fecha>[/] (bórralo tú
     cuando compruebes que todo está bien). DeepTutor debe estar parado. Si el
-    intercambio falla a medias, se deshace. Un snapshot hecho desde otra ruta
-    exige [bold]--nueva-ruta[/] (las KB guardan rutas absolutas: revísalas).
+    intercambio falla a medias, se deshace. Una copia hecha desde otra ruta exige
+    [bold]--nueva-ruta[/] (las KB guardan rutas absolutas: revísalas).
     """
     station = get_station(ctx)
-    executable = _restic()
-    (target,) = _reachable(_select(station, [target_name]), explicit=True)
     dt = DeepTutor(station)
     if dt.installed and (dt.backend_up() or dt.frontend_up()):
         fail("DeepTutor está en marcha; páralo antes con: atril parar")
-
-    restic = Restic(target, executable)
-    try:
-        snapshots = restic.snapshots()
-    except BackupError as exc:
-        fail(str(exc))
-    chosen = snapshots[-1] if snapshot == "latest" and snapshots else None
-    if snapshot != "latest":
-        chosen = next((s for s in snapshots if s.short_id.startswith(snapshot)), None)
-    if chosen is None:
-        fail(f"no hay snapshot {snapshot!r} en {target.name}.")
-    _show_snapshots([chosen])
-    findings = _path_findings(station, chosen)
-    show(findings)
-    if any(f.level is Level.WARNING for f in findings) and not other_path:
-        fail(
-            "el snapshot es de otra ruta; si es lo que quieres, repite con "
-            "--nueva-ruta."
-        )
+    chosen = archive_path or _latest(station)
+    if not chosen.is_file():
+        fail(f"no existe la copia {chosen}.")
 
     stamp = time.strftime("%Y%m%d-%H%M%S")
     staging = station.root.with_name(f"{station.root.name}.restaurar-{stamp}")
     keep = station.root.with_name(f"{station.root.name}.previo-{stamp}")
-    message = (
-        f"Se sustituirán atril.toml, data/ y temarios/ de {station.root} por el "
-        f"snapshot {chosen.short_id}. Lo actual se guardará en {keep.name}. ¿Continuar?"
+    question = (
+        f"Se sustituirán atril.toml, data/ y temarios/ de {station.root} por "
+        f"{chosen.name}. Lo actual se guardará en {keep.name}. ¿Continuar?"
     )
-    if not yes and not typer.confirm(message):
+    if not yes and not ask_yes(question):
         raise typer.Exit(1)
-
     try:
-        with console.status(
-            f"Restaurando {chosen.short_id} en {escape(staging.name)}..."
-        ):
-            restic.restore(chosen.short_id, staging)
-        restored = backup.find_restored_root(staging)
-        if restored is None:
-            fail(f"el snapshot no contiene una estación reconocible (mira {staging}).")
-        replaced = backup.swap_in(station, restored, keep)
+        with console.status(f"Extrayendo {escape(chosen.name)}..."):
+            manifest = backup.extract(chosen, staging)
+        source = str(manifest.get("estacion", ""))
+        if not _same_root(source, station.root) and not other_path:
+            fail(
+                f"la copia se hizo desde {source or '?'}, no desde {station.root}; "
+                "si es lo que quieres, repite con --nueva-ruta."
+            )
+        replaced = backup.swap_in(station, staging, keep)
     except BackupError as exc:
         fail(str(exc))
     finally:
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
-    show(
-        [
-            ok(f"Restaurado: {', '.join(replaced)}."),
-            info(f"Lo anterior está en {keep}."),
-        ]
-    )
+    show([ok(f"Restaurado: {', '.join(replaced)}."), info(f"Lo anterior: {keep}.")])
     success("Restauración terminada. Comprueba con: atril estado")
 
 
 # --- auxiliares ----------------------------------------------------------------
 
 
-def _restic() -> str:
-    """Ruta de restic; termina con error si falta él o la contraseña."""
-    executable = shutil.which("restic")
-    if executable is None:
-        fail(
-            "no se encuentra restic en el PATH (Windows: winget install restic.restic)."
-        )
-    if not backup.password_configured():
-        fail(
-            "restic necesita la contraseña del repositorio en RESTIC_PASSWORD, "
-            "RESTIC_PASSWORD_FILE o RESTIC_PASSWORD_COMMAND (nunca en atril.toml)."
-        )
-    return executable
-
-
-def _select(station: Station, names: list[str] | None) -> list[BackupTarget]:
-    """Destinos pedidos (o todos); termina si alguno no existe en atril.toml."""
-    targets = list(station.backup.targets)
-    if not names:
-        return targets
-    known = {target.name: target for target in targets}
-    unknown = [name for name in names if name not in known]
-    if unknown:
-        fail(
-            f"destinos desconocidos: {', '.join(unknown)} "
-            f"(atril.toml tiene: {', '.join(known)})."
-        )
-    return [known[name] for name in names]
-
-
-def _reachable(targets: list[BackupTarget], *, explicit: bool) -> list[BackupTarget]:
-    """Destinos accesibles; un disco desconectado se salta (o falla si se pidió)."""
-    available, skipped = [], []
-    for target in targets:
-        (available if backup.is_reachable(target) else skipped).append(target)
-    uses_rclone = any(target.repo.startswith("rclone:") for target in available)
-    if uses_rclone and shutil.which("rclone") is None:
-        fail("hay destinos rclone pero rclone no está en el PATH.")
-    for target in skipped:
-        message = (
-            f"{target.name}: no está accesible ({target.repo}); ¿disco desconectado?"
-        )
-        if explicit:
-            fail(message)
-        show([warning(message)])
+def _reachable(station: Station) -> list[Path]:
+    """Destinos accesibles; un disco desconectado se salta con un aviso."""
+    available = []
+    for folder in station.backup.destinations:
+        if backup.is_reachable(folder):
+            available.append(folder)
+        else:
+            show([warning(f"{folder}: no está accesible; ¿disco desconectado?")])
     if not available:
-        fail("ningún destino accesible.")
+        fail("ningún destino de backup accesible.")
     return available
 
 
-def _bundle_findings(station: Station) -> list[Finding]:
-    """Crea los git bundle y los convierte en comprobaciones."""
-    if not backup.git_repos(station):
-        return [info("No hay repos de git que empaquetar.")]
-    if shutil.which("git") is None:
-        return [warning("git no está en el PATH: se copia sin bundles.")]
-    findings = []
-    for result in backup.make_bundles(station):
-        if not result.error:
-            findings.append(ok(f"{result.name}.bundle"))
-        elif result.required:
-            findings.append(error(f"{result.name}: {result.error}"))
-        else:
-            findings.append(warning(f"{result.name}: {result.error}"))
-    return findings
-
-
-def _backup_one(
-    station: Station, target: BackupTarget, executable: str
-) -> tuple[BackupTarget, Summary]:
-    """Backup y retención en un destino, con barra de avance."""
-    restic = Restic(target, executable)
-    keep = station.backup.retention
-    try:
-        if restic.ensure_repository():
-            show([info(f"{target.name}: repositorio creado en {target.repo}.")])
-        with Progress(
-            TextColumn(f"[bold]{escape(target.name)}[/]"),
-            BarColumn(),
-            DownloadColumn(),
-            console=console,
-            transient=True,
-        ) as progress:
-            task = progress.add_task("", total=None)
-
-            def update(fraction: float, done: int, total: int) -> None:
-                progress.update(task, completed=done, total=total or None)
-
-            summary = restic.backup(backup.backup_paths(station), update)
-        if summary.incomplete:
-            # Un snapshot incompleto no debe desplazar a uno completo en la
-            # retención: no se aplica hasta el siguiente backup correcto.
-            show(
-                [
-                    warning(f"{target.name}: no se pudo leer {item}")
-                    for item in summary.unread
-                ]
-                + [
-                    warning(
-                        f"{target.name}: snapshot incompleto; retención no aplicada."
-                    )
-                ]
+def _create(station: Station, folder: Path) -> backup.Result:
+    """Crea la copia con barra de avance."""
+    total = sum(_size(path) for path, _ in backup.station_files(station))
+    with Progress(
+        TextColumn("[bold]Comprimiendo[/]"),
+        BarColumn(),
+        DownloadColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("", total=total)
+        try:
+            return backup.create(
+                station, folder, lambda done: progress.advance(task, done)
             )
-            return target, summary
-        with console.status(f"Aplicando la retención en {escape(target.name)}..."):
-            restic.forget(keep.daily, keep.weekly, keep.monthly)
+        except BackupError as exc:
+            fail(str(exc))
+
+
+def _size(path: Path) -> int:
+    """Tamaño de un fichero; 0 si no se puede leer (se avisará al copiarlo)."""
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def _verify(archive: Path) -> Finding:
+    """Lee la copia entera y la convierte en una comprobación."""
+    try:
+        backup.verify(archive)
     except BackupError as exc:
-        fail(str(exc))
-    return target, summary
+        return error(str(exc))
+    return ok(f"{archive} verificada.")
 
 
-def _show_summaries(results: list[tuple[BackupTarget, Summary]]) -> None:
-    """Tabla con el resultado de cada destino."""
-    table = Table("Destino", "Snapshot", "Nuevos", "Cambiados", "Añadido", "Duración")
-    table.title = "Backup"
-    table.title_justify = "left"
-    for target, summary in results:
-        table.add_row(
-            escape(target.name),
-            summary.snapshot,
-            str(summary.files_new),
-            str(summary.files_changed),
-            parse_size(summary.data_added),
-            f"{summary.seconds:.0f} s",
-        )
+def _copy(archive: Path, folder: Path) -> Finding:
+    """Lleva la copia ya verificada a otro destino (``.part`` y renombrado)."""
+    target = folder / archive.name
+    partial = target.with_name(target.name + ".part")
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(archive, partial)
+        partial.replace(target)
+    except OSError as exc:
+        partial.unlink(missing_ok=True)
+        return error(f"{folder}: no se pudo copiar ({exc}).")
+    return ok(f"{target} copiada.")
+
+
+def _latest(station: Station) -> Path:
+    """Copia más reciente de todos los destinos accesibles."""
+    found = [a for folder in _reachable(station) for a in backup.archives(folder)]
+    if not found:
+        fail("no hay copias en los destinos.")
+    return max(found, key=lambda archive: archive.stamp).path
+
+
+def _show_archives(folder: Path, found: list[Archive]) -> None:
+    """Tabla con las últimas copias de un destino."""
+    table = Table("Copia", "Tamaño", title=escape(str(folder)), title_justify="left")
+    for archive in found[-10:]:
+        table.add_row(escape(archive.path.name), parse_size(archive.size))
     console.print(table)
 
 
-def _show_snapshots(snapshots: list[Snapshot]) -> None:
-    """Tabla de snapshots."""
-    if not snapshots:
-        show([info("Sin snapshots de atril.")])
-        return
-    table = Table("Snapshot", "Fecha", "Equipo", "Rutas")
-    for item in snapshots:
-        table.add_row(
-            item.short_id,
-            item.time.replace("T", " "),
-            escape(item.hostname),
-            escape(", ".join(item.paths)),
-        )
-    console.print(table)
+def _same_root(source: str, root: Path) -> bool:
+    """La copia se hizo desde esta ruta (sin distinguir mayúsculas ni barras)."""
 
+    def norm(text: str) -> str:
+        return text.replace("\\", "/").rstrip("/").lower()
 
-def _path_findings(station: Station, snapshot: Snapshot) -> list[Finding]:
-    """Avisa si el snapshot es de otra ruta (kb_config.json guarda rutas absolutas)."""
-    roots = {str(_parent(path)) for path in snapshot.paths}
-    here = str(station.root).replace("\\", "/").lower()
-    if roots and all(
-        root.replace("\\", "/").lower().rstrip("/") == here for root in roots
-    ):
-        return [ok("El snapshot es de esta misma ruta.")]
-    return [
-        warning(
-            f"El snapshot se hizo desde {', '.join(sorted(roots))}, no desde "
-            f"{station.root}: las rutas absolutas de las KB (kb_config.json) no "
-            "coincidirán."
-        )
-    ]
-
-
-def _parent(path: str) -> str:
-    """Carpeta que contiene una ruta de snapshot (formato POSIX o Windows de restic)."""
-    normalized = path.replace("\\", "/").rstrip("/")
-    parent = normalized.rsplit("/", 1)[0]
-    # restic en Windows guarda /D/ruta: equivale a D:/ruta.
-    if (
-        len(parent) > 2
-        and parent[0] == "/"
-        and parent[2] == "/"
-        and parent[1].isalpha()
-    ):
-        parent = f"{parent[1]}:{parent[2:]}"
-    return parent
+    return norm(source) == norm(str(root))

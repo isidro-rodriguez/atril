@@ -30,13 +30,10 @@
 │   ├── decisiones.md       # Design decisions (source of truth for scope and phases)
 │   ├── esquemas.md         # atril.toml and temario.toml reference
 │   └── ejemplos/           # Example config files, validated by the tests
-├── scripts/
-│   ├── backup.py           # git bundle of this repo (`poe backup`)
-│   └── migrar_estacion.py  # One-off migration of the old PowerShell station (not packaged)
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
-│   ├── backup.py           # restic backups, git bundles, restore staging and swap
+│   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
 │   ├── evaluation.py       # Full-text retrieval evaluation (app/ Python) and reports
@@ -78,7 +75,7 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - **atril's code never lives inside the station.**
 - Target platform is Windows (PowerShell 7). CI also runs on Linux: keep logic
   platform-neutral and isolate Windows-only calls so tests can run anywhere.
-- Never store secrets in config (`RESTIC_PASSWORD` comes from the environment).
+- Never store secrets in config.
 - Configuration errors raise `atril.config.ConfigError` with a Spanish message naming the file,
   table and key. Commands catch it, print it in red and exit with code 1.
 - Every schema change updates `docs/esquemas.md`, `docs/ejemplos/` and the tests.
@@ -127,14 +124,17 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   gold answers against `evidence_text` (full chunk) instead of the 200-char `content`. Reports go to
   `temarios/<t>/eval/informes/` — never inside `espacio/`, which the agent reads — and each run is
   compared with the latest previous report for the same KB, dataset and `k`.
-- Backups use restic (>= 0.17: exit code 10 = no repository, 12 = wrong password). They copy
-  `atril.toml`, `data/` and `temarios/` (never `app/`) plus git bundles in `data/atril/bundles/`,
-  stop DeepTutor first (SQLite) and restart it after. restic exit code 3 (unreadable files) or a
-  failed `repos_git` bundle make the backup **incomplete**: exit code 1 and no retention
-  (`forget`). A local repo whose parent folder is missing is a disconnected disk: skipped with a warning, or an error if requested explicitly. Restore
-  goes to `<root>.restaurar-<ts>` next to the station, then swaps in; the current content moves to
-  `<root>.previo-<ts>` and is never deleted. A failed swap is rolled back; a snapshot taken from
-  another path requires `--nueva-ruta`. The restic password only comes from the environment.
+- Backups are compressed archives (`zip` deflate 9 or `tar.xz` xz 9), written with the stdlib to
+  the folders in `[backup] destinos` (no restic, rclone or git bundles). Each one holds
+  `atril.toml`, `data/` (without `data/atril/logs/`) and `temarios/` — never `app/` — plus
+  `atril-backup.json` with the station root. DeepTutor is stopped first (SQLite) and restarted
+  after. The archive is written as `.part`, renamed, verified (zip CRC / full xz stream) and then
+  copied to the other destinations; only `atril-*` files are pruned to `conservar`, and nothing is
+  pruned if a file could not be read or a copy failed (exit code 1). A destination whose parent
+  folder is missing is a disconnected disk and is skipped with a warning. Restore extracts to
+  `<root>.restaurar-<ts>` (rejecting absolute or `..` paths), then swaps in; the current content
+  moves to `<root>.previo-<ts>` and is never deleted. A failed swap is rolled back; an archive from
+  another root requires `--nueva-ruta`.
 
 ## Project rules (load-bearing)
 
@@ -167,11 +167,7 @@ with plain `uv run`.
   project's venv.
 - `poe check`: `ruff format --check`, `ruff check`, `ty check`, `pytest` (same as CI).
 - `poe fix`: `ruff format` and `ruff check --fix`.
-- `poe backup`: `git bundle create <project>_<timestamp>.bundle --all` in the repo root
-  (ignored by git). Written as a
-  Python `shell` task so it works on Linux and Windows without a shell dependency.
 - Keep tasks thin wrappers over existing commands. Do not add logic that only exists in poe.
-- Restore a backup with `git clone <file>.bundle <dir>`.
 
 ## Agent workflow
 

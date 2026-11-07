@@ -11,9 +11,11 @@ def test_example_station_is_valid(station_dir: Path) -> None:
 
     assert station.deeptutor.patches == ("paginas-citas", "arranque-sin-ventana")
     assert station.ollama.dimension == 4096
-    assert [t.name for t in station.backup.targets] == ["disco", "drive"]
+    assert station.backup.destinations == (
+        Path(r"E:\backups-atril"),
+        Path(r"G:\Mi unidad\Backups\atril"),
+    )
     assert station.app_dir == station_dir.resolve() / "app"
-    assert station.backup.git_repos == (Path(r"D:\Desarrollo\Repositorios\atril"),)
 
 
 def test_defaults(tmp_path: Path) -> None:
@@ -29,7 +31,7 @@ def test_defaults(tmp_path: Path) -> None:
     assert station.ollama.context == 8192
     assert station.indexing.parser == "docling"
     assert (station.indexing.chunk_size, station.indexing.chunk_overlap) == (1024, 150)
-    assert station.backup.retention.daily == 7
+    assert (station.backup.archive_format, station.backup.keep) == ("zip", 7)
     assert (station.indexing.batch_size, station.indexing.pause_ms) == (10, 0)
 
 
@@ -39,15 +41,6 @@ def test_defaults(tmp_path: Path) -> None:
         ("[estacion]\nraiz = 'D:/x'", "claves desconocidas: estacion"),
         ("[indexado]\nchunk = 100\nsolape = 100", "'solape' debe ser menor"),
         ("[indexado]\nchunk = true", "tipo no válido"),
-        ("[backup]\nrepos_git = ['repos/atril']", "exige rutas absolutas"),
-        (
-            "[backup.retencion]\ndiarias = 0\nsemanales = 0\nmensuales = 0",
-            "0/0/0",
-        ),
-        (
-            "[backup]\nrepos_git = ['D:/a/atril', 'E:/b/Atril']",
-            "dos repos llamados",
-        ),
     ],
 )
 def test_invalid_station(tmp_path: Path, extra: str, message: str) -> None:
@@ -57,9 +50,30 @@ def test_invalid_station(tmp_path: Path, extra: str, message: str) -> None:
         load_station(tmp_path)
 
 
-def test_backup_repo_inside_station(tmp_path: Path) -> None:
-    inside = (tmp_path / "data" / "restic").as_posix()
-    write(tmp_path / "atril.toml", MINIMAL_STATION.replace("E:\\restic-atril", inside))
+BACKUP_LINE = "destinos = ['E:\\backups-atril']"
+
+
+@pytest.mark.parametrize(
+    ("backup", "message"),
+    [
+        ("destinos = []", "al menos una carpeta"),
+        ("destinos = ['copias']", "exige rutas absolutas"),
+        ("destinos = ['E:/a', 'E:/a']", "destino repetido"),
+        (BACKUP_LINE + "\nformato = '7z'", "'formato' debe ser"),
+        (BACKUP_LINE + "\nconservar = 0", "conservar"),
+        (BACKUP_LINE + "\nrepos_git = []", "claves desconocidas: repos_git"),
+    ],
+)
+def test_invalid_backup(tmp_path: Path, backup: str, message: str) -> None:
+    write(tmp_path / "atril.toml", MINIMAL_STATION.replace(BACKUP_LINE, backup))
+
+    with pytest.raises(ConfigError, match=message):
+        load_station(tmp_path)
+
+
+def test_backup_folder_inside_station(tmp_path: Path) -> None:
+    inside = f"destinos = ['{(tmp_path / 'data' / 'copias').as_posix()}']"
+    write(tmp_path / "atril.toml", MINIMAL_STATION.replace(BACKUP_LINE, inside))
 
     with pytest.raises(ConfigError, match="dentro de la estación"):
         load_station(tmp_path)
@@ -72,16 +86,6 @@ def test_ports_must_differ(tmp_path: Path) -> None:
     write(tmp_path / "atril.toml", text)
 
     with pytest.raises(ConfigError, match="mismo puerto"):
-        load_station(tmp_path)
-
-
-def test_backup_needs_a_target(tmp_path: Path) -> None:
-    text = MINIMAL_STATION.replace(
-        "[backup.destinos.disco]\nrepo = 'E:\\restic-atril'", "[backup.destinos]"
-    )
-    write(tmp_path / "atril.toml", text)
-
-    with pytest.raises(ConfigError, match="al menos un destino"):
         load_station(tmp_path)
 
 

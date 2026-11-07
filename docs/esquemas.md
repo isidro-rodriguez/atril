@@ -42,14 +42,13 @@ Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`
 (`deeptutor config apply`), y `[indexado]` (ajustes internos de parser, chunks y ritmo del
 embedding). `atril kb indexar` vuelve a aplicar `[indexado]` antes de empezar. Sustituye a
 `setup.json`.
-| `[backup]` | `retencion` | `{ diarias, semanales, mensuales }` | `7`, `4`, `12` | `restic forget --keep-*`; no todo a 0 |
-| | `repos_git` | lista de rutas absolutas | `[]` | Git bundle en el snapshot (`D:\…` o `/…`); nombres de carpeta distintos |
-| `[backup.destinos.<nombre>]` | `repo` | texto | **obligatorio** | Repositorio restic; al menos uno; nunca dentro de la estación |
+| `[backup]` | `destinos` | lista de rutas absolutas | **obligatorio** | Carpetas para las copias; fuera de la estación. Un disco desconectado se salta |
+| | `formato` | `zip` · `tar.xz` | `"zip"` | `zip` (deflate 9) o `tar.xz` (xz 9: más compacto, bastante más lento) |
+| | `conservar` | entero ≥ 1 | `7` | Copias que se guardan en cada destino; las más antiguas se borran |
 
-La contraseña de restic **nunca** va en `atril.toml`: `RESTIC_PASSWORD`,
-`RESTIC_PASSWORD_FILE` o `RESTIC_PASSWORD_COMMAND`. Requiere restic 0.17 o posterior (y rclone
-para destinos `rclone:`). Un destino local cuya carpeta padre no existe se considera un disco
-desconectado y se salta.
+Cada copia es `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`) con `atril.toml`, `data\` (sin
+`data\atril\logs\`) y `temarios\`, más `atril-backup.json` con la ruta de la estación. Se escribe
+como `.part`, se verifica y después se copia al resto de destinos.
 
 ## `temario.toml` (temario)
 
@@ -104,9 +103,7 @@ desde su última comprobación; `--todas` o ids explícitos fuerzan la revisión
 | Cambio | Motivo |
 |---|---|
 | Fuera `[estacion] raiz` | Se deduce de la ubicación de `atril.toml`; evita incoherencias |
-| `[backup] destinos` → `[backup.destinos.<nombre>]` | La lista duplicaba los nombres de las subtablas |
 | Nuevos `[ollama] url`, `contexto` | Lección: el contexto de Ollama debe coincidir con DT |
 | Nueva tabla `[indexado]` | Lección: DT usa `text_only` por defecto; chunks 1024/150 |
-| Nuevo `[backup] repos_git` | Git bundle del repo de atril (fuera de la estación) |
 | Nuevos `titulo`, `archivo`, `descripcion`, `evaluacion` | Fuentes manuales (ISO, PIOT/PGO) y `atril kb evaluar` |
 | `comprobar` por defecto `nunca` | Explícito; solo fuentes con `url` |

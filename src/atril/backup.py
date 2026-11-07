@@ -1,326 +1,273 @@
-"""Copias de seguridad de la estación con restic.
+"""Copias de seguridad de la estación en ficheros comprimidos.
 
-Se copian ``atril.toml``, ``data/`` y ``temarios/`` (no ``app/``, que se
-reconstruye con ``atril instalar``), más un *git bundle* de cada repo (el git de
-cada temario y ``[backup] repos_git``) dentro de ``data/atril/bundles/``.
-
-La contraseña de restic viene del entorno (``RESTIC_PASSWORD``,
-``RESTIC_PASSWORD_FILE`` o ``RESTIC_PASSWORD_COMMAND``), nunca de ``atril.toml``.
+Cada copia es un ``.zip`` (deflate 9) o un ``.tar.xz`` (xz 9) con
+``atril.toml``, ``data/`` y ``temarios/`` (no ``app/``, que se reconstruye con
+``atril instalar``) y un manifiesto ``atril-backup.json`` con la ruta de la
+estación. Se escribe en ``.part`` y se renombra al terminar: una copia a medias
+nunca pasa por buena.
 """
 
 import contextlib
+import io
 import json
-import os
 import shutil
-import subprocess
-import tempfile
-from collections.abc import Callable
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+import tarfile
+import time
+import zipfile
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 
-from atril.config.station import BackupTarget, Station
+from atril import __version__
+from atril.config.station import Station
 
-PASSWORD_VARIABLES = (
-    "RESTIC_PASSWORD",
-    "RESTIC_PASSWORD_FILE",
-    "RESTIC_PASSWORD_COMMAND",
-)
-"""Variables con las que restic obtiene la contraseña del repositorio."""
+MANIFEST = "atril-backup.json"
+"""Manifiesto dentro de cada copia: ruta de la estación, fecha y versión."""
 
-TAG = "atril"
-"""Etiqueta de los snapshots de atril."""
+PREFIX = "atril-"
+"""Prefijo de las copias; la retención solo toca ficheros ``atril-*``."""
 
-EXCLUDES = ("*.part", "*.nuevo")
-"""Descargas a medias de atril: no se copian."""
+EXTENSIONS = {"zip": ".zip", "tar.xz": ".tar.xz"}
+"""Extensión de cada formato."""
 
-EXIT_NO_REPOSITORY = 10
-"""Código de restic (>= 0.17) cuando el repositorio no existe."""
+EXCLUDED_DIRS = ("data/atril/logs", "data/atril/bundles")
+"""Carpetas que no se copian: logs y los bundles de git de versiones antiguas."""
 
-EXIT_WRONG_PASSWORD = 12
-"""Código de restic cuando la contraseña no abre el repositorio."""
+EXCLUDED_SUFFIXES = (".part", ".nuevo")
+"""Descargas a medias."""
 
-EXIT_INCOMPLETE = 3
-"""Código de ``restic backup``: snapshot creado, pero faltan ficheros ilegibles."""
-
-REMOTE_PREFIXES = ("rclone:", "sftp:", "s3:", "b2:", "azure:", "gs:", "rest:", "swift:")
-"""Repositorios que no son una carpeta local."""
+Progress = Callable[[int], None]
+"""Recibe los bytes leídos desde la última llamada."""
 
 
 class BackupError(Exception):
-    """Fallo de restic o de la preparación del backup; mensaje en español."""
+    """Error de backup o restauración, con mensaje en español."""
 
 
 @dataclass(frozen=True, slots=True)
-class Summary:
-    """Resumen de un ``restic backup``."""
+class Archive:
+    """Copia de seguridad encontrada en un destino."""
 
-    snapshot: str
-    files_new: int
-    files_changed: int
-    data_added: int
-    seconds: float
-    unread: tuple[str, ...] = ()
-    """Errores de lectura: el snapshot existe pero está incompleto."""
+    path: Path
+    size: int
+
+    @property
+    def stamp(self) -> str:
+        """Fecha de la copia (``AAAAMMDD-HHMMSS``), sacada del nombre."""
+        name = self.path.name.removeprefix(PREFIX)
+        return name.split(".", 1)[0]
+
+
+@dataclass(slots=True)
+class Result:
+    """Resultado de crear una copia."""
+
+    archive: Path
+    files: int = 0
+    read_bytes: int = 0
+    unread: list[str] = field(default_factory=list)
+    """Ficheros que no se pudieron leer: la copia queda incompleta."""
 
     @property
     def incomplete(self) -> bool:
-        """``True`` si restic no pudo leer algún fichero."""
+        """``True`` si faltan ficheros en la copia."""
         return bool(self.unread)
 
 
-@dataclass(frozen=True, slots=True)
-class Snapshot:
-    """Snapshot de un repositorio."""
+def is_reachable(folder: Path) -> bool:
+    """El destino existe o puede crearse (su carpeta padre existe).
 
-    short_id: str
-    time: str
-    paths: tuple[str, ...]
-    hostname: str
-
-
-Progress = Callable[[float, int, int], None]
-"""Avance: fracción completada, bytes hechos y bytes totales."""
-
-
-def is_local(target: BackupTarget) -> bool:
-    """El repositorio es una carpeta (p. ej. un disco externo)."""
-    return not target.repo.startswith(REMOTE_PREFIXES)
-
-
-def is_reachable(target: BackupTarget) -> bool:
-    """Un repositorio local está accesible si existe su carpeta padre (disco conectado).
-
-    Los remotos se dan por accesibles: restic informará si no lo son.
+    Si falta también la carpeta padre, es un disco desconectado.
     """
-    return not is_local(target) or Path(target.repo).parent.is_dir()
+    return folder.is_dir() or folder.parent.is_dir()
 
 
-def password_configured(env: dict[str, str] | None = None) -> bool:
-    """Hay alguna forma de contraseña para restic en el entorno."""
-    environ = os.environ if env is None else env
-    return any(environ.get(name) for name in PASSWORD_VARIABLES)
+def station_files(station: Station) -> Iterator[tuple[Path, str]]:
+    """Ficheros que se copian, con su nombre dentro de la copia (``data/...``)."""
+    root = station.root
+    if (root / "atril.toml").is_file():
+        yield root / "atril.toml", "atril.toml"
+    for top in ("data", "temarios"):
+        base = root / top
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*")):
+            name = path.relative_to(root).as_posix()
+            if not path.is_file() or path.name.endswith(EXCLUDED_SUFFIXES):
+                continue
+            if any(name.startswith(f"{folder}/") for folder in EXCLUDED_DIRS):
+                continue
+            yield path, name
 
 
-def backup_paths(station: Station) -> list[Path]:
-    """Lo que se copia de la estación (solo lo que existe)."""
-    paths = [station.root / "atril.toml", station.data_dir, station.syllabi_dir]
-    return [path for path in paths if path.exists()]
+def archive_name(archive_format: str, stamp: str | None = None) -> str:
+    """Nombre de una copia nueva: ``atril-AAAAMMDD-HHMMSS.zip``."""
+    stamp = stamp or time.strftime("%Y%m%d-%H%M%S")
+    return f"{PREFIX}{stamp}{EXTENSIONS[archive_format]}"
 
 
-def bundles_dir(station: Station) -> Path:
-    """Carpeta de los git bundle (dentro de ``data/``, así entran en el snapshot)."""
-    return station.data_dir / "atril" / "bundles"
+def create(station: Station, folder: Path, progress: Progress | None = None) -> Result:
+    """Crea una copia de la estación en ``folder``.
 
-
-def git_repos(station: Station) -> dict[str, Path]:
-    """Repos de git a empaquetar: cada temario con ``.git`` y ``repos_git``."""
-    repos: dict[str, Path] = {}
-    if station.syllabi_dir.is_dir():
-        for folder in sorted(station.syllabi_dir.iterdir()):
-            if (folder / ".git").exists():
-                repos[f"temario-{folder.name}"] = folder
-    for repo in station.backup.git_repos:
-        repos[f"repo-{repo.name}"] = repo
-    return repos
-
-
-class Restic:
-    """Llamadas a restic para un repositorio."""
-
-    def __init__(self, target: BackupTarget, executable: str = "restic") -> None:
-        """Prepara las llamadas al repositorio de ``target``."""
-        self.target = target
-        self.executable = executable
-
-    def _command(self, *args: str) -> list[str]:
-        """Comando completo de restic con el repositorio."""
-        return [self.executable, "-r", self.target.repo, *args]
-
-    def _run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        """Ejecuta restic capturando la salida."""
-        result = subprocess.run(
-            self._command(*args),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if check and result.returncode != 0:
-            raise BackupError(self._explain(result))
-        return result
-
-    def _explain(self, result: subprocess.CompletedProcess[str]) -> str:
-        """Mensaje de error de restic, con pista para los casos conocidos."""
-        if result.returncode == EXIT_WRONG_PASSWORD:
-            return f"{self.target.name}: la contraseña no abre el repositorio."
-        if result.returncode == EXIT_NO_REPOSITORY:
-            return f"{self.target.name}: el repositorio no existe ({self.target.repo})."
-        lines = [line for line in result.stderr.strip().splitlines() if line.strip()]
-        detail = lines[-1] if lines else f"código {result.returncode}"
-        return f"{self.target.name}: {detail}"
-
-    def ensure_repository(self) -> bool:
-        """Inicializa el repositorio si no existe.
-
-        Returns:
-            ``True`` si se ha creado ahora.
-        """
-        result = self._run("cat", "config", check=False)
-        if result.returncode == 0:
-            return False
-        if result.returncode != EXIT_NO_REPOSITORY:
-            raise BackupError(self._explain(result))
-        self._run("init")
-        return True
-
-    def backup(self, paths: list[Path], progress: Progress | None = None) -> Summary:
-        """``restic backup`` con avance; devuelve el resumen."""
-        args = ["backup", "--json", "--tag", TAG]
-        for pattern in EXCLUDES:
-            args += ["--exclude", pattern]
-        command = self._command(*args, *(str(path) for path in paths))
-        summary: dict[str, Any] = {}
-        errors: list[str] = []
-        # stderr a un fichero: con dos tuberías, restic podría bloquearse si
-        # llenase la de stderr mientras se lee stdout.
-        with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as log:
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=log,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-            for line in process.stdout or ():
+    Raises:
+        BackupError: Si no se puede escribir la copia.
+    """
+    archive_format = station.backup.archive_format
+    target = folder / archive_name(archive_format)
+    partial = target.with_name(target.name + ".part")
+    result = Result(target)
+    manifest = json.dumps(
+        {
+            "estacion": str(station.root),
+            "fecha": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "atril": __version__,
+        },
+        ensure_ascii=False,
+        indent=2,
+    ).encode("utf-8")
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        with _open(partial, archive_format) as archive:
+            _put_bytes(archive, MANIFEST, manifest)
+            for path, name in station_files(station):
                 try:
-                    message = json.loads(line)
-                except ValueError:
+                    _put_file(archive, path, name)
+                    size = path.stat().st_size
+                except OSError as exc:
+                    result.unread.append(f"{name}: {exc}")
                     continue
-                kind = message.get("message_type")
-                if kind == "status" and progress:
-                    progress(
-                        float(message.get("percent_done", 0)),
-                        int(message.get("bytes_done", 0)),
-                        int(message.get("total_bytes", 0)),
-                    )
-                elif kind == "summary":
-                    summary = message
-                elif kind == "error":
-                    errors.append(_error_text(message))
-            process.wait()
-            log.seek(0)
-            stderr = log.read()
-        code = process.returncode
-        if code not in {0, EXIT_INCOMPLETE} or not summary:
-            detail = (errors or stderr.strip().splitlines() or [f"código {code}"])[-1]
-            raise BackupError(f"{self.target.name}: {detail}")
-        unread = tuple(errors) if code == EXIT_INCOMPLETE else ()
-        if code == EXIT_INCOMPLETE and not unread:
-            unread = tuple((stderr.strip().splitlines() or ["ficheros sin leer"])[-1:])
-        return Summary(
-            snapshot=str(summary.get("snapshot_id", ""))[:8],
-            files_new=int(summary.get("files_new", 0)),
-            files_changed=int(summary.get("files_changed", 0)),
-            data_added=int(summary.get("data_added", 0)),
-            seconds=float(summary.get("total_duration", 0)),
-            unread=unread,
+                result.files += 1
+                result.read_bytes += size
+                if progress:
+                    progress(size)
+        partial.replace(target)
+    except OSError as exc:
+        with contextlib.suppress(OSError):
+            partial.unlink()
+        raise BackupError(f"no se puede escribir la copia en {folder}: {exc}") from exc
+    return result
+
+
+def _open(path: Path, archive_format: str) -> zipfile.ZipFile | tarfile.TarFile:
+    """Abre una copia nueva con la compresión máxima del formato."""
+    if archive_format == "zip":
+        return zipfile.ZipFile(
+            path, "w", zipfile.ZIP_DEFLATED, compresslevel=9, allowZip64=True
         )
-
-    def forget(self, daily: int, weekly: int, monthly: int) -> None:
-        """Aplica la retención y borra los datos que ya no usa ningún snapshot."""
-        self._run(
-            "forget",
-            "--tag",
-            TAG,
-            "--keep-daily",
-            str(daily),
-            "--keep-weekly",
-            str(weekly),
-            "--keep-monthly",
-            str(monthly),
-            "--prune",
-        )
-
-    def snapshots(self) -> list[Snapshot]:
-        """Snapshots de atril, del más antiguo al más reciente."""
-        data = json.loads(self._run("snapshots", "--json", "--tag", TAG).stdout or "[]")
-        return [
-            Snapshot(
-                short_id=str(item.get("short_id", item.get("id", ""))[:8]),
-                time=str(item.get("time", ""))[:19],
-                paths=tuple(item.get("paths", [])),
-                hostname=str(item.get("hostname", "")),
-            )
-            for item in data or []
-        ]
-
-    def check(self, read_data: str | None = None) -> None:
-        """``restic check``; con ``read_data`` (p. ej. ``5%``) lee esa parte."""
-        args = ["check"]
-        if read_data:
-            args.append(f"--read-data-subset={read_data}")
-        self._run(*args)
-
-    def restore(self, snapshot: str, target: Path) -> None:
-        """Restaura un snapshot en ``target`` (con la estructura de la estación)."""
-        self._run("restore", snapshot, "--target", str(target))
+    return tarfile.open(path, "w:xz", preset=9)
 
 
-@dataclass(frozen=True, slots=True)
-class BundleResult:
-    """Resultado de empaquetar un repo de git."""
+def _put_bytes(
+    archive: zipfile.ZipFile | tarfile.TarFile, name: str, data: bytes
+) -> None:
+    """Añade un fichero en memoria (el manifiesto)."""
+    if isinstance(archive, zipfile.ZipFile):
+        archive.writestr(name, data)
+        return
+    info = tarfile.TarInfo(name)
+    info.size = len(data)
+    info.mtime = int(time.time())
+    archive.addfile(info, io.BytesIO(data))
 
-    name: str
-    error: str = ""
-    """Vacío si el bundle se ha creado."""
-    required: bool = False
-    """Repo declarado en ``repos_git``: si falla, el backup queda incompleto."""
+
+def _put_file(
+    archive: zipfile.ZipFile | tarfile.TarFile, path: Path, name: str
+) -> None:
+    """Añade un fichero del disco."""
+    if isinstance(archive, zipfile.ZipFile):
+        archive.write(path, name)
+    else:
+        archive.add(path, name, recursive=False)
 
 
-def make_bundles(station: Station, git: str = "git") -> list[BundleResult]:
-    """Crea un git bundle de cada repo.
+def verify(path: Path) -> dict[str, str]:
+    """Lee la copia entera (CRC del zip o flujo del xz) y devuelve su manifiesto.
 
-    Un fallo no detiene el resto: se anota en el resultado. El git de un temario
-    sin commits no importa; un repo de ``repos_git`` que falla deja el backup
-    incompleto.
+    Raises:
+        BackupError: Si está dañada o no es una copia de atril.
     """
-    folder = bundles_dir(station)
-    folder.mkdir(parents=True, exist_ok=True)
-    results = []
-    declared = set(station.backup.git_repos)
-    for name, repo in git_repos(station).items():
-        target = folder / f"{name}.bundle"
-        result = subprocess.run(
-            [git, "-C", str(repo), "bundle", "create", str(target), "--all"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        lines = result.stderr.strip().splitlines()
-        failure = "" if result.returncode == 0 else (lines[-1] if lines else "error")
-        results.append(BundleResult(name, failure, required=repo in declared))
-    return results
+    try:
+        if path.name.endswith(".zip"):
+            with zipfile.ZipFile(path) as archive:
+                broken = archive.testzip()
+                if broken is not None:
+                    raise BackupError(f"{path.name}: {broken} está dañado.")
+                manifest = archive.read(MANIFEST)
+        else:
+            manifest = b""
+            with tarfile.open(path, "r:xz") as archive:
+                for member in archive:
+                    reader = archive.extractfile(member)
+                    if reader is None:
+                        continue
+                    if member.name == MANIFEST:
+                        manifest = reader.read()
+                    # Leer hasta el final comprueba el flujo xz sin cargarlo entero.
+                    while reader.read(1 << 20):
+                        pass
+        return json.loads(manifest)
+    except BackupError:
+        raise
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile, tarfile.TarError) as exc:
+        raise BackupError(f"{path.name}: copia dañada o incompleta ({exc}).") from exc
 
 
-def find_restored_root(target: Path) -> Path | None:
-    """Carpeta restaurada con la estructura de una estación (``atril.toml`` o ``data``).
+def archives(folder: Path) -> list[Archive]:
+    """Copias de atril en ``folder``, de la más antigua a la más reciente."""
+    if not folder.is_dir():
+        return []
+    found = [
+        Archive(path, path.stat().st_size)
+        for path in folder.iterdir()
+        if path.is_file()
+        and path.name.startswith(PREFIX)
+        and path.name.endswith(tuple(EXTENSIONS.values()))
+    ]
+    return sorted(found, key=lambda archive: archive.stamp)
 
-    restic deja la estructura relativa al ancestro común de las rutas copiadas,
-    pero se busca a algo de profundidad por si cambia.
+
+def prune(folder: Path, keep: int) -> list[Path]:
+    """Borra las copias más antiguas y deja las ``keep`` más recientes."""
+    removed = []
+    for archive in archives(folder)[:-keep]:
+        archive.path.unlink()
+        removed.append(archive.path)
+    return removed
+
+
+def extract(archive: Path, target: Path) -> dict[str, str]:
+    """Extrae una copia en ``target`` (vacía) y devuelve su manifiesto.
+
+    Rechaza rutas absolutas o con ``..``: una copia nunca escribe fuera.
+
+    Raises:
+        BackupError: Si la copia está dañada o tiene rutas peligrosas.
     """
-    candidates = [target, *sorted(p for p in target.rglob("*") if p.is_dir())]
-    for folder in candidates:
-        looks_like_station = (folder / "atril.toml").is_file() or (
-            folder / "data"
-        ).is_dir()
-        if looks_like_station and len(folder.relative_to(target).parts) <= 6:
-            return folder
-    return None
+    target.mkdir(parents=True, exist_ok=False)
+    try:
+        if archive.name.endswith(".zip"):
+            with zipfile.ZipFile(archive) as source:
+                for name in source.namelist():
+                    _check_name(name)
+                source.extractall(target)
+        else:
+            with tarfile.open(archive, "r:xz") as source:
+                source.extractall(target, filter="data")
+        manifest = target / MANIFEST
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        manifest.unlink()
+    except BackupError:
+        raise
+    except (OSError, ValueError, zipfile.BadZipFile, tarfile.TarError) as exc:
+        raise BackupError(f"{archive.name}: no se puede extraer ({exc}).") from exc
+    return data
+
+
+def _check_name(name: str) -> None:
+    """Rechaza nombres de zip absolutos o que salen de la carpeta."""
+    path = PurePosixPath(name.replace("\\", "/"))
+    if path.is_absolute() or ".." in path.parts or ":" in path.parts[0]:
+        raise BackupError(f"la copia tiene una ruta no permitida: {name!r}.")
 
 
 RESTORED_ITEMS = ("atril.toml", "data", "temarios")
@@ -381,11 +328,3 @@ def _undo(moves: list[tuple[Path, Path]]) -> list[str]:
         except OSError as exc:
             problems.append(f"{destination} → {origin}: {exc}")
     return problems
-
-
-def _error_text(message: dict[str, Any]) -> str:
-    """Texto de un mensaje ``error`` de ``restic backup --json``."""
-    detail = message.get("error", {})
-    text = detail.get("message", message) if isinstance(detail, dict) else detail
-    item = message.get("item")
-    return f"{item}: {text}" if item else str(text)

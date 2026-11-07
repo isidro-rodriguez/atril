@@ -55,27 +55,14 @@ atril kb evaluar <kb> [-k 5]     # mide la recuperación y la compara con el inf
 ### Backup
 
 ```bash
-atril backup [-d destino]        # copia la estación con restic (sin app\) y aplica la retención
-atril backup comprobar           # verifica los repositorios y lista sus últimos snapshots
-atril backup restaurar -d <d>    # restaura un snapshot; lo actual queda en <estación>.previo-*
+atril backup                     # comprime la estación (sin app\) en cada destino y borra las antiguas
+atril backup comprobar           # lista las copias de cada destino y verifica la más reciente
+atril backup restaurar [copia]   # restaura (por defecto, la más reciente); lo actual queda en <estación>.previo-*
 ```
 
-Requisitos, una sola vez (PowerShell):
-
-```powershell
-winget install restic.restic      # restic 0.17 o posterior (compruébalo con: restic version)
-winget install Rclone.Rclone      # solo para destinos rclone: (p. ej. Google Drive)
-rclone config                     # crea el remoto que usa el destino, p. ej. "gdrive"
-
-# Contraseña de los repositorios: en un fichero fuera de la estación, nunca en atril.toml
-Set-Content "$env:USERPROFILE\.restic-atril" "tu-contraseña" -NoNewline
-setx RESTIC_PASSWORD_FILE "$env:USERPROFILE\.restic-atril"
-```
-
-Abre un terminal nuevo para que se vean los cambios. También vale `RESTIC_PASSWORD` o
-`RESTIC_PASSWORD_COMMAND`. Guarda la contraseña también en otro sitio, por ejemplo en un gestor de
-contraseñas: sin ella los backups no se pueden restaurar. El repositorio de cada destino se crea
-solo en el primer `atril backup`.
+Las copias son ficheros `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`) en las carpetas de
+`[backup] destinos`: un disco externo o la carpeta de Google Drive para escritorio. No hace falta
+instalar nada más.
 
 Configuración: [`docs/esquemas.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](https://github.com/isidro-rodriguez/atril/blob/main/docs/ejemplos/).
 
@@ -96,7 +83,7 @@ uv run ty check
 uv run pytest
 ```
 
-Con [Poe the Poet](https://poethepoet.natn.io/): `poe check` · `poe fix` · `poe backup`.
+Con [Poe the Poet](https://poethepoet.natn.io/): `poe check` · `poe fix`.
 
 ## Enlaces
 

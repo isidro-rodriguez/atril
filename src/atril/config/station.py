@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from acodo.utils import valid_path, valid_slug, valid_url
+from acodo.utils import valid_path, valid_url
 
 from atril.config._toml import ConfigError, Table, load_toml
 from atril.patches import PATCHES
@@ -89,34 +89,20 @@ class IndexingConfig:
     """Intervalo mínimo entre peticiones de embedding, en milisegundos."""
 
 
-@dataclass(frozen=True, slots=True)
-class BackupTarget:
-    """Destino de backup ``[backup.destinos.<nombre>]`` (repositorio restic)."""
-
-    name: str
-    repo: str
-
-
-@dataclass(frozen=True, slots=True)
-class Retention:
-    """Retención de snapshots de restic (``restic forget --keep-*``)."""
-
-    daily: int
-    weekly: int
-    monthly: int
+ARCHIVE_FORMATS = ("zip", "tar.xz")
+"""Formatos de backup: ``zip`` (deflate 9) o ``tar.xz`` (xz 9, más lento y compacto)."""
 
 
 @dataclass(frozen=True, slots=True)
 class BackupConfig:
-    """Tabla ``[backup]``.
+    """Tabla ``[backup]``: copias comprimidas de la estación en carpetas."""
 
-    La contraseña de restic nunca va en ``atril.toml``: se toma del entorno
-    (``RESTIC_PASSWORD`` o ``RESTIC_PASSWORD_FILE``).
-    """
-
-    targets: tuple[BackupTarget, ...]
-    retention: Retention
-    git_repos: tuple[Path, ...]
+    destinations: tuple[Path, ...]
+    """Carpetas donde se guardan las copias (disco externo, Google Drive...)."""
+    archive_format: str
+    """``zip`` o ``tar.xz``."""
+    keep: int
+    """Copias que se conservan en cada destino; las más antiguas se borran."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,8 +180,8 @@ STATION_TEMPLATE = """\
 embedding = "qwen3-embedding:8b"
 dimension = 4096
 
-[backup.destinos.disco]
-repo = 'E:\\restic-atril'  # cámbialo por tu disco o repositorio restic
+[backup]
+destinos = ['E:\\backups-atril']  # carpetas para las copias; cámbialo por la tuya
 """
 """``atril.toml`` mínimo y válido para una estación nueva."""
 
@@ -331,49 +317,31 @@ def _indexing(table: Table) -> IndexingConfig:
 
 def _backup(table: Table, root: Path) -> BackupConfig:
     """Tabla ``[backup]``; ``root`` es la raíz de la estación."""
-    targets_table = table.get_table("destinos")
-    targets = []
-    for name, target in targets_table.get_named_tables():
-        if not valid_slug(name):
-            raise targets_table.error(f"nombre de destino no válido: {name!r}.")
-        repo = target.get_str("repo")
-        if _inside(Path(repo), root):
-            raise target.error(
-                f"el repositorio {repo!r} está dentro de la estación: se copiaría "
-                "a sí mismo y se perdería con ella."
-            )
-        targets.append(BackupTarget(name=name, repo=repo))
-        target.close()
-    if not targets:
-        raise targets_table.error("declara al menos un destino.")
-
-    keep = table.get_table("retencion", required=False)
-    retention = Retention(
-        daily=keep.get_int("diarias", 7, minimum=0),
-        weekly=keep.get_int("semanales", 4, minimum=0),
-        monthly=keep.get_int("mensuales", 12, minimum=0),
-    )
-    if not (retention.daily or retention.weekly or retention.monthly):
-        raise keep.error("la retención 0/0/0 borraría todos los snapshots.")
-    keep.close()
-
-    repos = table.get_str_list("repos_git", [])
-    names: set[str] = set()
-    for repo in repos:
-        if not valid_path(repo, absolute=True):
-            raise table.error(f"'repos_git' exige rutas absolutas: {repo!r}.")
-        name = Path(repo).name.lower()
-        if name in names:
+    folders = table.get_str_list("destinos")
+    if not folders:
+        raise table.error("declara al menos una carpeta en 'destinos'.")
+    destinations: list[Path] = []
+    for folder in folders:
+        if not valid_path(folder, absolute=True):
+            raise table.error(f"'destinos' exige rutas absolutas: {folder!r}.")
+        path = Path(folder)
+        if _inside(path, root):
             raise table.error(
-                f"'repos_git' tiene dos repos llamados {Path(repo).name!r}: "
-                "sus bundles se pisarían."
+                f"el destino {folder!r} está dentro de la estación: se copiaría a "
+                "sí mismo y se perdería con ella."
             )
-        names.add(name)
-
+        if path in destinations:
+            raise table.error(f"destino repetido: {folder!r}.")
+        destinations.append(path)
+    archive_format = table.get_str("formato", "zip")
+    if archive_format not in ARCHIVE_FORMATS:
+        raise table.error(
+            f"'formato' debe ser {' o '.join(ARCHIVE_FORMATS)}: {archive_format!r}."
+        )
     config = BackupConfig(
-        targets=tuple(targets),
-        retention=retention,
-        git_repos=tuple(Path(repo) for repo in repos),
+        destinations=tuple(destinations),
+        archive_format=archive_format,
+        keep=table.get_int("conservar", 7),
     )
     table.close()
     return config
@@ -381,13 +349,11 @@ def _backup(table: Table, root: Path) -> BackupConfig:
 
 __all__ = [
     "BackupConfig",
-    "BackupTarget",
     "ConfigError",
     "DeepTutorConfig",
     "IndexingConfig",
     "LlmConfig",
     "OllamaConfig",
-    "Retention",
     "Station",
     "init_station",
     "load_station",

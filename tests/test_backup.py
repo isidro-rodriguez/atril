@@ -1,98 +1,141 @@
 import json
 import shutil
-import subprocess
+import tarfile
+import zipfile
 from pathlib import Path
-from typing import IO
 
 import pytest
 from support import write
 from typer.testing import CliRunner
 
 from atril import backup
-from atril.backup import BackupError, BundleResult, Restic, Snapshot, Summary
+from atril.backup import BackupError
 from atril.commands import backup as commands
 from atril.config import load_station
-from atril.config.station import BackupTarget, Station
+from atril.config.station import Station
 from atril.deeptutor import DeepTutor
 from atril.main import app
 
 runner = CliRunner()
 
-STATION_BACKUP = """
-[backup]
-[backup.destinos.disco]
-repo = "{disco}"
-[backup.destinos.usb]
-repo = "{usb}"
-"""
+
+def _station(station_dir: Path, tmp_path: Path, archive_format: str = "zip") -> Station:
+    """Estación con un destino accesible (discoE) y otro desconectado (usb)."""
+    text = (station_dir / "atril.toml").read_text(encoding="utf-8")
+    disco = (tmp_path / "discoE" / "atril").as_posix()
+    usb = (tmp_path / "no-conectado" / "atril").as_posix()
+    text = text[: text.index("[backup]")] + (
+        f"[backup]\ndestinos = ['{disco}', '{usb}']\n"
+        f"formato = '{archive_format}'\nconservar = 2\n"
+    )
+    (station_dir / "atril.toml").write_text(text, encoding="utf-8")
+    (tmp_path / "discoE").mkdir()
+    write(station_dir / "data" / "user" / "settings.json", '{"tema": "claro"}')
+    write(station_dir / "data" / "atril" / "logs" / "indexado.log", "ruido")
+    write(station_dir / "data" / "knowledge_bases" / "cte" / "x.part", "a medias")
+    write(station_dir / "app" / "pyproject.toml", "no se copia")
+    return load_station(station_dir)
 
 
 @pytest.fixture
 def station(station_dir: Path, tmp_path: Path) -> Station:
-    """Estación con un destino accesible (disco) y otro desconectado (usb)."""
-    text = (station_dir / "atril.toml").read_text(encoding="utf-8")
-    text = text[: text.index("[backup]")] + STATION_BACKUP.format(
-        disco=(tmp_path / "discoE" / "repo").as_posix(),
-        usb=(tmp_path / "no-conectado" / "repo").as_posix(),
+    return _station(station_dir, tmp_path)
+
+
+def _folder(station: Station) -> Path:
+    return station.backup.destinations[0]
+
+
+# --- módulo backup -------------------------------------------------------------
+
+
+def test_station_files_skip_app_logs_and_partial(station: Station) -> None:
+    names = {name for _, name in backup.station_files(station)}
+
+    assert "atril.toml" in names
+    assert "data/user/settings.json" in names
+    assert "temarios/normativa/temario.toml" in names
+    assert not any(name.startswith(("app/", "data/atril/logs/")) for name in names)
+    assert not any(name.endswith(".part") for name in names)
+
+
+@pytest.mark.parametrize("archive_format", ["zip", "tar.xz"])
+def test_create_verify_and_extract(
+    station_dir: Path, tmp_path: Path, archive_format: str
+) -> None:
+    station = _station(station_dir, tmp_path, archive_format)
+    seen: list[int] = []
+
+    result = backup.create(station, _folder(station), seen.append)
+
+    assert result.archive.name.endswith(backup.EXTENSIONS[archive_format])
+    assert not result.incomplete
+    assert sum(seen) == result.read_bytes
+    assert not list(_folder(station).glob("*.part"))
+    manifest = backup.verify(result.archive)
+    assert manifest["estacion"] == str(station.root)
+
+    target = tmp_path / "extraido"
+    assert backup.extract(result.archive, target)["estacion"] == str(station.root)
+    assert (target / "data" / "user" / "settings.json").read_text() == (
+        '{"tema": "claro"}'
     )
-    (station_dir / "atril.toml").write_text(text, encoding="utf-8")
-    (tmp_path / "discoE").mkdir()
-    write(station_dir / "data" / "user" / "settings.json", "{}")
-    return load_station(station_dir)
+    assert not (target / backup.MANIFEST).exists()
 
 
-def _target(station: Station, name: str) -> BackupTarget:
-    return next(t for t in station.backup.targets if t.name == name)
+def test_verify_detects_damage(station: Station) -> None:
+    archive = backup.create(station, _folder(station)).archive
+    data = archive.read_bytes()
+    archive.write_bytes(data[: len(data) // 2])
+
+    with pytest.raises(BackupError, match="dañada"):
+        backup.verify(archive)
 
 
-# --- funciones puras -----------------------------------------------------------
+def test_extract_rejects_paths_outside(tmp_path: Path) -> None:
+    evil = tmp_path / "atril-20260101-000000.zip"
+    with zipfile.ZipFile(evil, "w") as archive:
+        archive.writestr("../fuera.txt", "x")
+        archive.writestr(backup.MANIFEST, "{}")
+
+    with pytest.raises(BackupError, match="ruta no permitida"):
+        backup.extract(evil, tmp_path / "destino")
+    assert not (tmp_path / "fuera.txt").exists()
 
 
-def test_reachability(station: Station) -> None:
-    assert backup.is_reachable(_target(station, "disco"))
-    assert not backup.is_reachable(_target(station, "usb"))
-    drive = BackupTarget("drive", "rclone:gdrive:Atril/restic")
-    assert not backup.is_local(drive)
-    assert backup.is_reachable(drive)
+def test_extract_tar_rejects_paths_outside(tmp_path: Path) -> None:
+    evil = tmp_path / "atril-20260101-000000.tar.xz"
+    payload = tmp_path / "carga.txt"
+    payload.write_text("x")
+    with tarfile.open(evil, "w:xz") as archive:
+        archive.add(payload, "../fuera.txt")
+
+    with pytest.raises(BackupError):
+        backup.extract(evil, tmp_path / "destino")
+    assert not (tmp_path / "fuera.txt").exists()
 
 
-def test_password_from_environment() -> None:
-    assert not backup.password_configured({})
-    assert backup.password_configured({"RESTIC_PASSWORD_FILE": "C:/clave.txt"})
+def test_archives_and_prune(tmp_path: Path) -> None:
+    for stamp in ("20261101-010000", "20261103-010000", "20261102-010000"):
+        write(tmp_path / backup.archive_name("zip", stamp), "x")
+    write(tmp_path / "otra-cosa.zip", "no es de atril")
 
-
-def test_backup_paths_and_git_repos(station: Station) -> None:
-    (station.syllabi_dir / "normativa" / ".git").mkdir()
-
-    assert backup.backup_paths(station) == [
-        station.root / "atril.toml",
-        station.data_dir,
-        station.syllabi_dir,
+    assert [a.stamp for a in backup.archives(tmp_path)] == [
+        "20261101-010000",
+        "20261102-010000",
+        "20261103-010000",
     ]
-    assert backup.git_repos(station) == {
-        "temario-normativa": station.syllabi_dir / "normativa"
-    }
+    removed = backup.prune(tmp_path, 2)
+    assert [path.name for path in removed] == ["atril-20261101-010000.zip"]
+    assert (tmp_path / "otra-cosa.zip").exists()
 
 
-def test_find_restored_root_and_swap(station: Station, tmp_path: Path) -> None:
-    staging = tmp_path / "staging"
-    write(staging / "atril.toml", "restaurado")
-    write(staging / "data" / "user" / "settings.json", '{"restaurado": true}')
-    restored = backup.find_restored_root(staging)
-    assert restored == staging
-    (tmp_path / "vacio").mkdir()
-    assert backup.find_restored_root(tmp_path / "vacio") is None
-
-    keep = tmp_path / "previo"
-    replaced = backup.swap_in(station, staging, keep)
-
-    assert replaced == ["atril.toml", "data"]
-    assert (station.root / "atril.toml").read_text() == "restaurado"
-    assert (keep / "data" / "user" / "settings.json").read_text() == "{}"
-    assert (station.syllabi_dir / "normativa" / "temario.toml").is_file()  # no tocado
+def test_reachability(tmp_path: Path) -> None:
+    assert backup.is_reachable(tmp_path / "nueva")
+    assert not backup.is_reachable(tmp_path / "no-conectado" / "atril")
 
 
-def test_swap_rolls_back_on_failure(
+def test_find_swap_rolls_back_on_failure(
     station: Station, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     staging = tmp_path / "staging"
@@ -113,346 +156,131 @@ def test_swap_rolls_back_on_failure(
         backup.swap_in(station, staging, tmp_path / "previo")
 
     assert (station.root / "atril.toml").read_text() == before
-    assert (station.data_dir / "user" / "settings.json").is_file()
     assert (staging / "data" / "x.txt").is_file()
     assert not (tmp_path / "previo").exists()
-
-
-def test_parent_handles_windows_snapshot_paths() -> None:
-    assert commands._parent("/D/Desarrollo/DeepTutor/data") == "D:/Desarrollo/DeepTutor"
-    assert (
-        commands._parent("D:\\Desarrollo\\DeepTutor\\data") == "D:/Desarrollo/DeepTutor"
-    )
-    assert commands._parent("/home/u/est/data") == "/home/u/est"
-
-
-def test_path_findings_warn_on_other_root(station: Station) -> None:
-    same = Snapshot("a", "t", (f"{station.root.as_posix()}/data",), "pc")
-    other = Snapshot("b", "t", ("/otra/estacion/data",), "pc")
-
-    assert commands._path_findings(station, same)[0].message.startswith(
-        "El snapshot es"
-    )
-    assert "no coincidirán" in commands._path_findings(station, other)[0].message
-
-
-# --- Restic con subprocess simulado --------------------------------------------
-
-
-class FakeProcess:
-    def __init__(self, lines: list[str], code: int = 0) -> None:
-        self.stdout = iter(line + "\n" for line in lines)
-        self.returncode = code
-
-    def wait(self) -> int:
-        return self.returncode
-
-
-SUMMARY = json.dumps(
-    {"message_type": "summary", "snapshot_id": "0123456789abcdef", "files_new": 1}
-)
-
-
-def _completed(
-    code: int, stdout: str = "", stderr: str = ""
-) -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess([], code, stdout, stderr)
-
-
-def test_ensure_repository(monkeypatch: pytest.MonkeyPatch, station: Station) -> None:
-    calls: list[list[str]] = []
-    codes = iter([backup.EXIT_NO_REPOSITORY, 0, 0, backup.EXIT_WRONG_PASSWORD])
-
-    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
-        calls.append(command[3:])
-        return _completed(next(codes))
-
-    monkeypatch.setattr(backup.subprocess, "run", fake_run)
-    restic = Restic(_target(station, "disco"))
-
-    assert restic.ensure_repository() is True
-    assert calls == [["cat", "config"], ["init"]]
-    assert restic.ensure_repository() is False
-    with pytest.raises(BackupError, match="contraseña"):
-        restic.ensure_repository()
-
-
-def test_backup_parses_progress_and_summary(
-    monkeypatch: pytest.MonkeyPatch, station: Station
-) -> None:
-    lines = [
-        json.dumps(
-            {
-                "message_type": "status",
-                "percent_done": 0.5,
-                "bytes_done": 5,
-                "total_bytes": 10,
-            }
-        ),
-        "texto que no es json",
-        json.dumps(
-            {
-                "message_type": "summary",
-                "snapshot_id": "0123456789abcdef",
-                "files_new": 3,
-                "files_changed": 1,
-                "data_added": 2048,
-                "total_duration": 4.2,
-            }
-        ),
-    ]
-    seen: list[tuple[float, int, int]] = []
-    commands_run: list[list[str]] = []
-
-    def fake_popen(command: list[str], **kwargs: object) -> FakeProcess:
-        commands_run.append(command)
-        return FakeProcess(lines)
-
-    monkeypatch.setattr(backup.subprocess, "Popen", fake_popen)
-
-    summary = Restic(_target(station, "disco")).backup(
-        [station.data_dir], lambda *args: seen.append(args)
-    )
-
-    assert summary == Summary("01234567", 3, 1, 2048, 4.2)
-    assert seen == [(0.5, 5, 10)]
-    assert "--tag" in commands_run[0] and "*.part" in commands_run[0]
-
-
-def test_backup_incomplete_on_code_3(
-    monkeypatch: pytest.MonkeyPatch, station: Station
-) -> None:
-    unreadable = json.dumps(
-        {
-            "message_type": "error",
-            "error": {"message": "access denied"},
-            "item": "D:/est/data/x.db",
-        }
-    )
-    monkeypatch.setattr(
-        backup.subprocess,
-        "Popen",
-        lambda command, **kw: FakeProcess([unreadable, SUMMARY], code=3),
-    )
-
-    summary = Restic(_target(station, "disco")).backup([station.data_dir])
-
-    assert summary.incomplete
-    assert summary.unread == ("D:/est/data/x.db: access denied",)
-
-
-def test_backup_error_detail_comes_from_stderr_file(
-    monkeypatch: pytest.MonkeyPatch, station: Station
-) -> None:
-    def fake_popen(command: list[str], *, stderr: IO[str], **kw: object) -> FakeProcess:
-        stderr.write("Fatal: unable to open repository\n")
-        return FakeProcess([], code=1)
-
-    monkeypatch.setattr(backup.subprocess, "Popen", fake_popen)
-
-    with pytest.raises(BackupError, match="unable to open"):
-        Restic(_target(station, "disco")).backup([station.data_dir])
-
-
-def test_backup_failure(monkeypatch: pytest.MonkeyPatch, station: Station) -> None:
-    error = json.dumps({"message_type": "error", "error": {"message": "disco lleno"}})
-    monkeypatch.setattr(
-        backup.subprocess, "Popen", lambda command, **kw: FakeProcess([error], code=1)
-    )
-
-    with pytest.raises(BackupError, match="disco lleno"):
-        Restic(_target(station, "disco")).backup([station.data_dir])
 
 
 # --- comandos ------------------------------------------------------------------
 
 
 @pytest.fixture
-def cli(station: Station, monkeypatch: pytest.MonkeyPatch) -> dict[str, list]:
-    """restic y git simulados; DeepTutor parado."""
-    calls: dict[str, list] = {
-        "backup": [],
-        "forget": [],
-        "restore": [],
-        "lifecycle": [],
-    }
-    monkeypatch.setenv("RESTIC_PASSWORD", "x")
-    monkeypatch.setattr(commands.shutil, "which", lambda name: f"/bin/{name}")
+def idle(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DeepTutor parado."""
     monkeypatch.setattr(DeepTutor, "backend_up", lambda self: False)
     monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: False)
-    monkeypatch.setattr(Restic, "ensure_repository", lambda self: True)
-
-    def fake_backup(self: Restic, paths: list[Path], progress=None) -> Summary:
-        calls["backup"].append(self.target.name)
-        if progress:
-            progress(1.0, 10, 10)
-        return Summary("abcd1234", 2, 0, 1024, 1.0)
-
-    monkeypatch.setattr(Restic, "backup", fake_backup)
-    monkeypatch.setattr(
-        Restic, "forget", lambda self, d, w, m: calls["forget"].append((d, w, m))
-    )
-    monkeypatch.setattr(commands.backup, "make_bundles", lambda station: [])
-    return calls
 
 
-def _invoke(station: Station, *args: str):
-    return runner.invoke(
-        app, ["backup", *args], env={"ATRIL_ESTACION": str(station.root)}
-    )
+def _invoke(station: Station, *args: str, input: str | None = None):
+    env = {"ATRIL_ESTACION": str(station.root)}
+    return runner.invoke(app, ["backup", *args], env=env, input=input)
 
 
-def test_backup_skips_disconnected_disk(station: Station, cli: dict[str, list]) -> None:
+def test_backup_command_skips_disconnected_disk(station: Station, idle: None) -> None:
     result = _invoke(station)
 
     assert result.exit_code == 0, result.output
-    assert cli["backup"] == ["disco"]
-    assert cli["forget"] == [(7, 4, 12)]
     assert "¿disco desconectado?" in result.output
-    assert "abcd1234" in result.output
+    assert "Backup terminado" in result.output
+    assert len(backup.archives(_folder(station))) == 1
 
 
-def test_incomplete_backup_skips_retention_and_fails(
-    station: Station, cli: dict[str, list], monkeypatch: pytest.MonkeyPatch
+def test_backup_copies_to_every_destination_and_prunes(
+    station_dir: Path, tmp_path: Path, idle: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    station = _station(station_dir, tmp_path)
+    (tmp_path / "no-conectado").mkdir()  # el segundo disco ya está conectado
+    stamps = iter(["20261101-010000", "20261102-010000", "20261103-010000"])
+    real_name = backup.archive_name
     monkeypatch.setattr(
-        Restic,
-        "backup",
-        lambda self, paths, progress=None: Summary(
-            "abcd1234", 1, 0, 10, 1.0, unread=("x.db: bloqueado",)
-        ),
+        backup, "archive_name", lambda fmt, stamp=None: real_name(fmt, next(stamps))
     )
+
+    for _ in range(3):
+        assert _invoke(station).exit_code == 0
+
+    for folder in station.backup.destinations:
+        assert [a.stamp for a in backup.archives(folder)] == [
+            "20261102-010000",
+            "20261103-010000",
+        ]
+
+
+def test_unreadable_file_makes_backup_incomplete(
+    station: Station, idle: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(_folder(station) / backup.archive_name("zip", "20200101-000000"), "vieja")
+    real_files = backup.station_files
+
+    def with_missing(station: Station):
+        yield from real_files(station)
+        yield station.root / "data" / "bloqueado.db", "data/bloqueado.db"
+
+    monkeypatch.setattr(backup, "station_files", with_missing)
+    monkeypatch.setattr(commands.backup, "station_files", with_missing)
 
     result = _invoke(station)
 
     assert result.exit_code == 1
-    assert cli["forget"] == []
     assert "INCOMPLETO" in result.output
-    assert "x.db: bloqueado" in result.output
-    assert "Backup terminado" not in result.output
-
-
-def test_failed_declared_bundle_makes_backup_incomplete(
-    station: Station, cli: dict[str, list], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(backup, "git_repos", lambda station: {"repo-atril": Path()})
-    monkeypatch.setattr(
-        commands.backup,
-        "make_bundles",
-        lambda station: [
-            BundleResult("temario-x", "sin commits"),
-            BundleResult("repo-atril", "no es un repo", required=True),
-        ],
-    )
-
-    result = _invoke(station)
-
-    assert result.exit_code == 1
-    assert cli["backup"] == ["disco"]
-    assert "repos_git" in result.output
-
-
-def test_backup_fails_if_requested_disk_is_missing(
-    station: Station, cli: dict[str, list]
-) -> None:
-    result = _invoke(station, "--destino", "usb")
-
-    assert result.exit_code == 1
-    assert cli["backup"] == []
+    assert "bloqueado.db" in result.output
+    assert len(backup.archives(_folder(station))) == 2  # no se borra la antigua
 
 
 def test_backup_stops_and_restarts_deeptutor(
-    station: Station, cli: dict[str, list], monkeypatch: pytest.MonkeyPatch
+    station: Station, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    calls: list[str] = []
     write(station.deeptutor_cli, "")
     monkeypatch.setattr(DeepTutor, "backend_up", lambda self: True)
+    monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: False)
+    monkeypatch.setattr(commands, "shutdown", lambda dt: calls.append("parar"))
     monkeypatch.setattr(
-        commands, "shutdown", lambda dt: cli["lifecycle"].append("parar")
-    )
-    monkeypatch.setattr(
-        commands, "launch", lambda dt, timeout: cli["lifecycle"].append("arrancar")
+        commands, "launch", lambda dt, timeout: calls.append("arrancar")
     )
 
     result = _invoke(station)
 
     assert result.exit_code == 0, result.output
-    assert cli["lifecycle"] == ["parar", "arrancar"]
+    assert calls == ["parar", "arrancar"]
 
 
-def test_backup_requires_password(
-    station: Station, cli: dict[str, list], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.delenv("RESTIC_PASSWORD")
+def test_check_command(station: Station, idle: None) -> None:
+    assert _invoke(station, "comprobar").exit_code == 1  # sin copias
+    _invoke(station)
 
-    result = _invoke(station)
-
-    assert result.exit_code == 1
-    assert "RESTIC_PASSWORD" in result.output
-
-
-def test_restore_command(
-    station: Station, cli: dict[str, list], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    snapshot = Snapshot(
-        "8b3931f2", "2026-11-03T15:43:12", (f"{station.root.as_posix()}/data",), "pc"
-    )
-    monkeypatch.setattr(Restic, "snapshots", lambda self: [snapshot])
-
-    def fake_restore(self: Restic, snap: str, target: Path) -> None:
-        cli["restore"].append(snap)
-        write(target / "data" / "user" / "settings.json", '{"restaurado": true}')
-
-    monkeypatch.setattr(Restic, "restore", fake_restore)
-
-    result = _invoke(station, "restaurar", "-d", "disco", "--si")
+    result = _invoke(station, "comprobar")
 
     assert result.exit_code == 0, result.output
-    assert cli["restore"] == ["8b3931f2"]
-    assert '"restaurado"' in (station.data_dir / "user" / "settings.json").read_text()
+    assert "verificada" in result.output
+
+
+def test_restore_command(station: Station, idle: None) -> None:
+    _invoke(station)
+    write(station.data_dir / "user" / "settings.json", '{"tema": "oscuro"}')
+
+    result = _invoke(station, "restaurar", input="s\n")
+
+    assert result.exit_code == 0, result.output
+    assert "claro" in (station.data_dir / "user" / "settings.json").read_text()
     kept = list(station.root.parent.glob(f"{station.root.name}.previo-*"))
     assert len(kept) == 1
+    assert "oscuro" in (kept[0] / "data" / "user" / "settings.json").read_text()
     assert not list(station.root.parent.glob(f"{station.root.name}.restaurar-*"))
 
 
 def test_restore_from_other_path_needs_flag(
-    station: Station, cli: dict[str, list], monkeypatch: pytest.MonkeyPatch
+    station: Station, idle: None, tmp_path: Path
 ) -> None:
-    snapshot = Snapshot("8b3931f2", "2026-11-03T15:43:12", ("/otra/est/data",), "pc")
-    monkeypatch.setattr(Restic, "snapshots", lambda self: [snapshot])
-    monkeypatch.setattr(
-        Restic, "restore", lambda self, snap, target: cli["restore"].append(snap)
-    )
+    archive = tmp_path / backup.archive_name("zip", "20261101-010000")
+    with zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr(backup.MANIFEST, json.dumps({"estacion": "D:/otra"}))
+        zipped.writestr("data/user/settings.json", '{"tema": "de otra"}')
 
-    blocked = _invoke(station, "restaurar", "-d", "disco", "--si")
+    blocked = _invoke(station, "restaurar", str(archive), "--si")
     assert blocked.exit_code == 1
     assert "--nueva-ruta" in blocked.output
-    assert cli["restore"] == []
+    assert not list(station.root.parent.glob(f"{station.root.name}.previo-*"))
 
-    forced = _invoke(station, "restaurar", "-d", "disco", "--si", "--nueva-ruta")
-    assert cli["restore"] == ["8b3931f2"]
-    assert "estación reconocible" in forced.output  # el restore simulado no deja nada
-
-
-# --- integración con restic real -----------------------------------------------
-
-
-@pytest.mark.skipif(shutil.which("restic") is None, reason="restic no instalado")
-def test_real_restic_roundtrip(
-    station: Station, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("RESTIC_PASSWORD", "prueba")
-    restic = Restic(_target(station, "disco"), shutil.which("restic") or "restic")
-
-    assert restic.ensure_repository() is True
-    summary = restic.backup(backup.backup_paths(station))
-    assert summary.files_new >= 2
-    restic.check()
-    snapshots = restic.snapshots()
-    assert len(snapshots) == 1
-
-    target = tmp_path / "restaurado"
-    restic.restore(snapshots[0].short_id, target)
-    restored = backup.find_restored_root(target)
-    assert restored is not None
-    assert (restored / "data" / "user" / "settings.json").read_text() == "{}"
-    restic.forget(7, 4, 12)
+    forced = _invoke(station, "restaurar", str(archive), "--si", "--nueva-ruta")
+    assert forced.exit_code == 0, forced.output
+    assert "de otra" in (station.data_dir / "user" / "settings.json").read_text()

@@ -96,23 +96,23 @@ def _first_run() -> Path:
     """Elige la estación (la carpeta actual u otra) o la inicializa, y la guarda."""
     console.print("[bold]Primera ejecución de atril:[/] falta indicar la estación.")
     cwd = Path.cwd()
-    if (cwd / STATION_FILE).is_file() and _yes(
+    if (cwd / STATION_FILE).is_file() and ask_yes(
         f"¿Usar {cwd} como estación de atril?", default=True
     ):
         return _save(cwd)
     answer = typer.prompt("Carpeta de la estación")
     root = Path(answer.strip().strip('"')).expanduser().resolve()
     if (root / STATION_FILE).is_file():
-        if _yes(f"¿Usar {root} como estación de atril?", default=True):
+        if ask_yes(f"¿Usar {root} como estación de atril?", default=True):
             return _save(root)
-    elif _yes(f"No hay {STATION_FILE} en {root}. ¿Inicializar ahí la estación?"):
+    elif ask_yes(f"No hay {STATION_FILE} en {root}. ¿Inicializar ahí la estación?"):
         init_station(root)
         show([info(f"Creado {root / STATION_FILE}: revísalo y ejecuta atril validar.")])
         return _save(root)
     fail("no se ha configurado ninguna estación.")
 
 
-def _yes(question: str, *, default: bool = False) -> bool:
+def ask_yes(question: str, *, default: bool = False) -> bool:
     """Pregunta sí/no en español (s/sí/n/no; Intro = valor por defecto)."""
     hint = "S/n" if default else "s/N"
     while True:

@@ -11,8 +11,8 @@ MINIMAL_STATION = """
 [ollama]
 embedding = "qwen3-embedding:8b"
 dimension = 4096
-[backup.destinos.disco]
-repo = 'E:\\restic-atril'
+[backup]
+destinos = ['E:\\backups-atril']
 """
 
 

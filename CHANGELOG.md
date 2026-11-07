@@ -5,6 +5,28 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.15.0] - 2026-11-08
+
+### Changed
+
+- `atril backup` crea copias comprimidas `atril-AAAAMMDD-HHMMSS.zip` (deflate 9) o `.tar.xz`
+  (xz 9) en las carpetas de `[backup] destinos` (disco externo, Google Drive para escritorio...),
+  con solo la biblioteca estándar. Las KB ocupan varios GB y restic + rclone exigían instalar y
+  configurar demasiado para esta aplicación. Cada copia se escribe como `.part`, se verifica
+  entera y se copia al resto de destinos; se conservan `conservar` copias por destino y no se
+  borra ninguna si falta algún fichero o falla una copia.
+- `[backup]` pasa a `destinos` (lista de carpetas), `formato` (`zip` o `tar.xz`) y `conservar`.
+  Hay que actualizar `atril.toml`: `atril validar` señala las claves antiguas.
+- `atril backup restaurar [COPIA]` restaura la copia indicada o la más reciente; `--nueva-ruta`
+  sigue siendo obligatoria para una copia hecha desde otra ruta. `backup comprobar` lista las
+  copias de cada destino y verifica la más reciente.
+
+### Removed
+
+- restic, rclone y los git bundles (`repos_git`), con las opciones `--destino` y `--snapshot`.
+- `scripts/backup.py` (`poe backup`) y `scripts/migrar_estacion.py`: la migración de la estación
+  antigua ya está hecha.
+
 ## [0.14.1] - 2026-11-04
 
 ### Changed

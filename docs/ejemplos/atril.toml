@@ -31,12 +31,7 @@ lote_embedding = 10   # fragmentos por petición de embedding (menos = ráfagas 
 pausa_embedding = 0   # ms mínimos entre peticiones de embedding; deja respirar a la GPU
 
 [backup]
-# La contraseña de restic se toma de RESTIC_PASSWORD o RESTIC_PASSWORD_FILE.
-retencion = { diarias = 7, semanales = 4, mensuales = 12 } # por defecto
-repos_git = ['D:\Desarrollo\Repositorios\atril'] # además del git de cada temario
-
-[backup.destinos.disco]
-repo = 'E:\restic-atril'
-
-[backup.destinos.drive]
-repo = "rclone:gdrive:Atril/restic"
+# Carpetas para las copias (un disco desconectado se salta; vale la de Google Drive).
+destinos = ['E:\backups-atril', 'G:\Mi unidad\Backups\atril']
+formato = "zip"   # "zip" (deflate 9) o "tar.xz" (xz 9: más compacto, bastante más lento)
+conservar = 7     # copias que se guardan en cada destino; las más antiguas se borran
