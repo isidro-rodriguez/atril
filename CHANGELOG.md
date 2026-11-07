@@ -5,6 +5,24 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.15.1] - 2026-11-08
+
+Segunda revisión externa (las partes de git bundles ya no aplican).
+
+### Fixed
+
+- Procesos: las rutas se normalizan resolviendo `.` y `..` antes de compararlas, así que
+  `DeepTutor\..\DeepTutorBackup\app\python` ya no cuenta como proceso de la estación.
+- `registro.json` e `indexado.json` se validan de forma estricta: versión 1, sección obligatoria,
+  sin claves desconocidas y con tipos exactos (`"false"` no se toma por `false`). Un fichero que
+  no cumple da error y nunca se lee como vacío ni se sobrescribe.
+- `atril backup restaurar` comprueba antes de tocar nada que la copia contiene un `atril.toml`
+  válido y que las carpetas `.restaurar-*` y `.previo-*` no existen, sin trazas de Python.
+- `deeptutor doctor` con comprobaciones de formato inesperado, o ajustes internos que no
+  devuelven un objeto, dan un error explicativo.
+- `atril instalar` sobre un `app/` existente comprueba antes que sigue el repo y la rama de
+  `atril.toml`.
+
 ## [0.15.0] - 2026-11-08
 
 ### Changed

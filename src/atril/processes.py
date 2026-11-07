@@ -6,6 +6,7 @@ si su línea de comandos pertenece a la estación.
 """
 
 import contextlib
+import posixpath
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,16 +47,20 @@ class PortOwner:
 
 
 def _normalize(path: str) -> str:
-    r"""Ruta comparable: sin comillas, con ``/``, sin ``/`` final y en minúsculas.
+    r"""Ruta comparable: sin comillas, ``.`` ni ``..``, con ``/`` y en minúsculas.
+
+    Resolver ``..`` evita que ``D:\DT\..\DTBackup\app`` pase por ruta de ``D:\DT``.
 
     Examples:
         >>> _normalize(r'"D:\Desarrollo\DeepTutor\"')
         'd:/desarrollo/deeptutor'
+        >>> _normalize("D:/DT/../DTBackup/./app")
+        'd:/dtbackup/app'
     """
     text = path.strip().strip('"').strip("'").replace("\\", "/")
-    while "//" in text[1:]:
-        text = text[0] + text[1:].replace("//", "/")
-    return text.rstrip("/").casefold()
+    if not text:
+        return ""
+    return posixpath.normpath(text).rstrip("/").casefold()
 
 
 def lower_priority(pid: int) -> bool:

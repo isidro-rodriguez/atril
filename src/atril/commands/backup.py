@@ -16,6 +16,7 @@ from atril.backup import Archive, BackupError
 from atril.checks import Finding, error, info, ok, warning
 from atril.commands._common import ask_yes, console, fail, get_station, show, success
 from atril.commands.deeptutor import launch, shutdown
+from atril.config import ConfigError, load_station
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
 
@@ -126,6 +127,9 @@ def restore(
     stamp = time.strftime("%Y%m%d-%H%M%S")
     staging = station.root.with_name(f"{station.root.name}.restaurar-{stamp}")
     keep = station.root.with_name(f"{station.root.name}.previo-{stamp}")
+    for folder in (staging, keep):
+        if folder.exists():
+            fail(f"{folder} ya existe; muévelo o bórralo antes de restaurar.")
     question = (
         f"Se sustituirán atril.toml, data/ y temarios/ de {station.root} por "
         f"{chosen.name}. Lo actual se guardará en {keep.name}. ¿Continuar?"
@@ -141,6 +145,10 @@ def restore(
                 f"la copia se hizo desde {source or '?'}, no desde {station.root}; "
                 "si es lo que quieres, repite con --nueva-ruta."
             )
+        try:
+            load_station(staging)
+        except ConfigError as exc:
+            fail(f"la copia no contiene una estación válida: {exc}")
         replaced = backup.swap_in(station, staging, keep)
     except BackupError as exc:
         fail(str(exc))

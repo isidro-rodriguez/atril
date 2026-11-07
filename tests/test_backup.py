@@ -275,6 +275,7 @@ def test_restore_from_other_path_needs_flag(
     with zipfile.ZipFile(archive, "w") as zipped:
         zipped.writestr(backup.MANIFEST, json.dumps({"estacion": "D:/otra"}))
         zipped.writestr("data/user/settings.json", '{"tema": "de otra"}')
+        zipped.write(station.root / "atril.toml", "atril.toml")
 
     blocked = _invoke(station, "restaurar", str(archive), "--si")
     assert blocked.exit_code == 1
@@ -284,3 +285,21 @@ def test_restore_from_other_path_needs_flag(
     forced = _invoke(station, "restaurar", str(archive), "--si", "--nueva-ruta")
     assert forced.exit_code == 0, forced.output
     assert "de otra" in (station.data_dir / "user" / "settings.json").read_text()
+
+
+def test_restore_rejects_archive_without_station(
+    station: Station, idle: None, tmp_path: Path
+) -> None:
+    archive = tmp_path / backup.archive_name("zip", "20261101-010000")
+    with zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr(backup.MANIFEST, json.dumps({"estacion": str(station.root)}))
+        zipped.writestr("data/user/settings.json", "{}")
+    before = (station.root / "atril.toml").read_text(encoding="utf-8")
+
+    result = _invoke(station, "restaurar", str(archive), "--si")
+
+    assert result.exit_code == 1
+    assert "atril.toml" in result.output
+    assert (station.root / "atril.toml").read_text(encoding="utf-8") == before
+    assert not list(station.root.parent.glob(f"{station.root.name}.restaurar-*"))
+    assert not list(station.root.parent.glob(f"{station.root.name}.previo-*"))

@@ -230,3 +230,23 @@ def test_damaged_registry_is_never_overwritten(tmp_path: Path, text: str) -> Non
     with pytest.raises(StateFileError, match="no lo sobrescribe"):
         Registry(path)
     assert path.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"version": 1}',
+        '{"fuentes": {}}',
+        '{"version": 2, "fuentes": {}}',
+        '{"version": 1, "fuentes": {}, "extra": 1}',
+        '{"version": 1, "fuentes": {"a": {"url": "", "sha256": "", "size": "5", '
+        '"downloaded_at": "", "checked_at": ""}}}',
+        '{"version": 1, "fuentes": {"a": {"url": "", "sha256": "", "size": true, '
+        '"downloaded_at": "", "checked_at": ""}}}',
+    ],
+)
+def test_registry_is_strict(tmp_path: Path, text: str) -> None:
+    path = write(tmp_path / "registro.json", text)
+
+    with pytest.raises(StateFileError):
+        Registry(path)

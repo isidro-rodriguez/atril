@@ -87,7 +87,7 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;
   a command exits with code 1 when any finding is an error.
 - Only kill processes with an **argument that is a path inside the station root**, compared as
-  paths (`processes._normalize`), never as substrings: `D:\DeepTutorBackup` is not inside
+  normalized paths (`processes._normalize`, which resolves `.`/`..`), never as substrings: `D:\DeepTutorBackup` is not inside
   `D:\DeepTutor`. Never touch other processes.
 - Patches are idempotent text replacements registered in `atril.patches.PATCHES`. Only two states
   are clean: original once and patched absent (pending), or the reverse (applied); anything else
@@ -104,8 +104,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   clean tree, after reverting patches and after checking that `origin` and the current branch match
   `atril.toml` (abort otherwise). `actualizar` reapplies `config apply`, parser/chunks and `doctor`;
   a venv with another Python version is recreated (`uv venv --clear`).
-- State files (`registro.json`, `indexado.json`) that fail to parse raise `StateFileError` and are
-  never overwritten.
+- State files (`registro.json`, `indexado.json`) are `{"version": 1, "<section>": {...}}` with
+  exact fields and types (`_toml.load_state` / `check_record`); anything else raises
+  `StateFileError` and is never overwritten nor read as empty.
 - Sources keep a **stable file name** (`archivo` or the URL's last segment, no date): versions go
   to `fuentes/historico/`, and `fuentes/registro.json` (text, sorted) records hash and dates.
   Downloads write `.part`/`.nuevo` first and require the `%PDF-` header; a failed download never

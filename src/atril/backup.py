@@ -243,8 +243,8 @@ def extract(archive: Path, target: Path) -> dict[str, str]:
     Raises:
         BackupError: Si la copia está dañada o tiene rutas peligrosas.
     """
-    target.mkdir(parents=True, exist_ok=False)
     try:
+        target.mkdir(parents=True, exist_ok=False)
         if archive.name.endswith(".zip"):
             with zipfile.ZipFile(archive) as source:
                 for name in source.namelist():
@@ -287,7 +287,12 @@ def swap_in(station: Station, restored: Path, keep: Path) -> list[str]:
     Raises:
         BackupError: Si el intercambio falla; el mensaje dice si se ha deshecho.
     """
-    keep.mkdir(parents=True, exist_ok=False)
+    if not (restored / "atril.toml").is_file():
+        raise BackupError(f"{restored} no contiene atril.toml: no es una estación.")
+    try:
+        keep.mkdir(parents=True, exist_ok=False)
+    except OSError as exc:
+        raise BackupError(f"no se puede preparar {keep}: {exc}") from exc
     done: list[tuple[Path, Path]] = []
     replaced = []
     try:

@@ -18,7 +18,7 @@ from pathlib import Path
 from acodo.utils import get_file_hash, get_now
 
 from atril import net
-from atril.config._toml import StateFileError, load_state
+from atril.config._toml import check_record, load_state
 from atril.config.syllabus import CheckFrequency, Source, SourceKind, Syllabus
 
 PDF_MAGIC = b"%PDF-"
@@ -52,6 +52,16 @@ class SourceRecord:
     checked_at: str
 
 
+_RECORD_FIELDS: dict[str, tuple[type, ...]] = {
+    "url": (str,),
+    "sha256": (str,),
+    "size": (int,),
+    "downloaded_at": (str,),
+    "checked_at": (str,),
+}
+"""Campos exactos de cada entrada de ``registro.json``."""
+
+
 class Registry:
     """Registro ``fuentes/registro.json`` de un temario."""
 
@@ -64,16 +74,10 @@ class Registry:
             StateFileError: Si el fichero está dañado.
         """
         self.path = path
-        try:
-            self.records: dict[str, SourceRecord] = {
-                key: SourceRecord(**value)
-                for key, value in load_state(path, "fuentes").items()
-            }
-        except TypeError as exc:
-            raise StateFileError(
-                f"{path}: entrada con campos inesperados ({exc}); corrígelo o "
-                "recupéralo de git o del backup; atril no lo sobrescribe."
-            ) from exc
+        self.records: dict[str, SourceRecord] = {}
+        for key, value in load_state(path, "fuentes").items():
+            check_record(path, f"fuentes.{key}", value, _RECORD_FIELDS)
+            self.records[key] = SourceRecord(**value)
 
     def get(self, source_id: str) -> SourceRecord | None:
         """Entrada de una fuente, si la hay."""

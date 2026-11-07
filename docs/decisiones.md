@@ -85,6 +85,11 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | Preguntas repetidas en la evaluación | Traza por pregunta en orden |
 | Versión de DT no probada / JSON de DT distinto | Aviso / error explicativo |
 | Fuentes `github`/`web` | Experimentales: sin batería de pruebas hasta tener un uso real |
+| 2.ª revisión (0.15.1): `..` en rutas de procesos | Se resuelven `.`/`..` antes de comparar: `DT\..\DTBackup` no es de la estación |
+| 2.ª revisión: estados JSON permisivos | Versión, claves y tipos exactos; `"false"` no es `false` |
+| 2.ª revisión: restaurar sin estación válida, `keep` existente | Se comprueba antes de intercambiar; nada cambia |
+| 2.ª revisión: `doctor` con elementos raros, `instalar` sobre otro checkout | `StepError` y se para |
+| 2.ª revisión: git bundles (P1.1, P2.2) | No aplica: backups en zip/tar.xz desde 0.15.0 |
 
 ## Lecciones de la instalación previa
 

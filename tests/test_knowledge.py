@@ -296,3 +296,18 @@ def test_add_ignores_stale_run_and_explains_reindex_required(
     assert f"atril kb reindexar {kb.id}" in result.detail
     assert "35263" not in result.detail
     assert seen and all(run is None for run in seen)
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"reindexar": "false", "fuentes": {}},
+        {"reindexar": False},
+        {"reindexar": False, "fuentes": {"x": {"file": "a.pdf", "sha256": "h"}}},
+    ],
+)
+def test_ledger_is_strict(syllabus: Syllabus, entry: dict) -> None:
+    write(ledger_path(syllabus), json.dumps({"version": 1, "kb": {"cte": entry}}))
+
+    with pytest.raises(StateFileError):
+        Ledger(ledger_path(syllabus))

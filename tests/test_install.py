@@ -112,9 +112,20 @@ def test_clone_new(station_dir: Path, recorder: Recorder) -> None:
 
 def test_clone_existing_checkout(station_dir: Path, recorder: Recorder) -> None:
     (station_dir / "app" / ".git").mkdir(parents=True)
+    _origin(recorder)
 
     assert _installer(station_dir).clone().level is Level.INFO
-    assert recorder.commands == []
+    assert [c[3] for c in recorder.commands] == ["remote", "branch"]
+
+
+def test_clone_refuses_existing_checkout_of_other_repo(
+    station_dir: Path, recorder: Recorder
+) -> None:
+    (station_dir / "app" / ".git").mkdir(parents=True)
+    _origin(recorder, "https://github.com/otro/DeepTutor")
+
+    with pytest.raises(StepError, match="sigue"):
+        _installer(station_dir).clone()
 
 
 def test_clone_refuses_foreign_folder(station_dir: Path, recorder: Recorder) -> None:
@@ -328,3 +339,10 @@ def test_capture_check(tmp_path: Path) -> None:
     with pytest.raises(StepError, match="ha fallado"):
         install.capture(command)
     assert json.loads(install.capture(command, check=False)) == {"ok": False}
+
+
+def test_doctor_rejects_malformed_check(station_dir: Path, recorder: Recorder) -> None:
+    recorder.outputs["doctor"] = '{"checks": ["no es un objeto"]}'
+
+    with pytest.raises(StepError, match="formato"):
+        _installer(station_dir).doctor()

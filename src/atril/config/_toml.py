@@ -25,34 +25,78 @@ class StateFileError(ConfigError):
 _MISSING: Any = object()
 
 
-def load_state(path: Path, section: str) -> dict[str, Any]:
-    """Carga un fichero de estado JSON con una sección de objetos por id.
+STATE_VERSION = 1
+"""Versión de esquema de los ficheros de estado que entiende atril."""
+
+_HINT = "corrígelo o recupéralo del backup; atril no lo sobrescribe."
+
+
+def load_state(path: Path, section: str) -> dict[str, dict[str, Any]]:
+    """Carga un fichero de estado JSON: ``{"version": 1, "<section>": {id: {...}}}``.
 
     Args:
         path: Fichero; si no existe, se devuelve la sección vacía.
-        section: Clave que debe ser un objeto de objetos (``fuentes``, ``kb``).
+        section: Clave con los registros por id (``fuentes``, ``kb``).
 
     Returns:
         El contenido de ``section``.
 
     Raises:
-        StateFileError: Si no es JSON válido o no tiene la forma esperada.
+        StateFileError: Si no es JSON válido, le falta la sección, tiene otra
+            versión o claves desconocidas. Un fichero existente nunca se toma
+            por vacío.
     """
     if not path.is_file():
         return {}
-    hint = "corrígelo o recupéralo de git o del backup; atril no lo sobrescribe."
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise StateFileError(f"{path}: no se puede leer ({exc}); {hint}") from exc
-    content = data.get(section, {}) if isinstance(data, dict) else None
+        raise StateFileError(f"{path}: no se puede leer ({exc}); {_HINT}") from exc
+    if not isinstance(data, dict) or set(data) != {"version", section}:
+        raise StateFileError(
+            f"{path}: se esperaban las claves 'version' y '{section}'; {_HINT}"
+        )
+    version = data["version"]
+    if type(version) is not int or version != STATE_VERSION:
+        raise StateFileError(
+            f"{path}: versión {version!r} desconocida (atril usa {STATE_VERSION}); "
+            f"{_HINT}"
+        )
+    content = data[section]
     if not isinstance(content, dict) or not all(
         isinstance(value, dict) for value in content.values()
     ):
         raise StateFileError(
-            f"{path}: '{section}' no tiene el formato esperado; {hint}"
+            f"{path}: '{section}' no tiene el formato esperado; {_HINT}"
         )
     return content
+
+
+def check_record(
+    path: Path, where: str, record: dict[str, Any], fields: dict[str, tuple[type, ...]]
+) -> None:
+    """Exige exactamente los campos de ``fields`` con esos tipos exactos.
+
+    ``bool`` no vale como ``int`` ni ``"false"`` como ``bool``; un ``int`` sí
+    vale donde se admite ``float``.
+
+    Raises:
+        StateFileError: Si falta un campo, sobra alguno o tiene otro tipo.
+    """
+    if set(record) != set(fields):
+        missing = sorted(set(fields) - set(record))
+        extra = sorted(set(record) - set(fields))
+        raise StateFileError(
+            f"{path}: {where} tiene campos distintos de los esperados "
+            f"(faltan {missing}, sobran {extra}); {_HINT}"
+        )
+    for name, types in fields.items():
+        value = record[name]
+        allowed = (*types, int) if float in types else types
+        if type(value) not in allowed:
+            raise StateFileError(
+                f"{path}: {where}.{name} tiene un tipo no válido ({value!r}); {_HINT}"
+            )
 
 
 def load_toml(path: Path) -> dict[str, Any]:

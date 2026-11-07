@@ -253,6 +253,11 @@ def doctor_findings(report: Mapping[str, Any]) -> list[Finding]:
     """Convierte el JSON de ``deeptutor doctor --format json`` en comprobaciones."""
     findings = []
     for check in report.get("checks", []):
+        if not isinstance(check, Mapping) or not isinstance(check.get("status"), str):
+            raise StepError(
+                "'deeptutor doctor' devuelve una comprobación sin el formato "
+                f"esperado: {check!r}; puede que DeepTutor haya cambiado."
+            )
         label = (
             f"{check.get('label', check.get('key', '?'))}: {check.get('detail', '')}"
         )
@@ -286,7 +291,8 @@ class Installer:
     def clone(self) -> Finding:
         """Clona la rama configurada (superficial) si ``app/`` no existe."""
         if self.cloned:
-            return info(f"Código ya presente en {self.app}; no se cambia de rama.")
+            self._check_origin(tool("git"))
+            return info(f"Código ya presente en {self.app} (repo y rama correctos).")
         if self.app.exists() and any(self.app.iterdir()):
             raise StepError(f"{self.app} existe y no es un checkout de git.")
         git = tool("git")
@@ -345,13 +351,13 @@ class Installer:
         if not same_remote(origin, dt.repo):
             raise StepError(
                 f"app/ sigue {origin}, pero atril.toml dice {dt.repo}; "
-                "corrige uno de los dos antes de actualizar."
+                "corrige uno de los dos antes de continuar."
             )
         branch = capture([git, "-C", app, "branch", "--show-current"]).strip()
         if branch != dt.branch:
             raise StepError(
                 f"app/ está en la rama {branch or '(ninguna)'!r}, pero atril.toml "
-                f"dice {dt.branch!r}; cámbiala a mano antes de actualizar."
+                f"dice {dt.branch!r}; cámbiala a mano antes de continuar."
             )
 
     # --- Python ------------------------------------------------------------
@@ -489,6 +495,8 @@ class Installer:
         )
         try:
             before = json.loads(output.strip().splitlines()[-1])
+            if not isinstance(before, dict):
+                raise ValueError(before)
         except (IndexError, ValueError) as exc:
             raise StepError(
                 "los ajustes internos de DeepTutor no responden como se esperaba "

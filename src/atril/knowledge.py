@@ -27,7 +27,7 @@ import psutil
 from acodo.utils import get_file_hash
 
 from atril import net
-from atril.config._toml import StateFileError, load_state
+from atril.config._toml import StateFileError, check_record, load_state
 from atril.config.station import Station
 from atril.config.syllabus import KnowledgeBase, Source, SourceKind, Syllabus
 from atril.processes import kill_tree, lower_priority
@@ -148,6 +148,18 @@ class KbLedger:
     sources: dict[str, IndexedSource] = field(default_factory=dict)
 
 
+_KB_FIELDS: dict[str, tuple[type, ...]] = {"reindexar": (bool,), "fuentes": (dict,)}
+"""Campos exactos de cada KB en ``indexado.json``."""
+
+_SOURCE_FIELDS: dict[str, tuple[type, ...]] = {
+    "file": (str,),
+    "sha256": (str,),
+    "indexed_at": (str,),
+    "minutes": (float, type(None)),
+}
+"""Campos exactos de cada fuente indexada."""
+
+
 class Ledger:
     """Registro ``fuentes/indexado.json`` de un temario (texto, versionable)."""
 
@@ -161,18 +173,16 @@ class Ledger:
         """
         self.path = path
         self.kbs: dict[str, KbLedger] = {}
-        try:
-            for kb_id, entry in load_state(path, "kb").items():
-                sources = {
-                    key: IndexedSource(**value)
-                    for key, value in entry.get("fuentes", {}).items()
-                }
-                self.kbs[kb_id] = KbLedger(bool(entry.get("reindexar")), sources)
-        except (AttributeError, TypeError) as exc:
-            raise StateFileError(
-                f"{path}: entrada con formato inesperado ({exc}); corrígelo o "
-                "recupéralo de git o del backup; atril no lo sobrescribe."
-            ) from exc
+        for kb_id, entry in load_state(path, "kb").items():
+            check_record(path, f"kb.{kb_id}", entry, _KB_FIELDS)
+            sources = {}
+            for key, value in entry["fuentes"].items():
+                where = f"kb.{kb_id}.fuentes.{key}"
+                if not isinstance(value, dict):
+                    raise StateFileError(f"{path}: {where} no es un objeto.")
+                check_record(path, where, value, _SOURCE_FIELDS)
+                sources[key] = IndexedSource(**value)
+            self.kbs[kb_id] = KbLedger(entry["reindexar"], sources)
 
     def kb(self, kb_id: str) -> KbLedger:
         """Registro de una KB (se crea vacío si no existe)."""

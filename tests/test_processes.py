@@ -88,3 +88,20 @@ def test_lower_priority_of_missing_process() -> None:
     from atril.processes import lower_priority
 
     assert lower_priority(2**22 + 12345) is False
+
+
+@pytest.mark.parametrize(
+    ("argument", "inside"),
+    [
+        ("/home/u/DeepTutor/app/python", True),
+        ("/home/u/DeepTutor/./app/../app/python", True),
+        ("/home/u/DeepTutor/../DeepTutorBackup/app/python", False),
+        ("/home/u/DeepTutorBackup/app/python", False),
+        ("/home/u/DeepTutor.previo-20261101/app/python", False),
+        (r"\HOME\U\DEEPTUTOR\app\python.exe", True),
+    ],
+)
+def test_belongs_to_compares_normalized_paths(argument: str, inside: bool) -> None:
+    owner = PortOwner(8001, 1, "python", argument, (argument,))
+
+    assert owner.belongs_to(Path("/home/u/DeepTutor")) is inside
