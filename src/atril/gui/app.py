@@ -12,6 +12,7 @@ import json
 import sys
 import time
 import tkinter as tk
+import webbrowser
 from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -21,14 +22,22 @@ from atril.config import ConfigError, load_station
 from atril.config.station import STATION_FILE, Station, init_station
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError, CancelledError
-from atril.gui import style
+from atril.gui import style, tray
 from atril.gui.activity import ActivityLog, Event
 from atril.gui.backups import BackupsView
 from atril.gui.dialogs import ask_three, ask_yes_no, show_message
 from atril.gui.history import HistoryView
 from atril.gui.home import HomeView
 from atril.gui.library import LibraryView
-from atril.gui.model import Facts, service_states
+from atril.gui.model import (
+    CloseAction,
+    Facts,
+    TrayCommand,
+    close_action,
+    service_states,
+    tray_menu,
+    tray_tooltip,
+)
 from atril.gui.settings import SettingsView
 from atril.gui.syllabi import SyllabiView
 from atril.gui.widgets import Footer, Sidebar
@@ -83,6 +92,12 @@ class App(tk.Tk):
         self._status_at = 0.0
         self.syllabus_id: str | None = self._remembered_syllabus()
         self.closed = False
+        self.hidden = False
+        """La ventana está oculta en el área de notificación."""
+        self._stop_on_quit = False
+        self._deeptutor_up = False
+        self._expected_change = False
+        self._hinted = False
         self.title("Atril")
         _fit_scale(self)
         style.apply(self)
@@ -92,6 +107,8 @@ class App(tk.Tk):
         self.resizable(False, False)
         self._build()
         self.protocol("WM_DELETE_WINDOW", self.close)
+        self.tray = tray.create()
+        """Icono del área de notificación (``None`` fuera de Windows)."""
         self.after(POLL_MS, self._poll)
         self.show_view("Inicio")
 
@@ -186,10 +203,23 @@ class App(tk.Tk):
         self._activity_changed()
 
     def set_facts(self, facts: Facts) -> None:
-        """Estado de los servicios en el pie de ventana."""
+        """Estado de los servicios en el pie de ventana.
+
+        Con la ventana oculta, avisa si DeepTutor se para sin una operación de
+        atril detrás.
+        """
         self._status_at = time.monotonic()
         for name, (level, text) in service_states(facts).items():
             self._footer.set_service(name, level, text)
+        was_up, self._deeptutor_up = self._deeptutor_up, facts.backend_up
+        stopped = was_up and not facts.backend_up and not self._expected_change
+        if self.hidden and stopped and self.tray is not None:
+            self.tray.notify(
+                "DeepTutor se ha detenido",
+                "Atril sigue en el área de notificación.",
+                Level.WARNING,
+            )
+        self._expected_change = False
 
     def choose_syllabus(self, syllabus_id: str | None) -> None:
         """Temario activo (compartido por Temarios y Biblioteca) y lo recuerda."""
@@ -226,14 +256,25 @@ class App(tk.Tk):
     def close(self) -> None:
         """Cierra la ventana sin dejar operaciones a medias.
 
-        Con una operación en marcha se le pide que pare en un punto seguro (o se
-        espera a que termine si no admite cancelación) y la ventana se cierra
-        después: nunca se corta el trabajo. Si DeepTutor sigue en marcha, se
+        Con DeepTutor en marcha, la ventana se oculta en el área de notificación
+        (la operación en curso, si la hay, sigue). Si no, con una operación en
+        marcha se le pide que pare en un punto seguro (o se espera a que termine
+        si no admite cancelación) y la ventana se cierra después: nunca se corta
+        el trabajo. Sin área de notificación, si DeepTutor sigue en marcha, se
         pregunta si pararlo.
         """
         if self._closing:
             return
-        if self.worker.running and not self._quiet:
+        dt = DeepTutor(self.station)
+        action = close_action(
+            tray=self.tray is not None,
+            deeptutor_up=dt.installed and dt.backend_up(),
+            busy=self.worker.running and not self._quiet,
+        )
+        if action is CloseAction.HIDE:
+            self.hide_window()
+            return
+        if action is CloseAction.WAIT:
             if ask_yes_no(
                 self,
                 "Cerrar atril",
@@ -249,8 +290,7 @@ class App(tk.Tk):
                     text="Cerrando al terminar la operación..."
                 )
             return
-        dt = DeepTutor(self.station)
-        if dt.installed and dt.backend_up():
+        if action is CloseAction.ASK_STOP:
             answer = ask_three(
                 self,
                 "Cerrar atril",
@@ -265,6 +305,102 @@ class App(tk.Tk):
                 self.run("Deteniendo DeepTutor...", _stopper(self.station), self._quit)
                 return
         self._quit(None)
+
+    def hide_window(self) -> None:
+        """Oculta la ventana y deja el icono en el área de notificación."""
+        if self.tray is None:
+            return
+        self.withdraw()
+        self.hidden = True
+        self._update_tray()
+        self.tray.show_icon()
+        if not self._hinted:
+            self._hinted = True
+            self.tray.notify(
+                "Atril sigue abierto",
+                "DeepTutor sigue en marcha. Pulsa el icono para volver a la ventana.",
+            )
+
+    def show_window(self) -> None:
+        """Vuelve a mostrar la ventana y quita el icono."""
+        if self.tray is not None:
+            self.tray.hide_icon()
+        self.hidden = False
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+    def quit_all(self) -> None:
+        """Sale de atril y para DeepTutor y el Ollama que abrió atril.
+
+        Con una operación en marcha, se muestra la ventana y se pregunta: se le
+        pide que pare en un punto seguro y se sale después.
+        """
+        if self._closing:
+            return
+        if self.worker.running and not self._quiet:
+            self.show_window()
+            if ask_yes_no(
+                self,
+                "Salir de atril",
+                "Hay una operación en curso. Atril la parará en cuanto sea seguro "
+                "(o esperará a que termine si no se puede parar). Después parará "
+                "DeepTutor y Ollama y se cerrará.",
+                "Salir",
+                level=Level.WARNING,
+            ):
+                self._closing = True
+                self._stop_on_quit = True
+                self.worker.cancel.set()
+                self._footer.status.configure(
+                    text="Saliendo al terminar la operación..."
+                )
+            return
+        self._shutdown()
+
+    def _shutdown(self) -> None:
+        """Para los servicios en segundo plano y cierra al terminar."""
+        station = self.station
+
+        def stop(reporter: Reporter) -> None:
+            service.shutdown(station, reporter)
+
+        self.run("Parando los servicios...", stop, self._quit, title="Salir")
+
+    def _tray_command(self, command: TrayCommand) -> None:
+        """Atiende una orden del icono."""
+        match command:
+            case TrayCommand.SHOW:
+                self.show_window()
+            case TrayCommand.OPEN:
+                webbrowser.open(DeepTutor(self.station).frontend_url)
+            case TrayCommand.TOGGLE:
+                home = self.views["Inicio"]
+                if isinstance(home, HomeView):
+                    if self._deeptutor_up:
+                        home.stop_deeptutor()
+                    else:
+                        home.start()
+            case TrayCommand.BACKUP:
+                backups = self.views["Backups"]
+                if isinstance(backups, BackupsView):
+                    backups.create()
+            case TrayCommand.ACTIVITY:
+                self.show_window()
+                self.show_view("Actividad")
+            case TrayCommand.QUIT:
+                self.quit_all()
+
+    def _update_tray(self) -> None:
+        """Menú y texto del icono según el estado actual."""
+        if self.tray is None:
+            return
+        busy = self.worker.running and not self._quiet
+        self.tray.menu = tray_menu(deeptutor_up=self._deeptutor_up, busy=busy)
+        status = str(self._footer.status.cget("text")) if busy else ""
+        self.tray.set_tooltip(
+            tray_tooltip(deeptutor_up=self._deeptutor_up, status=status)
+        )
 
     # --- construcción -----------------------------------------------------------
 
@@ -306,9 +442,19 @@ class App(tk.Tk):
     def _poll(self) -> None:
         """Reparte los avisos del trabajo y vuelve a programarse."""
         self.worker.poll()
-        if self._closing and not self.worker.running:
-            self._quit(None)
+        if self.closed:
             return
+        if self._closing and not self.worker.running:
+            if self._stop_on_quit:
+                self._closing = self._stop_on_quit = False
+                self._shutdown()
+            else:
+                self._quit(None)
+                return
+        if self.tray is not None:
+            for command in self.tray.pending():
+                self._tray_command(command)
+            self._update_tray()
         if not self.worker.running and not self._idle:
             self._set_idle(True)
             self.on_busy(None)
@@ -374,6 +520,9 @@ class App(tk.Tk):
             event.finish(Level.ERROR, _sentence(text))
         else:
             event.finish()
+        if self.hidden and self.tray is not None:
+            self.tray.notify(event.title, event.summary, event.level)
+        self._expected_change = True  # DeepTutor puede pararse por la operación
         self._loaded.clear()  # la operación puede haber cambiado cualquier dato
         self._status_at = 0.0  # y el estado de los servicios
         self.activity.save(event)
@@ -390,8 +539,8 @@ class App(tk.Tk):
 
     def _show_error(self, exc: Exception) -> None:
         """Muestra un error (las cancelaciones, solo en la actividad)."""
-        if isinstance(exc, CancelledError) or self._closing:
-            return
+        if isinstance(exc, CancelledError) or self._closing or self.hidden:
+            return  # oculta: ya lo ha dicho la notificación de la operación
         message = _sentence(str(exc) if isinstance(exc, AtrilError) else repr(exc))
         if isinstance(exc, AtrilError) and exc.log:
             message += "\n\nEl detalle técnico está en Actividad."
@@ -409,6 +558,13 @@ class App(tk.Tk):
         """Cierra la aplicación."""
         self.closed = True
         self.destroy()
+
+    def destroy(self) -> None:
+        """Destruye la ventana y quita el icono del área de notificación."""
+        if self.tray is not None:
+            self.tray.stop()
+            self.tray = None
+        super().destroy()
 
 
 def _sentence(text: str) -> str:
@@ -521,6 +677,8 @@ def _prepare_windows() -> None:
 
 def run() -> None:
     """Abre la ventana principal (tras la primera ejecución, si hace falta)."""
+    if tray.signal_running():
+        return  # ya hay un atril abierto: se muestra ese
     _prepare_windows()
     style.register_fonts()
     station = choose_station()

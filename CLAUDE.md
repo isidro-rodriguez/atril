@@ -38,7 +38,7 @@
 │   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus,
 │   │                       #   sources, knowledge, installation)
 │   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), widgets, style,
-│   │                       #   model, activity, worker, dialogs, desktop and one module per
+│   │                       #   model, activity, worker, dialogs, desktop, tray and one module per
 │   │                       #   section (home, syllabi, library, backups, history,
 │   │                       #   settings); recursos/ (logo, tool logos, Lucide icons, Inter)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
@@ -156,6 +156,11 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   released by the OS if the process dies, reentrant within a process. Never delete the lock file.
 - Closing the GUI never kills an operation: it asks the job to cancel at a safe point (or waits
   for it) and destroys the window only when the worker is done.
+- Tray (`gui/tray.py`, Windows only, `ctypes` + `Shell_NotifyIconW`, no dependency): closing the
+  window with DeepTutor running hides it to the tray (`model.close_action`); without DeepTutor it
+  quits as before. The tray's "Salir" stops DeepTutor and atril's own Ollama
+  (`ops.service.shutdown`). Tray clicks reach Tk only through `Tray.commands`, drained in
+  `App._poll`; never touch Tk from the tray thread. A second `atril-gui` shows the running one.
 - Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,
   `pythonw`) Windows would open an empty console window per child.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;

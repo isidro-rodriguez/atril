@@ -146,6 +146,24 @@ def test_only_the_ollama_started_by_atril_is_stopped(
     assert service.ollama_owner(station) is None
 
 
+@pytest.mark.parametrize(("installed", "ours"), [(True, True), (False, False)])
+def test_shutdown_stops_deeptutor_and_only_our_ollama(
+    station_dir: Path, monkeypatch: pytest.MonkeyPatch, installed: bool, ours: bool
+) -> None:
+    station = load_station(station_dir)
+    calls: list[str] = []
+    monkeypatch.setattr(DeepTutor, "installed", property(lambda self: installed))
+    monkeypatch.setattr(service, "stop", lambda dt, reporter: calls.append("dt"))
+    monkeypatch.setattr(service, "ollama_owner", lambda st: 4242 if ours else None)
+    monkeypatch.setattr(
+        service, "stop_ollama", lambda st, reporter: calls.append("ollama")
+    )
+
+    service.shutdown(station, Recorder())
+
+    assert calls == (["dt", "ollama"] if installed else [])
+
+
 def test_active_assistant_reads_deeptutor_catalog_without_the_key(
     station_dir: Path,
 ) -> None:

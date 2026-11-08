@@ -5,6 +5,19 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.28.0] - 2026-11-08
+
+### Added
+
+- Área de notificación en Windows. Al cerrar la ventana con DeepTutor en marcha, atril se queda
+  en el área de notificación en vez de preguntar si pararlo. Sin DeepTutor en marcha, se cierra
+  del todo, como antes. El menú del icono permite mostrar atril, abrir DeepTutor, arrancarlo o
+  pararlo, hacer un backup, ver la actividad y salir. «Salir» para DeepTutor y el Ollama que
+  abrió atril.
+- Con la ventana oculta, atril avisa con notificaciones del sistema al terminar cada operación
+  y si DeepTutor se para por su cuenta.
+- Abrir atril cuando ya está abierto muestra la ventana existente en vez de abrir otra.
+
 ## [0.27.1] - 2026-11-08
 
 ### Fixed

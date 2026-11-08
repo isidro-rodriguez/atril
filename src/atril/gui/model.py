@@ -441,3 +441,107 @@ def size_label(size: int) -> str:
             return f"{text} {unit}"
         value /= 1000
     return f"{size} B"
+
+
+# --- área de notificación ---------------------------------------------------------
+
+
+class CloseAction(StrEnum):
+    """Qué hace la ventana al pulsar cerrar."""
+
+    HIDE = "ocultar"
+    """Al área de notificación: DeepTutor sigue en marcha."""
+    WAIT = "esperar"
+    """Hay una operación: se pide que pare y se cierra al acabar."""
+    ASK_STOP = "preguntar"
+    """Sin área de notificación y DeepTutor en marcha: ¿pararlo?"""
+    QUIT = "salir"
+
+
+def close_action(*, tray: bool, deeptutor_up: bool, busy: bool) -> CloseAction:
+    """Decide qué hacer al cerrar la ventana.
+
+    Con DeepTutor en marcha, la ventana se oculta en el área de notificación
+    (si la hay), también con una operación en curso, que sigue. Sin DeepTutor,
+    atril se cierra del todo, como siempre.
+
+    Examples:
+        >>> close_action(tray=True, deeptutor_up=True, busy=True)
+        <CloseAction.HIDE: 'ocultar'>
+        >>> close_action(tray=True, deeptutor_up=False, busy=False)
+        <CloseAction.QUIT: 'salir'>
+    """
+    if tray and deeptutor_up:
+        return CloseAction.HIDE
+    if busy:
+        return CloseAction.WAIT
+    if deeptutor_up:
+        return CloseAction.ASK_STOP
+    return CloseAction.QUIT
+
+
+class TrayCommand(StrEnum):
+    """Órdenes del menú del icono (y de una segunda instancia: mostrar)."""
+
+    SHOW = "mostrar"
+    OPEN = "abrir"
+    TOGGLE = "arrancar-parar"
+    BACKUP = "backup"
+    ACTIVITY = "actividad"
+    QUIT = "salir"
+
+
+@dataclass(frozen=True, slots=True)
+class MenuItem:
+    """Entrada del menú del icono."""
+
+    command: TrayCommand
+    text: str
+    enabled: bool = True
+    default: bool = False
+    """En negrita: la que hace el clic en el icono."""
+
+
+type TrayMenu = tuple[MenuItem | None, ...]
+"""Menú del icono; ``None`` es un separador."""
+
+
+def tray_menu(*, deeptutor_up: bool, busy: bool) -> TrayMenu:
+    """Menú del icono según el estado de DeepTutor y si hay una operación.
+
+    Examples:
+        >>> [i.text for i in tray_menu(deeptutor_up=True, busy=False) if i][2]
+        'Parar DeepTutor'
+    """
+    return (
+        MenuItem(TrayCommand.SHOW, "Mostrar atril", default=True),
+        MenuItem(TrayCommand.OPEN, "Abrir DeepTutor", enabled=deeptutor_up),
+        None,
+        MenuItem(
+            TrayCommand.TOGGLE,
+            "Parar DeepTutor" if deeptutor_up else "Arrancar DeepTutor",
+            enabled=not busy,
+        ),
+        MenuItem(TrayCommand.BACKUP, "Hacer backup", enabled=not busy),
+        MenuItem(TrayCommand.ACTIVITY, "Ver actividad"),
+        None,
+        MenuItem(TrayCommand.QUIT, "Salir"),
+    )
+
+
+TOOLTIP_LIMIT = 127
+"""Caracteres que admite el texto del icono en Windows."""
+
+
+def tray_tooltip(*, deeptutor_up: bool, status: str) -> str:
+    """Texto al pasar el ratón por el icono: la operación en curso o DeepTutor.
+
+    Examples:
+        >>> tray_tooltip(deeptutor_up=True, status="")
+        'Atril: DeepTutor en marcha'
+        >>> tray_tooltip(deeptutor_up=True, status="Haciendo el backup...")
+        'Atril: Haciendo el backup...'
+    """
+    detail = status or ("DeepTutor en marcha" if deeptutor_up else "DeepTutor parado")
+    text = f"Atril: {detail}"
+    return text if len(text) <= TOOLTIP_LIMIT else text[: TOOLTIP_LIMIT - 3] + "..."

@@ -292,3 +292,19 @@ def _with_log(dt: DeepTutor, message: str) -> AtrilError:
     return AtrilError(
         message, log=dt.launcher_log_tail(), log_title=str(dt.station.launcher_log)
     )
+
+
+def shutdown(station: Station, reporter: Reporter) -> None:
+    """Para DeepTutor (lo arrancara quien lo arrancara) y el Ollama de atril.
+
+    Es la salida desde el área de notificación. Un Ollama abierto aparte no se
+    toca (ver :func:`ollama_owner`).
+
+    Raises:
+        AtrilError: Si DeepTutor sigue respondiendo tras pararlo.
+    """
+    dt = DeepTutor(station)
+    if dt.installed:
+        stop(dt, reporter)
+    if ollama_owner(station) is not None:
+        stop_ollama(station, reporter)

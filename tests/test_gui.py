@@ -4,7 +4,20 @@ import threading
 from atril.checks import Level, ok, warning
 from atril.deeptutor import Assistant
 from atril.errors import AtrilError
-from atril.gui.model import Action, Facts, overall, service_states, tool_cards
+from atril.gui import tray
+from atril.gui.model import (
+    TOOLTIP_LIMIT,
+    Action,
+    CloseAction,
+    Facts,
+    TrayCommand,
+    close_action,
+    overall,
+    service_states,
+    tool_cards,
+    tray_menu,
+    tray_tooltip,
+)
 from atril.gui.worker import Worker
 from atril.ops import Reporter
 
@@ -195,3 +208,49 @@ def test_source_rows_and_actions(station_dir) -> None:
     assert any(row.state == "Sin fichero" for row in rows)
     assert actions_needed(statuses) == (True, [])
     assert filter_rows(rows, "no existe") == []
+
+
+def test_close_hides_only_with_tray_and_deeptutor_running() -> None:
+    def action(tray: bool, up: bool, busy: bool) -> CloseAction:
+        return close_action(tray=tray, deeptutor_up=up, busy=busy)
+
+    assert action(True, True, False) is CloseAction.HIDE
+    assert action(True, True, True) is CloseAction.HIDE  # la operación sigue
+    assert action(True, False, True) is CloseAction.WAIT
+    assert action(True, False, False) is CloseAction.QUIT
+    assert action(False, True, False) is CloseAction.ASK_STOP
+    assert action(False, True, True) is CloseAction.WAIT
+
+
+def test_tray_menu_follows_deeptutor_and_operation() -> None:
+    menu = tray_menu(deeptutor_up=False, busy=True)
+    items = {item.command: item for item in menu if item is not None}
+
+    assert [i.command for i in menu if i and i.default] == [TrayCommand.SHOW]
+    assert items[TrayCommand.TOGGLE].text == "Arrancar DeepTutor"
+    assert not items[TrayCommand.OPEN].enabled
+    assert not items[TrayCommand.TOGGLE].enabled
+    assert not items[TrayCommand.BACKUP].enabled
+    assert items[TrayCommand.QUIT].enabled
+    assert menu[-1] is not None and menu[-1].command is TrayCommand.QUIT
+
+
+def test_tray_tooltip_fits_windows_limit() -> None:
+    text = tray_tooltip(deeptutor_up=False, status="x" * 300)
+
+    assert len(text) == TOOLTIP_LIMIT
+    assert text.endswith("...")
+    assert tray_tooltip(deeptutor_up=False, status="") == "Atril: DeepTutor parado"
+
+
+def test_tray_lifecycle() -> None:
+    created = tray.create()
+    if created is None:  # fuera de Windows no hay icono ni otra instancia
+        assert not tray.signal_running()
+        return
+    try:
+        created.menu = tray_menu(deeptutor_up=True, busy=False)
+        created.set_tooltip("Atril: prueba")
+        assert created.pending() == []
+    finally:
+        created.stop()

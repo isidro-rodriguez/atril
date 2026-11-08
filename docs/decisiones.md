@@ -127,7 +127,7 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 | Escritura de `temario.toml` | `tomlkit`: conserva comentarios y orden (`tomllib` solo lee); se valida con `load_syllabus` antes de guardar y se escribe vía `.nuevo` + renombrado | Regenerar el fichero (borra comentarios) |
 | Ollama | `[ollama]` pasa a ser opcional: sin ella no se indexa (`kb indexar`/`reindexar`/`evaluar` lo dicen claramente) y `arrancar` no lo levanta. El LLM puede ser de la nube, con su clave en los ajustes de DeepTutor (nunca en `atril.toml`) | |
 | Ajustes | Desde 0.24.0, formulario completo de `atril.toml` en pestañas (ver «Segundo rediseño») | |
-| Bandeja | No: DeepTutor ya corre separado de la ventana; al cerrar se pregunta si pararlo | `pystray` (arrastra Pillow) |
+| Bandeja | Desde 0.28.0, área de notificación en Windows (ver «Área de notificación»). Antes: no, al cerrar se preguntaba si parar DeepTutor | `pystray` (arrastra Pillow) |
 | Icono | `icon.png` del proyecto reducido a 256/64/32 px en `gui/recursos/` y `.ico` para el instalador | Original de 1,4 MB |
 | Distribución Windows | Instalador Inno Setup **por usuario** (sin administrador), publicado en las releases de GitHub: lleva `uv.exe`, ejecuta `uv tool install atril`, crea accesos directos con icono. Desinstalar quita programa y accesos, nunca la estación, las copias ni `ATRIL_ESTACION` | PyInstaller: no incluye git, Node.js, Ollama ni DeepTutor |
 | Dependencias externas | Al instalar DeepTutor desde la GUI: git y Node.js obligatorios, Ollama opcional. Si faltan, se ofrece `winget` (puede pedir permiso de administrador) o el enlace oficial | Meterlas en el instalador |
@@ -236,6 +236,18 @@ Sustituye lo anterior donde choque.
 | Tablas ordenables (0.26.0) | Pulsar la cabecera ordena ascendente y, otra vez, descendente, con una flecha de Lucide en la cabecera (Inter no tiene flechas). Los empates, por la primera columna ascendente (alfabética, o por fecha en Backups y Actividad). Se conserva el orden al refrescar |
 | Pestañas (0.27.0) | Ajustes usa `widgets.TabBar` en vez de `ttk.Notebook`: pestañas de texto con el estilo de la navegación (azul y subrayado de 3 px, fondo azul claro al pasar) en la cabecera de una sola tarjeta, separadas del contenido por una línea. Sin iconos ni atajos de teclado. «Guardar» se oculta en Herramientas |
 | Recuadros de texto (0.27.1) | Fondo de las tablas (`#fafafa`, imagen `campo.png` con borde redondeado: `style.tile(field=True)`), barra de desplazamiento solo si hace falta y selección como las filas de las tablas (`#e7e7e7` y texto `#191919`, por encima del color de nivel) |
+
+### Área de notificación (0.28.0)
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Técnica | `gui/tray.py`: `Shell_NotifyIconW` con `ctypes` (solo stdlib) y una ventana oculta en su propio hilo; las órdenes llegan a Tk por una cola que vacía su sondeo. Fuera de Windows no hay icono | `pystray` (arrastra Pillow), `tk systray` (Tk 9, que Python 3.13 no trae; `tkinter.systray` llega en 3.16) |
+| Cerrar la ventana | Con DeepTutor en marcha (lo arrancara quien lo arrancara) se oculta en el área de notificación, también con una operación en curso, que sigue. Sin DeepTutor, atril se cierra del todo, como antes (`model.close_action`) | Preguntar cada vez |
+| Salir desde el icono | Para DeepTutor (aunque no lo arrancara atril) y el Ollama que abrió atril (`ops.service.shutdown`). Con una operación en curso, muestra la ventana y pregunta | Dejar DeepTutor en marcha |
+| Menú | Mostrar atril (también clic izquierdo), Abrir DeepTutor, Arrancar o parar DeepTutor, Hacer backup, Ver actividad, Salir (`model.tray_menu`) | |
+| Notificaciones | Con la ventana oculta: aviso la primera vez, el final de cada operación y si DeepTutor se para sin una operación de atril. Los errores van a la notificación, no a una ventana | |
+| Instancia única | Abrir atril otra vez muestra la ventana existente (busca la ventana oculta `AtrilTrayWindow`) | |
+| Arranque con Windows | No | |
 
 ## Lecciones de la instalación previa
 
