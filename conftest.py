@@ -7,7 +7,5 @@ ventana; se omiten al recoger los doctest de ``src/``.
 import importlib.util
 
 collect_ignore_glob = (
-    []
-    if importlib.util.find_spec("tkinter")
-    else ["src/atril/gui/app.py", "src/atril/gui/style.py"]
+    [] if importlib.util.find_spec("tkinter") else ["src/atril/gui/*.py"]
 )
