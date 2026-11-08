@@ -142,6 +142,16 @@ def create(
         )
 
 
+class OtherRootError(AtrilError):
+    """La copia se hizo desde otra ruta de estación; hay que aceptarlo expresamente."""
+
+
+def listing(station: Station, reporter: Reporter) -> list[FolderReport]:
+    """Copias de cada destino accesible, sin verificarlas (rápido)."""
+    folders = reachable(station, reporter)
+    return [FolderReport(folder, backup.archives(folder), []) for folder in folders]
+
+
 def check(station: Station, reporter: Reporter) -> list[FolderReport]:
     """Copias de cada destino accesible, con la más reciente verificada entera."""
     reports = []
@@ -204,7 +214,7 @@ def restore(
                 manifest = backup.extract(plan.archive, plan.staging)
             source = str(manifest.get("estacion", ""))
             if not same_root(source, station.root) and not other_root:
-                raise AtrilError(
+                raise OtherRootError(
                     f"la copia se hizo desde {source or '?'}, no desde "
                     f"{station.root}; si es lo que quieres, acepta la nueva ruta "
                     "(--nueva-ruta)."

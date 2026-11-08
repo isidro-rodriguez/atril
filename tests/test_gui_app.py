@@ -36,7 +36,19 @@ SCRIPT = textwrap.dedent(
 
     root = Path(sys.argv[1])
     init_station(root)
+    copies = root.parent / "copias"
+    copies.mkdir()
+    (copies / "atril-20261108-090000.zip").write_bytes(b"x")
+    config = root / "atril.toml"
+    text = config.read_text(encoding="utf-8")
+    start = text.index("destinos = [")
+    end = text.index("]", start) + 1
+    text = text[:start] + f"destinos = [{copies.as_posix()!r}]" + text[end:]
+    config.write_text(text, encoding="utf-8")
     station = load_station(root)
+
+    from atril import install
+    install.check_tools = lambda: [ok("git: /usr/bin/git")]
     syllabus_ops.create(station, "Física")
     sections = [("DeepTutor", [ok("Instalado."), ok("En marcha: http://x")])]
     service.status = lambda station, reporter: sections
@@ -60,6 +72,15 @@ SCRIPT = textwrap.dedent(
     assert isinstance(syllabi, SyllabiView)
     assert syllabi._list.get_children() == ("fisica",)
     assert "Física" in str(syllabi._title.cget("text"))
+
+    app.show_view("Copias")
+    settle(app)
+    copies_view = app.views["Copias"]
+    assert len(copies_view._table.get_children()) == 1
+
+    app.show_view("Administración")
+    settle(app)
+    assert app.views["Administración"]._tools.winfo_children()
     app.destroy()
     print("VENTANA-OK", flush=True)
     os._exit(0)

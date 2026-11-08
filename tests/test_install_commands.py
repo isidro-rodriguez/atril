@@ -4,12 +4,13 @@ import pytest
 from support import write, write_other_patches
 from typer.testing import CliRunner
 
+from atril import install
 from atril.checks import error, info, ok
-from atril.commands import install as commands
 from atril.config import load_station
 from atril.deeptutor import DeepTutor
 from atril.install import Installer, StepError
 from atril.main import app
+from atril.ops import service
 from atril.patches import PATCHES
 
 runner = CliRunner()
@@ -26,7 +27,7 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     write_other_patches(loaded.app_dir, PATCH.name)
     monkeypatch.setattr(DeepTutor, "backend_up", lambda self: False)
     monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: False)
-    monkeypatch.setattr(commands.install, "check_tools", lambda: [ok("git")])
+    monkeypatch.setattr(install, "check_tools", lambda: [ok("git")])
     for step in ("clone", "frontend", "embedding_model"):
         monkeypatch.setattr(Installer, step, lambda self, s=step, **kw: ok(s))
     for step in ("configure", "runtime_settings", "doctor"):
@@ -56,7 +57,7 @@ def test_install_refuses_when_running(
     result = _invoke(station, "instalar")
 
     assert result.exit_code == 1
-    assert "atril parar" in result.output
+    assert "páralo antes" in result.output
 
 
 def test_install_stops_on_step_error(
@@ -125,9 +126,9 @@ def test_update_new_version_restarts(
 ) -> None:
     calls: list[str] = []
     monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: True)
-    monkeypatch.setattr(commands, "shutdown", lambda dt: calls.append("parar"))
+    monkeypatch.setattr(service, "stop", lambda dt, reporter: calls.append("parar"))
     monkeypatch.setattr(
-        commands, "launch", lambda dt, timeout: calls.append("arrancar")
+        service, "start", lambda dt, reporter, timeout: calls.append("arrancar")
     )
     monkeypatch.setattr(
         Installer, "update_checkout", lambda self, commit=None: ("a1 x", "b2 y")

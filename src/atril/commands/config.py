@@ -6,14 +6,15 @@ from rich.table import Table
 
 from atril.checks import warning
 from atril.commands._common import console, fail, get_station, show, success
-from atril.config import ConfigError, load_syllabi
+from atril.config import ConfigError
+from atril.ops import installation as operations
 
 
 def validate(ctx: typer.Context) -> None:
     """Valida [bold]atril.toml[/] y el [bold]temario.toml[/] de cada temario."""
     station = get_station(ctx)
     try:
-        syllabi, warnings = load_syllabi(station.syllabi_dir)
+        syllabi, warnings = operations.validate(station)
     except ConfigError as exc:
         fail(str(exc))
 

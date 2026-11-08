@@ -9,7 +9,6 @@ from typing import Annotated
 
 import typer
 
-from atril.checks import Finding, ok
 from atril.commands._common import (
     console,
     fail,
@@ -21,9 +20,8 @@ from atril.commands._common import (
 )
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError
-from atril.ops import service
+from atril.ops import installation, service
 from atril.ops.service import patch_finding as patch_finding
-from atril.patches import PATCHES, PatchState
 
 
 def start(
@@ -94,17 +92,7 @@ def patches(
         console.print("atril.toml no declara parches.")
         return
 
-    findings: list[Finding] = []
-    changed = False
-    for name in station.deeptutor.patches:
-        patch = PATCHES[name]
-        before = patch.state(station.app_dir)
-        after = before if check_only else patch.apply(station.app_dir)
-        if before is PatchState.PENDING and after is PatchState.APPLIED:
-            changed = True
-            findings.append(ok(f"{name}: aplicado ahora."))
-        else:
-            findings.append(patch_finding(name, after))
+    findings, changed = installation.patch(station, check_only=check_only)
     clean = show(findings)
     if changed:
         console.print(

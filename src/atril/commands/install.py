@@ -1,19 +1,17 @@
-"""Comandos de instalación: ``atril instalar`` y ``atril actualizar``."""
+"""Comandos de instalación: ``atril instalar`` y ``atril actualizar``.
 
-from collections.abc import Callable
+La lógica está en :mod:`atril.ops.installation`; aquí solo se traducen las
+opciones y se muestra el resultado.
+"""
+
 from typing import Annotated
 
 import typer
-from rich.markup import escape
 
-from atril import install
-from atril.checks import Finding, info, ok
-from atril.commands._common import console, fail, get_station, reserve, show, success
-from atril.commands.deeptutor import launch, patch_finding, shutdown
-from atril.config.station import Station
-from atril.deeptutor import DeepTutor
-from atril.install import Installer, StepError
-from atril.patches import PATCHES, PatchState
+from atril.checks import info
+from atril.commands._common import fail_error, get_station, reporter, show, success
+from atril.errors import AtrilError
+from atril.ops import installation as operations
 
 NoDocling = Annotated[
     bool,
@@ -30,25 +28,10 @@ def install_command(ctx: typer.Context, no_docling: NoDocling = False) -> None:
     descarga el modelo de embedding, aplica la configuración de atril.toml y los
     parches, y termina con el diagnóstico de DeepTutor.
     """
-    station = get_station(ctx)
-    reserve(ctx, station, "instalación de DeepTutor")
-    dt = DeepTutor(station)
-    _require_stopped(dt)
-    installer = Installer(station, dt.env())
-
-    if not show(install.check_tools(), "Herramientas"):
-        fail("instala las herramientas que faltan y vuelve a ejecutar.")
-    _step("Código", installer.clone)
-    show([install.version_finding(station.app_dir)])
-    _step("Python", lambda: installer.python_env(docling=not no_docling))
-    _step("Frontend", installer.frontend)
-    _step("Modelo de embedding", installer.embedding_model)
-    _step("Configuración de DeepTutor", installer.configure)
-    _step("Parser y chunks", installer.runtime_settings)
-    patches_clean = show(_apply_patches(station), "Parches")
-    doctor_clean = show(_step_value(installer.doctor), "Diagnóstico")
-    if not (patches_clean and doctor_clean):
-        fail("la instalación ha terminado con errores; revisa los puntos marcados.")
+    try:
+        operations.install_deeptutor(get_station(ctx), reporter, docling=not no_docling)
+    except AtrilError as exc:
+        fail_error(exc)
     success("DeepTutor instalado. Arráncalo con: atril arrancar")
 
 
@@ -80,87 +63,16 @@ def update_command(
     (el frontend solo si cambia su lockfile), reaplica la configuración y los
     parches, y termina con el diagnóstico.
     """
-    station = get_station(ctx)
-    reserve(ctx, station, "actualización de DeepTutor")
-    dt = DeepTutor(station)
-    installer = Installer(station, dt.env())
-    if not installer.cloned or not dt.installed:
-        fail("DeepTutor no está instalado; usa atril instalar.")
-
-    was_running = dt.backend_up() or dt.frontend_up()
-    if was_running:
-        shutdown(dt)
-
-    show(_revert_patches(station), "Deshacer parches")
-    lock_before = installer.frontend_lock_hash()
-    with console.status("Trayendo el código..."):
-        before, after = _step_value(lambda: installer.update_checkout(commit))
-    changed = before != after
-    message = f"{before} → {after}" if changed else f"Sin cambios: {before}"
-    code = [ok(message) if changed else info(message)]
-    if changed:
-        previous = before.split(" ", 1)[0]
-        code.append(
-            info(f"Para volver a la anterior: atril actualizar --commit {previous}")
-        )
-    show(code, "Código")
-    show([install.version_finding(station.app_dir)])
-    if changed or not installer.venv_matches():
-        _step("Python", lambda: installer.python_env(docling=not no_docling))
-    if changed:
-        lock_changed = installer.frontend_lock_hash() != lock_before
-        _step("Frontend", lambda: installer.frontend(force=lock_changed))
-    _step("Configuración de DeepTutor", installer.configure)
-    _step("Parser y chunks", installer.runtime_settings)
-
-    if not show(_apply_patches(station), "Parches"):
-        fail(
-            "algún parche ya no encaja con el código nuevo; revísalo antes de arrancar."
-        )
-    if not show(_step_value(installer.doctor), "Diagnóstico"):
-        fail("DeepTutor actualizado con errores; revisa los puntos marcados.")
-    success("DeepTutor actualizado.")
-    if was_running and not no_restart:
-        launch(dt, timeout=900)
-
-
-def _require_stopped(dt: DeepTutor) -> None:
-    """Termina con error si DeepTutor está en marcha (Windows bloquea sus ficheros)."""
-    if dt.backend_up() or dt.frontend_up():
-        fail("DeepTutor está en marcha; páralo antes con: atril parar")
-
-
-def _step(title: str, action: Callable[[], Finding | list[Finding]]) -> None:
-    """Ejecuta un paso con su título y muestra su resultado; termina si falla."""
-    console.rule(f"[bold]{escape(title)}[/]", align="left")
-    result = _step_value(action)
-    show(result if isinstance(result, list) else [result])
-
-
-def _step_value[T](action: Callable[[], T]) -> T:
-    """Ejecuta ``action`` convirtiendo :class:`StepError` en un error de la CLI."""
     try:
-        return action()
-    except StepError as exc:
-        fail(str(exc))
-
-
-def _apply_patches(station: Station) -> list[Finding]:
-    """Aplica los parches configurados y devuelve su estado."""
-    findings = []
-    for name in station.deeptutor.patches:
-        state = PATCHES[name].apply(station.app_dir)
-        findings.append(patch_finding(name, state))
-    return findings or [info("Sin parches configurados.")]
-
-
-def _revert_patches(station: Station) -> list[Finding]:
-    """Deshace los parches para que git pueda actualizar el árbol limpio."""
-    findings = []
-    for name in station.deeptutor.patches:
-        state = PATCHES[name].revert(station.app_dir)
-        if state is PatchState.PENDING:
-            findings.append(info(f"{name}: deshecho."))
-        else:
-            findings.append(patch_finding(name, state))
-    return findings or [info("Sin parches configurados.")]
+        result = operations.update_deeptutor(
+            get_station(ctx),
+            reporter,
+            docling=not no_docling,
+            restart=not no_restart,
+            commit=commit,
+        )
+    except AtrilError as exc:
+        fail_error(exc)
+    if result.changed:
+        show([info(f"Para volver atrás: atril actualizar --commit {result.previous}")])
+    success("DeepTutor actualizado.")

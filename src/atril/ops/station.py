@@ -77,3 +77,32 @@ def _write_registry(value: str) -> None:
         5000,
         None,
     )
+
+
+def refresh_path() -> None:
+    """Recarga el ``PATH`` del sistema y del usuario (Windows), tras instalar programas.
+
+    Un proceso no ve los cambios del ``PATH`` hechos después de arrancar; sin esto,
+    git o Node.js recién instalados no se encontrarían hasta reabrir atril.
+    """
+    if sys.platform != "win32":
+        return
+    import winreg
+
+    parts = []
+    keys = (
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        ),
+        (winreg.HKEY_CURRENT_USER, _ENVIRONMENT_KEY),
+    )
+    for hive, path in keys:
+        try:
+            with winreg.OpenKey(hive, path) as key:
+                value, _ = winreg.QueryValueEx(key, "Path")
+        except OSError:
+            continue
+        parts.append(os.path.expandvars(str(value)))
+    if parts:
+        os.environ["PATH"] = os.pathsep.join(parts)

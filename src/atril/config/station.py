@@ -164,6 +164,11 @@ class Station:
         return self.data_dir / "user" / "runtime" / "launcher.json"
 
     @property
+    def config_file(self) -> Path:
+        """``atril.toml`` de la estación."""
+        return self.root / STATION_FILE
+
+    @property
     def lock_file(self) -> Path:
         """Bloqueo de operaciones largas; en la raíz, fuera de copias y restauración."""
         return self.root / ".atril.lock"

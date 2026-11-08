@@ -5,6 +5,26 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.21.0] - 2026-11-08
+
+Fase 5: todo lo necesario para instalar y mantener la estación sin consola.
+
+### Added
+
+- Apartado **Copias** en `atril-gui`: lista de copias de cada destino, «Hacer copia ahora» (con
+  Cancelar), «Comprobar copias» y «Restaurar…» (la elegida o la más reciente, con confirmación;
+  una copia de otra ruta se acepta expresamente).
+- Apartado **Administración**: instalar o completar DeepTutor (Docling opcional), actualizar,
+  volver a un commit, aplicar parches y diagnóstico; estado de git, uv, Node.js y Ollama con
+  «Instalar lo que falta» mediante `winget` (recarga el PATH sin reabrir atril); abrir y validar
+  `atril.toml` y abrir la carpeta de logs.
+
+### Changed
+
+- Instalar, actualizar, parches, validar y diagnóstico pasan a `atril.ops.installation`; la CLI
+  los usa igual. `atril actualizar` vuelve a arrancar DeepTutor desde la misma operación.
+- Todas las operaciones largas reservan la estación desde `ops`.
+
 ## [0.20.0] - 2026-11-08
 
 Fase 4: el alumno gestiona sus temarios desde la ventana.

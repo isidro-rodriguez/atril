@@ -30,7 +30,6 @@ from atril.config import (
 from atril.config.station import STATION_FILE, init_station
 from atril.config.syllabus import KnowledgeBase
 from atril.errors import AtrilError
-from atril.lock import BusyError, station_lock
 from atril.ops import Advance, Update
 from atril.ops.station import STATION_VARIABLE, persist_station, saved_station
 
@@ -235,11 +234,3 @@ def fail_error(exc: AtrilError) -> NoReturn:
             )
         )
     fail(str(exc))
-
-
-def reserve(ctx: typer.Context, station: Station, operation: str) -> None:
-    """Reserva la estación hasta que termine el comando; si está ocupada, termina."""
-    try:
-        ctx.with_resource(station_lock(station, operation))
-    except BusyError as exc:
-        fail(str(exc))

@@ -22,6 +22,8 @@ from atril.config.station import STATION_FILE, Station, init_station
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError, CancelledError
 from atril.gui import style
+from atril.gui.admin import AdminView
+from atril.gui.backups import BackupsView
 from atril.gui.home import HomeView
 from atril.gui.syllabi import SyllabiView
 from atril.gui.worker import Worker
@@ -34,7 +36,7 @@ POLL_MS = 100
 TAGLINE = "Aprende. Practica. Avanza."
 """Lema de la cabecera."""
 
-type View = HomeView | SyllabiView
+type View = HomeView | SyllabiView | BackupsView | AdminView
 """Apartado de la ventana: un marco con ``refresh()``."""
 
 
@@ -160,6 +162,8 @@ class App(tk.Tk):
         views: list[tuple[str, str, View]] = [
             ("Inicio", "⌂", HomeView(stack, self)),
             ("Temarios", "☰", SyllabiView(stack, self)),
+            ("Copias", "⟲", BackupsView(stack, self)),
+            ("Administración", "⚙", AdminView(stack, self)),
         ]
         for _, _, view in views:
             view.grid(row=0, column=0, sticky="nsew")
