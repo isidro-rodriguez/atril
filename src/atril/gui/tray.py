@@ -22,6 +22,9 @@ from atril.gui.model import TrayCommand, TrayMenu
 WINDOW_CLASS = "AtrilTrayWindow"
 """Clase de la ventana oculta: una segunda instancia la busca para avisar."""
 
+MUTEX = "AtrilGui"
+"""Mutex de la ventana: el instalador (``AppMutex``) pide cerrar atril si existe."""
+
 _CALLBACK = 0x8001  # WM_APP + 1: clics en el icono
 _SHOW = 0x8002  # WM_APP + 2: una segunda instancia pide mostrar la ventana
 
@@ -124,6 +127,16 @@ def signal_running() -> bool:
     _user32.AllowSetForegroundWindow(_ASFW_ANY)
     _post(hwnd, _SHOW)
     return True
+
+
+def hold_mutex() -> None:
+    """Crea el mutex :data:`MUTEX`, que Windows libera al cerrar el proceso."""
+    if sys.platform == "win32":
+        _mutexes.append(_kernel32.CreateMutexW(None, False, MUTEX))
+
+
+_mutexes: list[int] = []
+"""Mutex creados (se conservan mientras vive el proceso)."""
 
 
 # --- Win32 ---------------------------------------------------------------------------
@@ -255,6 +268,8 @@ if sys.platform == "win32":
         ctypes.POINTER(_NotifyIconData),
     )
     _shell32.Shell_NotifyIconW.restype = wintypes.BOOL
+    _kernel32.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
+    _kernel32.CreateMutexW.restype = wintypes.HANDLE
     _kernel32.GetModuleHandleW.argtypes = (wintypes.LPCWSTR,)
     _kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 

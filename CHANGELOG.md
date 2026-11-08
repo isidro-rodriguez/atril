@@ -5,6 +5,17 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.29.0] - 2026-11-09
+
+### Added
+
+- Instalador de Windows (`atril-X.Y.Z-setup.exe`) en cada release, construido y probado por la
+  CI. Es por usuario, sin administrador: instala atril con su propio Python dentro de su
+  carpeta, crea el acceso directo y pone `atril` en el PATH. Desinstalar no toca la estación,
+  las copias ni `ATRIL_ESTACION`.
+- La ventana crea el mutex `AtrilGui`, para que el instalador pida cerrar atril antes de
+  actualizarlo o desinstalarlo.
+
 ## [0.28.2] - 2026-11-09
 
 ### Changed

@@ -679,6 +679,7 @@ def run() -> None:
     """Abre la ventana principal (tras la primera ejecución, si hace falta)."""
     if tray.signal_running():
         return  # ya hay un atril abierto: se muestra ese
+    tray.hold_mutex()
     _prepare_windows()
     style.register_fonts()
     station = choose_station()

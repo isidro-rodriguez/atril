@@ -95,3 +95,92 @@ jobs:
             --target "${GITHUB_SHA}" \
             --title "atril ${{ needs.check.outputs.version }}" \
             --generate-notes
+
+  installer:
+    name: Instalador de Windows ${{ needs.check.outputs.version }}
+    needs: [ check, publish ]
+    # Tras publicar; a mano (workflow_dispatch) rehace el de una versión ya publicada.
+    if: >-
+      always() && needs.check.result == 'success' &&
+      (needs.publish.result == 'success' ||
+       (needs.publish.result == 'skipped' && github.event_name == 'workflow_dispatch'))
+    runs-on: windows-latest
+    permissions:
+      contents: write # adjuntar el instalador a la release
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: ${{ needs.check.outputs.tag }}
+      UV_VERSION: '0.13.7'
+      UV_SHA256: '0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021'
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Descargar uv.exe (versión fija y suma comprobada)
+        run: |
+          $zip = "uv.zip"
+          Invoke-WebRequest "https://github.com/astral-sh/uv/releases/download/$env:UV_VERSION/uv-x86_64-pc-windows-msvc.zip" -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:UV_SHA256) { throw "uv.zip: suma SHA-256 inesperada ($hash)" }
+          Expand-Archive $zip -DestinationPath uv-bin
+          if (-not (Test-Path uv-bin\uv.exe)) { throw "uv.zip no trae uv.exe" }
+
+      - name: Instalar Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Construir el instalador
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\uv-bin" instalador\atril.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC ha fallado" }
+
+      - name: Esperar a que PyPI sirva la versión
+        run: |
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              Invoke-WebRequest "https://pypi.org/pypi/atril/$env:VERSION/json" -UseBasicParsing | Out-Null
+              exit 0
+            } catch { Start-Sleep -Seconds 10 }
+          }
+          throw "PyPI no sirve atril $env:VERSION"
+
+      - name: Probar instalación y desinstalación
+        run: |
+          $setup = "dist\atril-$env:VERSION-setup.exe"
+          $app = "$env:LOCALAPPDATA\Programs\Atril"
+          Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/LOG=instalar.log' -Wait
+          if (Test-Path "$app\instalacion.log") { Get-Content "$app\instalacion.log" }
+          $version = & "$app\bin\atril.exe" --version
+          Write-Output $version
+          if ("$version" -notmatch [regex]::Escape($env:VERSION)) { throw "atril --version: $version" }
+          if (-not (Test-Path "$app\bin\atril-gui.exe")) { throw "falta atril-gui.exe" }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Atril.lnk")) { throw "falta el acceso directo" }
+          $path = (Get-ItemProperty HKCU:\Environment).Path
+          if ($path -notlike "*$app\bin*") { throw "bin no está en el PATH del usuario" }
+          Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES' -Wait
+          Start-Sleep -Seconds 5  # el desinstalador se relanza desde una copia temporal
+          if (Test-Path "$app\bin") { throw "la desinstalación ha dejado $app\bin" }
+          $path = (Get-ItemProperty HKCU:\Environment).Path
+          if ($path -like "*$app\bin*") { throw "la desinstalación ha dejado bin en el PATH" }
+
+      - name: Adjuntar a la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload $env:TAG "dist\atril-$env:VERSION-setup.exe" --clobber
+
+      - name: Reunir los registros si falla
+        if: failure()
+        run: |
+          New-Item -ItemType Directory registros -Force | Out-Null
+          Copy-Item instalar.log, "$env:LOCALAPPDATA\Programs\Atril\instalacion.log" registros -ErrorAction SilentlyContinue
+
+      - name: Guardar los registros si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registros-instalador
+          path: registros
+          if-no-files-found: ignore

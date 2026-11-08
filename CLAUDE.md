@@ -27,6 +27,7 @@
 ├── pyproject.toml          # Project: deps, build, tools (ruff, ty, pytest, uv, poe)
 ├── README.md               # Minimal project overview
 ├── uv.lock                 # Lockfile, tracked by git
+├── instalador/atril.iss    # Windows installer (Inno Setup), built by publish.yml
 ├── scripts/recursos/       # Dev-only generator of gui/recursos (logo SVG, tool logos in
 │                           #   marcas/, icons, fonts, card)
 ├── docs/
@@ -161,6 +162,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   quits as before. The tray's "Salir" stops DeepTutor and atril's own Ollama
   (`ops.service.shutdown`). Tray clicks reach Tk only through `Tray.commands`, drained in
   `App._poll`; never touch Tk from the tray thread. A second `atril-gui` shows the running one.
+- Windows installer (`instalador/atril.iss`, job `installer` in `publish.yml`): per user, ships
+  a pinned `uv.exe` (update `UV_VERSION`/`UV_SHA256` together) and runs `uv tool install
+  atril==X.Y.Z` with every uv folder inside the program folder; uninstalling deletes only that
+  folder and its PATH entry, never the station. The GUI holds the `AtrilGui` mutex (`AppMutex`).
 - Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,
   `pythonw`) Windows would open an empty console window per child.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;

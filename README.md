@@ -6,6 +6,10 @@ Ventana y CLI para gestionar una instalación local de
 
 ## 🚀 Guía rápida
 
+En Windows, lo más sencillo es el instalador `atril-X.Y.Z-setup.exe` de las
+[releases](https://github.com/isidro-rodriguez/atril/releases): no pide administrador, instala
+atril con su propio Python y crea el acceso directo. Con la consola:
+
 ```bash
 uv tool install atril            # instalar (o actualizar: uv tool upgrade atril)
 atril validar                    # comprueba atril.toml y los temarios (la 1.ª vez, elige la estación)

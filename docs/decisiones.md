@@ -254,6 +254,17 @@ Sustituye lo anterior donde choque.
 
 `arrancar` aplica los parches pendientes (código original intacto) antes de lanzar DeepTutor, que está parado. Antes solo avisaba, y unos parches deshechos (actualización interrumpida) volvían a abrir la consola en cada arranque. Un parche con el código cambiado sigue siendo un error y no se fuerza.
 
+### Instalador (0.29.0)
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Construcción | Job `installer` de `publish.yml` en `windows-latest`, tras publicar en PyPI: Inno Setup (`choco`), `uv.exe` de versión fija con su SHA-256, prueba de instalación y desinstalación silenciosas y `atril-X.Y.Z-setup.exe` adjunto a la release. A mano (`workflow_dispatch`) rehace el de la versión publicada | Construirlo en cada PR (necesita la versión en PyPI) |
+| Contenido | `instalador/atril.iss`: `uv.exe`, icono y licencia. Al instalar, `uv tool install atril==X.Y.Z` con Python 3.13 propio, todo dentro de `%LOCALAPPDATA%\Programs\Atril` (`bin`, `herramientas`, `python`; sin caché). Salida en `instalacion.log` | Usar las carpetas por defecto de uv (se mezclaría con un `uv tool install atril` del usuario) |
+| Accesos y CLI | Acceso en el menú Inicio (y en el escritorio, opcional) con `AppUserModelID` `atril.gui`, el de la ventana. `bin` se añade al final del PATH del usuario y se quita al desinstalar | |
+| Atril abierto | La ventana crea el mutex `AtrilGui` (`tray.hold_mutex`): instalar o desinstalar pide cerrarla antes (`AppMutex`) | |
+| Firma | Sin firmar por ahora (SmartScreen avisa). Después, solicitar SignPath Foundation | Azure Trusted Signing (de pago) |
+| Nombre «Atril» en el área de notificación | Pendiente: lanzador `Atril.exe` que cargue Python en su propio proceso | |
+
 ## Lecciones de la instalación previa
 
 - Backup: se retiran restic, rclone y los git bundles. Las KB ocupan varios GB y rclone exigía una configuración compleja; ahora son ficheros `atril-<fecha>.zip` (deflate 9) o `.tar.xz` (xz 9) en carpetas (disco externo o Google Drive para escritorio), verificados y con `conservar` copias por destino. Se retiran también `scripts/backup.py` y `scripts/migrar_estacion.py` (la migración ya está hecha).
