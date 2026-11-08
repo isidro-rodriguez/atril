@@ -22,7 +22,7 @@ SCRIPT = textwrap.dedent(
     try:
         tk.Tk().destroy()
     except tk.TclError:
-        print("SIN-PANTALLA")
+        print("SIN-PANTALLA", flush=True)
         os._exit(0)
 
     from atril.checks import ok
