@@ -11,7 +11,7 @@ from tkinter import ttk
 from atril import __version__
 from atril.checks import Level
 from atril.gui import style
-from atril.gui.model import Action, ToolCard
+from atril.gui.model import Action, SortKey, ToolCard, sort_order
 
 SIDEBAR_WIDTH = 200
 """Anchura de la navegación a 100 % (se escala con la pantalla)."""
@@ -185,3 +185,53 @@ class ToolTile(tk.Frame):
     def button(self) -> ttk.Button:
         """Botón de acción (se desactiva mientras hay una operación)."""
         return self._button
+
+
+class TableSorter:
+    """Ordena una tabla al pulsar la cabecera de una columna.
+
+    La primera pulsación ordena de forma ascendente y la siguiente, descendente.
+    Los empates se resuelven por la columna ``tie`` en orden ascendente. Las
+    vistas registran las claves de cada fila con :meth:`add` (fechas, números o
+    texto sin tildes) y llaman a :meth:`apply` tras rellenar la tabla, para
+    conservar el orden elegido.
+    """
+
+    def __init__(self, tree: ttk.Treeview, tie: int = 0) -> None:
+        """Hace pulsables las cabeceras de ``tree``."""
+        self._tree = tree
+        self._tie = tie
+        self._keys: dict[str, SortKey] = {}
+        self._column: int | None = None
+        self._descending = False
+        for index, column in enumerate(tree["columns"]):
+            tree.heading(column, command=lambda i=index: self.sort(i))
+
+    def clear(self) -> None:
+        """Olvida las claves (la tabla se va a rellenar de nuevo)."""
+        self._keys.clear()
+
+    def add(self, item: str, keys: SortKey) -> None:
+        """Claves de ordenación de una fila, una por columna."""
+        self._keys[item] = keys
+
+    def sort(self, column: int) -> None:
+        """Ordena por ``column`` (invierte el sentido si ya estaba ordenada así)."""
+        self._descending = self._column == column and not self._descending
+        self._column = column
+        self.apply()
+
+    def apply(self) -> None:
+        """Reordena las filas según la última columna elegida."""
+        if self._column is None:
+            return
+        keys = {i: k for i, k in self._keys.items() if self._tree.exists(i)}
+        order = sort_order(keys, self._column, self._descending, self._tie)
+        for index, item in enumerate(order):
+            self._tree.move(item, "", index)
+        arrow = style.icon(
+            self._tree, "chevron-down-nav" if self._descending else "chevron-up-nav", 14
+        )
+        for index, column in enumerate(self._tree["columns"]):
+            chosen = index == self._column
+            self._tree.heading(column, image=arrow if chosen else "")

@@ -129,6 +129,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - GUI texts never mention CLI commands or options (`tests/test_textos.py` scans every module
   except `commands/`): shared `ops` messages say what to do, the CLI adds its own hint. GUI
   texts never use ";" and setting descriptions fit in one line.
+- Tables are sortable with `widgets.TableSorter`: views register per-row sort keys (dates as
+  ISO or stamps, numbers as ints, text through `model.fold`) and call `apply()` after
+  refilling; ties sort by the first column ascending (`model.sort_order`).
 - Inicio's assistant card reads the active chat model from DeepTutor's `model_catalog.json`
   (`deeptutor.active_assistant`) and only reports whether a key exists: never read the key
   into anything else, never show or log it.

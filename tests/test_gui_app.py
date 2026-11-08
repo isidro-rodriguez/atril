@@ -40,6 +40,7 @@ SCRIPT = textwrap.dedent(
     copies = root.parent / "copias"
     copies.mkdir()
     (copies / "atril-20261108-090000.zip").write_bytes(b"x")
+    (copies / "atril-20261101-090000.zip").write_bytes(b"xx")
     config = root / "atril.toml"
     text = config.read_text(encoding="utf-8")
     start = text.index("destinos = [")
@@ -91,7 +92,14 @@ SCRIPT = textwrap.dedent(
     app.show_view("Backups")
     settle(app)
     backups = app.views["Backups"]
-    assert len(backups._table.get_children()) == 1
+    first = lambda: backups._table.item(backups._table.get_children()[0], "values")[0]
+    assert "8 nov" in first()  # el más reciente arriba
+    backups._sorter.sort(0)  # clic en «Fecha»: ascendente
+    assert "1 nov" in first()
+    backups._sorter.sort(0)  # otro clic: descendente
+    assert "8 nov" in first()
+    backups._sorter.sort(1)  # por tamaño, ascendente
+    assert "8 nov" in first()
 
     # Volver a un apartado ya leído no vuelve a consultar nada.
     calls = []

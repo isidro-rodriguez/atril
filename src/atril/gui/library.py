@@ -9,8 +9,16 @@ from atril.config import Syllabus, load_syllabus
 from atril.gui import style
 from atril.gui.desktop import open_path
 from atril.gui.dialogs import ask_choice, ask_text
-from atril.gui.model import SourceRow, SyllabusData, filter_rows, load_all, source_rows
+from atril.gui.model import (
+    SourceRow,
+    SyllabusData,
+    filter_rows,
+    fold,
+    load_all,
+    source_rows,
+)
 from atril.gui.syllabi import SyllabusPicker
+from atril.gui.widgets import TableSorter
 from atril.ops import Reporter
 from atril.ops import sources as source_ops
 from atril.ops import syllabus as syllabus_ops
@@ -106,6 +114,7 @@ class LibraryView(tk.Frame):
                 stretch=column == "titulo",
             )
         style.tag_levels(self._table)
+        self._sorter = TableSorter(self._table)
         self._table.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table, command=self._table.yview)
         scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
@@ -149,17 +158,20 @@ class LibraryView(tk.Frame):
     def _paint(self) -> None:
         """Pinta las fuentes que cumplen la búsqueda."""
         self._table.delete(*self._table.get_children())
+        self._sorter.clear()
         if self._current() is None:
             self._count.configure(text="Crea un temario en Temarios para empezar.")
             return
         rows = filter_rows(self._rows, self._query.get())
         for row in rows:
-            self._table.insert(
+            item = self._table.insert(
                 "",
                 "end",
                 values=style.cells(row.title, row.kb_id, row.state),
                 tags=(row.level.value,),
             )
+            self._sorter.add(item, (fold(row.title), fold(row.kb_id), fold(row.state)))
+        self._sorter.apply()
         self._count.configure(text=f"{len(rows)} de {len(self._rows)} fuentes")
 
     def _current(self) -> Syllabus | None:

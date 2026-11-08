@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from atril.checks import Level
 from atril.gui import style
 from atril.gui.activity import Event, when_label
+from atril.gui.model import fold
+from atril.gui.widgets import TableSorter
 
 if TYPE_CHECKING:
     from atril.gui.app import App
@@ -44,6 +46,7 @@ class HistoryView(tk.Frame):
                 stretch=column == "resultado",
             )
         style.tag_levels(self._list)
+        self._sorter = TableSorter(self._list)
         self._list.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table, command=self._list.yview)
         scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
@@ -72,6 +75,7 @@ class HistoryView(tk.Frame):
         chosen = self._events.get(selected[0]) if selected else None
         current = chosen.id if chosen else None
         self._list.delete(*self._list.get_children())
+        self._sorter.clear()
         self._events.clear()
         for event in self.app.activity.events:
             when = "Ahora" if event.running else when_label(event.when)
@@ -82,8 +86,11 @@ class HistoryView(tk.Frame):
                 tags=(event.level.value,),
             )
             self._events[item] = event
+            moment = "9999" if event.running else event.when  # en curso: lo último
+            self._sorter.add(item, (moment, fold(event.title), fold(event.summary)))
             if event.id == current:
                 self._list.selection_set(item)
+        self._sorter.apply()
         if not self._events:
             self._write([(Level.INFO, "Sin actividad todavía.")])
         elif not self._list.selection():

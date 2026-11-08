@@ -148,7 +148,8 @@ class HomeView(tk.Frame):
         self._sentence.grid(row=2, column=1, sticky="nw")
 
         side = tk.Frame(card, background=style.CARD)
-        side.grid(row=0, column=2, rowspan=3, sticky="ne", padx=(24, 0))
+        # Arriba alineado con el titular; los botones no invaden su columna.
+        side.grid(row=1, column=2, rowspan=3, sticky="ne", padx=(24, 0))
         style.label(side, "Última actividad", font=style.SMALL, color=style.MUTED).grid(
             row=0, column=0, sticky="w"
         )
@@ -161,7 +162,7 @@ class HomeView(tk.Frame):
         self._last_backup.grid(row=3, column=0, sticky="w")
 
         buttons = tk.Frame(card, background=style.CARD)
-        buttons.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        buttons.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(16, 0))
         buttons.columnconfigure(0, weight=1)
         self._toggle = self.app.action(
             ttk.Button(

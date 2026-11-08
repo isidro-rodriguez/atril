@@ -18,9 +18,11 @@ from atril.gui.model import (
     SyllabusData,
     actions_needed,
     choose_syllabus,
+    fold,
     load_all,
     size_label,
 )
+from atril.gui.widgets import TableSorter
 from atril.knowledge import PlanState
 from atril.ops import Reporter
 from atril.ops import knowledge as knowledge_ops
@@ -162,6 +164,7 @@ class SyllabiView(tk.Frame):
                 stretch=stretch,
             )
         self._kbs.grid(row=3, column=0, sticky="nsew")
+        self._sorter = TableSorter(self._kbs)
         self._pending = style.label(card, "", color=style.MUTED, wraplength=700)
         self._pending.grid(row=4, column=0, sticky="ew", pady=(12, 0))
         return card
@@ -192,6 +195,7 @@ class SyllabiView(tk.Frame):
     def _show_detail(self) -> None:
         """KB del temario elegido, con sus recuentos y el último indexado."""
         self._kbs.delete(*self._kbs.get_children())
+        self._sorter.clear()
         self._shown = self.app.syllabus_id
         data = self._data.get(self._shown or "")
         for button in (*self._buttons.values(), self._delete):
@@ -210,17 +214,16 @@ class SyllabiView(tk.Frame):
             pending = status.count(PlanState.NEW) + status.count(PlanState.CHANGED)
             run = status.run
             last = RUN_LABELS.get(run.state, run.state) if run else "Sin indexar"
-            self._kbs.insert(
-                "",
-                "end",
-                values=style.cells(
-                    status.kb.id,
-                    len(status.items),
-                    status.count(PlanState.INDEXED),
-                    pending,
-                    last.capitalize(),
-                ),
+            row = (
+                status.kb.id,
+                len(status.items),
+                status.count(PlanState.INDEXED),
+                pending,
+                last.capitalize(),
             )
+            item = self._kbs.insert("", "end", values=style.cells(*row))
+            self._sorter.add(item, (fold(row[0]), *row[1:4], fold(row[4])))
+        self._sorter.apply()
         new, stale = actions_needed(data.statuses)
         hints = [finding.message for finding in data.pending]
         self._pending.configure(text="\n".join(hints) or "Todo indexado.")

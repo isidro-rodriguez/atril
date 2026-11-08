@@ -380,6 +380,36 @@ def actions_needed(statuses: list[KbStatus]) -> tuple[bool, list[str]]:
     return new, [status.kb.id for status in statuses if status.needs_reindex]
 
 
+type SortKey = tuple[str | int | float, ...]
+"""Claves de ordenación de una fila, una por columna."""
+
+
+def sort_order(
+    keys: dict[str, SortKey], column: int, descending: bool, tie: int = 0
+) -> list[str]:
+    """Filas ordenadas por ``column``; los empates, por ``tie`` en orden ascendente.
+
+    Examples:
+        >>> keys = {"a": ("ley", 3), "b": ("decreto", 3), "c": ("orden", 1)}
+        >>> sort_order(keys, 1, descending=False)
+        ['c', 'b', 'a']
+        >>> sort_order(keys, 1, descending=True)
+        ['b', 'a', 'c']
+    """
+    by_tie = sorted(keys, key=lambda item: keys[item][tie])
+    return sorted(by_tie, key=lambda item: keys[item][column], reverse=descending)
+
+
+def fold(text: str) -> str:
+    """Texto para ordenar o buscar: minúsculas y sin tildes.
+
+    Examples:
+        >>> fold("Óptica")
+        'optica'
+    """
+    return _fold(text)
+
+
 def archive_label(stamp: str) -> str:
     """Fecha de un backup a partir de su nombre: «8 nov 2026, 09:00».
 

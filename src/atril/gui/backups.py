@@ -11,7 +11,8 @@ from atril.checks import Level, info, ok, warning
 from atril.gui import style
 from atril.gui.desktop import open_path
 from atril.gui.dialogs import ask_yes_no, show_message
-from atril.gui.model import archive_label
+from atril.gui.model import archive_label, fold
+from atril.gui.widgets import TableSorter
 from atril.ops import Reporter
 from atril.ops import backup as backup_ops
 from atril.ops.backup import FolderReport, OtherRootError, Restored, RestorePlan
@@ -93,6 +94,7 @@ class BackupsView(tk.Frame):
                 stretch=column == "destino",
             )
         style.tag_levels(self._table)
+        self._sorter = TableSorter(self._table)
         self._table.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table, command=self._table.yview)
         scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
@@ -128,13 +130,15 @@ class BackupsView(tk.Frame):
     def _show(self, reports: list[FolderReport]) -> None:
         """Pinta las copias, de la más reciente a la más antigua."""
         self._table.delete(*self._table.get_children())
+        self._sorter.clear()
         self._paths.clear()
         for report in reports:
             folder = report.folder.name or str(report.folder)
             if not report.archives:
-                self._table.insert(
+                item = self._table.insert(
                     "", "end", values=style.cells("Sin backups", "", folder, "")
                 )
+                self._sorter.add(item, ("", 0, fold(folder), ""))
             for archive in reversed(report.archives):
                 state, level = self._verified.get(archive.path, (PENDING, Level.INFO))
                 values = style.cells(
@@ -145,6 +149,10 @@ class BackupsView(tk.Frame):
                 )
                 item = self._table.insert("", "end", values=values, tags=(level.value,))
                 self._paths[item] = archive.path
+                self._sorter.add(
+                    item, (archive.stamp, archive.size, fold(folder), fold(state))
+                )
+        self._sorter.apply()
         self._note.configure(
             text="Selecciona un backup para restaurarlo. Sin selección se usa el "
             "más reciente. Las claves de API no se guardan: tras restaurar hay que "

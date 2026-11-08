@@ -5,6 +5,19 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.26.0] - 2026-11-08
+
+### Added
+
+- Las tablas de Temarios, Biblioteca, Backups y Actividad se ordenan al pulsar la cabecera de
+  una columna: ascendente y, con otra pulsación, descendente (una flecha lo indica). Los empates
+  se ordenan por la primera columna, en orden alfabético o por fecha.
+
+### Changed
+
+- Inicio: «Última actividad» y «Último backup» empiezan a la altura del titular del estado y
+  los botones Arrancar/Parar y Abrir en el navegador ya no invaden esa columna.
+
 ## [0.25.1] - 2026-11-08
 
 ### Changed
