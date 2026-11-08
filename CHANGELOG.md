@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.28.1] - 2026-11-09
+
+### Fixed
+
+- Arrancar DeepTutor aplica los parches pendientes en vez de solo avisar. Algo los había
+  deshecho (por ejemplo, una actualización interrumpida tras deshacerlos) y, sin
+  `arranque-sin-ventana`, cada arranque volvía a abrir una ventana de consola. Con DeepTutor
+  parado es seguro: solo se tocan los parches con el código original intacto.
+
 ## [0.28.0] - 2026-11-08
 
 ### Added

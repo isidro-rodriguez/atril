@@ -248,6 +248,11 @@ Sustituye lo anterior donde choque.
 | Notificaciones | Con la ventana oculta: aviso la primera vez, el final de cada operación y si DeepTutor se para sin una operación de atril. Los errores van a la notificación, no a una ventana | |
 | Instancia única | Abrir atril otra vez muestra la ventana existente (busca la ventana oculta `AtrilTrayWindow`) | |
 | Arranque con Windows | No | |
+| Nombre en Windows | La configuración de la barra de tareas muestra «Python» (la descripción de `pythonw.exe`, que es el proceso del icono). Se resolverá con un lanzador propio en el instalador | Cambiarlo desde el código (el icono no lleva nombre) |
+
+### Parches al arrancar (0.28.1)
+
+`arrancar` aplica los parches pendientes (código original intacto) antes de lanzar DeepTutor, que está parado. Antes solo avisaba, y unos parches deshechos (actualización interrumpida) volvían a abrir la consola en cada arranque. Un parche con el código cambiado sigue siendo un error y no se fuerza.
 
 ## Lecciones de la instalación previa
 

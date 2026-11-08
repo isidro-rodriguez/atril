@@ -42,13 +42,14 @@ def installed(station: Station) -> DeepTutor:
 def start(dt: DeepTutor, reporter: Reporter, timeout: int) -> None:
     """Arranca DeepTutor y espera a que responda.
 
-    Abre Ollama si hace falta, avisa de parches pendientes y cierra restos de un
-    arranque anterior de la estación. Se niega si los puertos son de otro programa.
+    Abre Ollama si hace falta, cierra restos de un arranque anterior de la
+    estación y aplica los parches pendientes (con DeepTutor parado es seguro: así
+    no se pierden si algo los deshizo, como una actualización a medias). Se niega
+    si los puertos son de otro programa.
 
     Raises:
         AtrilError: Si no arranca; lleva el final del log del lanzador.
     """
-    reporter.show(patch_findings(dt.station))
     reporter.show(ensure_ollama(dt.station, reporter))
 
     orphans = dt.orphans()
@@ -60,6 +61,7 @@ def start(dt: DeepTutor, reporter: Reporter, timeout: int) -> None:
             [warning(f"Cerrando restos de un arranque anterior: {pids(orphans.own)}.")]
         )
         dt.kill(orphans.own)
+    reporter.show(apply_pending_patches(dt.station))
 
     with reporter.busy("Arrancando DeepTutor..."):
         started = dt.start() == 0
@@ -179,6 +181,24 @@ def patch_finding(name: str, state: PatchState) -> Finding:
             )
         case PatchState.NO_FILE:
             return error(f"{name}: no existe {PATCHES[name].file} en app/.")
+
+
+def apply_pending_patches(station: Station) -> list[Finding]:
+    """Aplica los parches pendientes y dice el estado de cada uno.
+
+    Solo toca los pendientes (texto original intacto): un parche cuyo código ha
+    cambiado se queda como está y se informa como error.
+    """
+    findings = []
+    for name in station.deeptutor.patches:
+        patch = PATCHES[name]
+        before = patch.state(station.app_dir)
+        after = patch.apply(station.app_dir)
+        if before is PatchState.PENDING and after is PatchState.APPLIED:
+            findings.append(ok(f"{name}: aplicado ahora."))
+        else:
+            findings.append(patch_finding(name, after))
+    return findings
 
 
 def patch_findings(station: Station) -> list[Finding]:

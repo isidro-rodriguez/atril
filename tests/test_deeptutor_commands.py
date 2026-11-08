@@ -136,6 +136,9 @@ def test_start_launches_and_waits(
 
     assert result.exit_code == 0, result.output
     assert "Listo: http://localhost:3782" in result.output
+    # Los parches pendientes se aplican al arrancar (DeepTutor está parado).
+    assert "paginas-citas: aplicado ahora" in result.output
+    assert PATCH.new in (station / "app" / PATCH.file).read_text(encoding="utf-8")
 
 
 def test_start_timeout_shows_log(
