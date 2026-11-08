@@ -20,6 +20,7 @@ from atril.errors import AtrilError
 from atril.gui import style
 from atril.gui.desktop import open_path
 from atril.gui.dialogs import ask_yes_no, show_message
+from atril.gui.widgets import TabBar
 from atril.install import FULL_SHA
 from atril.ollama import DEFAULT_URL
 from atril.ops import Reporter, service
@@ -350,11 +351,22 @@ class SettingsView(tk.Frame):
         self._docling = tk.BooleanVar(self, value=True)
         self._commit = tk.StringVar(self)
 
-        self._tabs = ttk.Notebook(self, style="Atril.TNotebook")
-        self._tabs.grid(row=0, column=0, sticky="nsew")
+        card = style.card(self)
+        card.grid(row=0, column=0, sticky="nsew")
+        card.columnconfigure(0, weight=1)
+        card.rowconfigure(2, weight=1)
+        self._tabbar = TabBar(card, self._show_tab)
+        self._tabbar.grid(row=0, column=0, sticky="w")
+        tk.Frame(card, background=style.BORDER, height=1).grid(
+            row=1, column=0, sticky="ew"
+        )
+        self._stack = tk.Frame(card, background=style.CARD)
+        self._stack.grid(row=2, column=0, sticky="nsew")
+        self._stack.columnconfigure(0, weight=1)
+        self._stack.rowconfigure(0, weight=1)
+        self._pages: dict[str, tk.Frame] = {}
         for name, sections in TABS.items():
-            tab = tk.Frame(self._tabs, background=style.CARD, padx=PAD, pady=PAD)
-            self._tabs.add(tab, text=name, padding=style.TAB_INSET)
+            tab = self._page(name)
             body = self._scrolled(tab) if name == "Avanzado" else tab
             row = 0
             if name == "Indexado":
@@ -367,6 +379,7 @@ class SettingsView(tk.Frame):
 
         bar = tk.Frame(self, background=style.PAGE)
         bar.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        self._bar = bar
         bar.columnconfigure(2, weight=1)
         app.action(
             ttk.Button(bar, text="Guardar", style="Accent.TButton", command=self.save)
@@ -376,8 +389,34 @@ class SettingsView(tk.Frame):
         )
         self._note = style.label(bar, "", background=style.PAGE, color=style.MUTED)
         self._note.grid(row=0, column=2, sticky="w", padx=(16, 0))
+        self._tabbar.select(next(iter(TABS)))
 
     # --- construcción -----------------------------------------------------------
+
+    def _page(self, name: str) -> tk.Frame:
+        """Contenido de una pestaña (oculto hasta que se elige)."""
+        self._tabbar.add(name)
+        page = tk.Frame(self._stack, background=style.CARD, pady=PAD)
+        page.grid(row=0, column=0, sticky="nsew")
+        page.grid_remove()
+        self._pages[name] = page
+        return page
+
+    def show_tab(self, name: str) -> None:
+        """Elige una pestaña (como al pulsarla)."""
+        self._tabbar.select(name)
+
+    def _show_tab(self, name: str) -> None:
+        """Muestra el contenido de la pestaña elegida; Herramientas no se guarda."""
+        for key, page in self._pages.items():
+            if key == name:
+                page.grid()
+            else:
+                page.grid_remove()
+        if name == "Herramientas":
+            self._bar.grid_remove()
+        else:
+            self._bar.grid()
 
     def _build_section(
         self, parent: tk.Frame, row: int, title: str | None, fields: tuple[Field, ...]
@@ -545,9 +584,8 @@ class SettingsView(tk.Frame):
 
     def _build_tools(self) -> None:
         """Pestaña Herramientas: mantenimiento de DeepTutor y de la configuración."""
-        tab = tk.Frame(self._tabs, background=style.CARD, padx=PAD, pady=PAD)
+        tab = self._page("Herramientas")
         tab.columnconfigure(1, weight=1)
-        self._tabs.add(tab, text="Herramientas", padding=style.TAB_INSET)
         rows: tuple[tuple[str, str, Callable[[], None]], ...] = (
             (
                 "Instalar o reparar",

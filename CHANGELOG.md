@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.27.0] - 2026-11-08
+
+### Changed
+
+- Las pestañas de Ajustes tienen el estilo de la navegación (texto azul y subrayado en la
+  activa) y van en la cabecera de una sola tarjeta, en vez de las pestañas de `ttk`, que no
+  casaban con el resto de la ventana. «Guardar» se oculta en Herramientas, que no tiene nada
+  que guardar.
+
 ## [0.26.1] - 2026-11-08
 
 ### Changed

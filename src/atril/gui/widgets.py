@@ -233,3 +233,49 @@ class TableSorter:
         for index, column in enumerate(self._tree["columns"]):
             chosen = index == self._column
             self._tree.heading(column, image=arrow if chosen else "")
+
+
+class TabBar(tk.Frame):
+    """Pestañas de texto con el estilo de la navegación (azul y subrayado).
+
+    Van en la parte superior de una tarjeta. Se añaden con :meth:`add` y la
+    elegida se marca con :meth:`select`, que también avisa a ``on_select``.
+    """
+
+    def __init__(self, parent: tk.Misc, on_select: Callable[[str], None]) -> None:
+        """Construye la fila vacía de pestañas."""
+        super().__init__(parent, background=style.CARD)
+        self._on_select = on_select
+        self._tabs: dict[str, tuple[tk.Label, tk.Frame]] = {}
+        self.current: str | None = None
+
+    def add(self, name: str) -> None:
+        """Añade una pestaña al final."""
+        column = len(self._tabs)
+        text = style.label(self, name, font=style.NAV, padx=14, pady=8)
+        text.configure(cursor="hand2", anchor="center")
+        text.grid(row=0, column=column, sticky="ew")
+        line = tk.Frame(self, background=style.CARD, height=3)
+        line.grid(row=1, column=column, sticky="ew")
+        text.bind("<Button-1>", lambda _: self.select(name))
+        text.bind("<Enter>", lambda _: self._hover(name, True))
+        text.bind("<Leave>", lambda _: self._hover(name, False))
+        self._tabs[name] = (text, line)
+
+    def select(self, name: str) -> None:
+        """Marca ``name`` como pestaña activa y avisa."""
+        self.current = name
+        for key, (text, line) in self._tabs.items():
+            active = key == name
+            text.configure(
+                foreground=style.ACCENT if active else style.TEXT,
+                background=style.CARD,
+            )
+            line.configure(background=style.ACCENT if active else style.CARD)
+        self._on_select(name)
+
+    def _hover(self, name: str, inside: bool) -> None:
+        """Fondo azul claro al pasar por una pestaña no activa."""
+        if name != self.current:
+            text, _ = self._tabs[name]
+            text.configure(background=style.SELECTED if inside else style.CARD)

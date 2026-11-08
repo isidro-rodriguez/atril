@@ -128,9 +128,6 @@ def apply(root: tk.Tk) -> None:
     # La misma tarjeta dentro de otra (esquinas sobre blanco): baldosas y recuadros.
     style.layout("Tile.Atril.TFrame", [("Atril.Card.bg", {"sticky": "nsew"})])
     style.configure("Tile.Atril.TFrame", background=CARD)
-    # Pestañas con el contenido en una tarjeta redondeada.
-    style.layout("Atril.TNotebook", [("Atril.Card.bg", {"sticky": "nsew"})])
-    style.configure("Atril.TNotebook", background=PAGE)
     for widget in ("TButton", "Accent.TButton", "TCheckbutton", "TEntry", "TCombobox"):
         style.configure(widget, font=BODY)
     style.configure("Treeview", font=BODY, rowheight=round(28 * scale(root)))
@@ -311,10 +308,6 @@ def label(
     if image is not None:
         widget.configure(image=image, compound="left")
     return widget
-
-
-TAB_INSET = 4
-"""Margen del contenido de una pestaña para que no tape las esquinas redondeadas."""
 
 
 def tile(parent: tk.Misc, padding: tuple[int, int] = (16, 12)) -> ttk.Frame:
