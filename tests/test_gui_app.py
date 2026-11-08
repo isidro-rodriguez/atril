@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,8 @@ def display() -> None:
     except tk.TclError:
         pytest.skip("sin pantalla")
     root.destroy()
+    del root
+    gc.collect()  # Tk debe liberarse en el hilo principal, no en el de otro test
 
 
 def test_main_window_shows_status(
@@ -38,3 +41,5 @@ def test_main_window_shows_status(
         assert app._rows.winfo_children()
     finally:
         app.destroy()
+        del app
+        gc.collect()

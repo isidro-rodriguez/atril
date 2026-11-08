@@ -22,6 +22,7 @@
 ├── .pre-commit-config.yaml # pre-commit/pre-push hooks (ruff, ty, pytest)
 ├── CLAUDE.md               # This file
 ├── CHANGELOG.md            # Keep a Changelog
+├── conftest.py             # Root pytest config: skips GUI doctests without tkinter
 ├── LICENSE                 # MIT
 ├── pyproject.toml          # Project: deps, build, tools (ruff, ty, pytest, uv, poe)
 ├── README.md               # Minimal project overview
