@@ -28,9 +28,9 @@ Si el proceso que lo creó ya no existe, se sustituye.
 | | `busqueda` | texto | — | Proveedor de búsqueda de DT (`duckduckgo`) |
 | `[deeptutor.llm]` (opcional) | `proveedor` | texto | — | Junto con `modelo`; sin claves en el fichero |
 | | `modelo` | texto | — | |
-| `[ollama]` | `url` | URL | `http://localhost:11434` | |
-| | `embedding` | texto | **obligatorio** | |
-| | `dimension` | entero ≥ 1 | **obligatorio** | |
+| `[ollama]` (opcional) | `url` | URL | `http://localhost:11434` | Sin `[ollama]` DeepTutor funciona (LLM en la nube), pero no se indexan fuentes: `kb indexar`, `reindexar` y `evaluar` lo piden |
+| | `embedding` | texto | **obligatorio** en `[ollama]` | |
+| | `dimension` | entero ≥ 1 | **obligatorio** en `[ollama]` | |
 | | `contexto` | entero ≥ 1 | `8192` | = `OLLAMA_CONTEXT_LENGTH` y ventana en DT |
 | `[indexado]` (opcional) | `parser` | `text_only` · `docling` · `mineru` · `markitdown` · `pymupdf4llm` · `liteparse` · `tika` | `"docling"` | DT usa `text_only` por defecto |
 | | `chunk` | entero ≥ 1 | `1024` | |
@@ -53,6 +53,12 @@ Cada copia es `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`) con `atril.toml`, `data\
 como `.part`, se verifica y después se copia al resto de destinos.
 
 ## `temario.toml` (temario)
+
+`atril temario crear <nombre>` genera uno nuevo con una sola KB (mismo id que el temario,
+`fuentes = ["*"]`, no vinculante) y `prompt.md`. `atril fuentes añadir <temario> <pdf|url>`
+añade una `[[fuente]]` pdf (un fichero local se copia a `fuentes\<kb>\` y queda manual; una URL
+se descarga con `fuentes descargar`) y, si la KB no la selecciona, añade su id a `fuentes` de la
+KB. El fichero se edita conservando comentarios y orden, y se valida antes de sustituirlo.
 
 Ruta: `temarios\<id>\temario.toml`. El id del temario es el nombre de la carpeta (slug).
 

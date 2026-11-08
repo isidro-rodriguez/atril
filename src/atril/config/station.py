@@ -111,9 +111,23 @@ class Station:
 
     root: Path
     deeptutor: DeepTutorConfig
-    ollama: OllamaConfig
+    ollama: OllamaConfig | None
+    """``None`` sin Ollama: DeepTutor funciona, pero no se indexan fuentes."""
     indexing: IndexingConfig
     backup: BackupConfig
+
+    def require_ollama(self) -> OllamaConfig:
+        """Configuración de Ollama, necesaria para indexar y evaluar.
+
+        Raises:
+            ConfigError: Si ``atril.toml`` no declara ``[ollama]``.
+        """
+        if self.ollama is None:
+            raise ConfigError(
+                f"{self.root / STATION_FILE}: falta [ollama]. Para indexar fuentes "
+                "hace falta Ollama con un modelo de embedding (ver docs/esquemas.md)."
+            )
+        return self.ollama
 
     @property
     def app_dir(self) -> Path:
@@ -181,9 +195,10 @@ STATION_TEMPLATE = """\
 # rama = "dev"
 # parches = ["paginas-citas", "arranque-sin-ventana"]
 
-[ollama]
-embedding = "qwen3-embedding:8b"
-dimension = 4096
+# Opcional: para indexar fuentes en bases de conocimiento hace falta Ollama.
+# [ollama]
+# embedding = "qwen3-embedding:8b"
+# dimension = 4096
 
 [backup]
 destinos = ['E:\\backups-atril']  # carpetas para las copias; cámbialo por la tuya
@@ -221,7 +236,7 @@ def load_station(root: Path) -> Station:
     station = Station(
         root=root.resolve(),
         deeptutor=_deeptutor(top.get_table("deeptutor")),
-        ollama=_ollama(top.get_table("ollama")),
+        ollama=_ollama(top.get_table("ollama")) if top.has("ollama") else None,
         indexing=_indexing(top.get_table("indexado", required=False)),
         backup=_backup(top.get_table("backup"), root.resolve()),
     )

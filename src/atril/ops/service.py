@@ -113,8 +113,7 @@ def status(station: Station, reporter: Reporter) -> list[Section]:
         sections: list[Section] = [("DeepTutor", service_findings(dt))]
         if station.deeptutor.patches:
             sections.append(("Parches", patch_findings(station)))
-        current = ollama.get_status(station.ollama.url)
-        sections.append(("Ollama", ollama.check(current, station.ollama)))
+        sections.append(("Ollama", _ollama_findings(station)))
     sections.append(("Estación y copias", backup.station_findings(station)))
     return sections
 
@@ -173,6 +172,8 @@ def patch_findings(station: Station) -> list[Finding]:
 def ensure_ollama(station: Station, reporter: Reporter) -> list[Finding]:
     """Abre Ollama si no responde y devuelve sus comprobaciones."""
     config = station.ollama
+    if config is None:
+        return []
     current = ollama.get_status(config.url)
     if not current.running and (app := ollama.app_path()):
         ollama.launch_app(app)
@@ -185,6 +186,13 @@ def ensure_ollama(station: Station, reporter: Reporter) -> list[Finding]:
     if not current.running:
         findings.append(warning("Sin Ollama, el RAG no funcionará."))
     return findings
+
+
+def _ollama_findings(station: Station) -> list[Finding]:
+    """Estado de Ollama; sin ``[ollama]`` es opcional y solo se informa."""
+    if station.ollama is None:
+        return [info("Sin [ollama]: DeepTutor funciona, pero no se indexan fuentes.")]
+    return ollama.check(ollama.get_status(station.ollama.url), station.ollama)
 
 
 def pids(owners: tuple[PortOwner, ...]) -> str:

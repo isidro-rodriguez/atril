@@ -32,7 +32,7 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
-│   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station)
+│   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
@@ -56,9 +56,10 @@
 
 - Every `__init__.py` must include a short docstring describing the module or package.
 - The project uses `uv` as dependency manager and build backend.
-- Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` with `rich` (CLI output) and
-  `psutil` (ports, command lines and process trees, portable and testable on Linux CI). Anything else needs a justification
-  (stdlib first). Raise the `acodo` lower bound only when a newer API is needed.
+- Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` with `rich` (CLI output),
+  `psutil` (ports, command lines and process trees, portable and testable on Linux CI) and
+  `tomlkit` (edits `temario.toml` keeping comments; `tomllib` only reads). Anything else needs
+  a justification (stdlib first). Raise the `acodo` lower bound only when a newer API is needed.
 - `README.md` must stay minimal: what it is, installation, usage, quality commands and links.
   Put any extra explanation in this file instead.
 
@@ -80,6 +81,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Target platform is Windows (PowerShell 7). CI also runs on Linux: keep logic
   platform-neutral and isolate Windows-only calls so tests can run anywhere.
 - Never store secrets in config.
+- `[ollama]` is optional: without it DeepTutor runs (cloud LLM) but nothing is indexed. Read it
+  through `Station.require_ollama()` wherever embeddings are needed.
+- `temario.toml` is written only by `ops.syllabus` with `tomlkit`: validate the new text with
+  `load_syllabus` in a temporary copy, then replace through `.nuevo`.
 - Configuration errors raise `atril.config.ConfigError` with a Spanish message naming the file,
   table and key. Commands catch it, print it in red and exit with code 1.
 - Every schema change updates `docs/esquemas.md`, `docs/ejemplos/` and the tests.

@@ -10,7 +10,7 @@ def test_example_station_is_valid(station_dir: Path) -> None:
     station = load_station(station_dir)
 
     assert station.deeptutor.patches == ("paginas-citas", "arranque-sin-ventana")
-    assert station.ollama.dimension == 4096
+    assert station.require_ollama().dimension == 4096
     assert station.backup.destinations == (
         Path(r"E:\backups-atril"),
         Path(r"G:\Mi unidad\Backups\atril"),
@@ -28,7 +28,7 @@ def test_defaults(tmp_path: Path) -> None:
         8001,
         3782,
     )
-    assert station.ollama.context == 8192
+    assert station.require_ollama().context == 8192
     assert station.indexing.parser == "docling"
     assert (station.indexing.chunk_size, station.indexing.chunk_overlap) == (1024, 150)
     assert (station.backup.archive_format, station.backup.keep) == ("zip", 7)
@@ -98,7 +98,10 @@ def test_init_station_creates_valid_template(tmp_path: Path) -> None:
     root = tmp_path / "nueva"
     init_station(root)
 
-    assert load_station(root).ollama.dimension == 4096
+    station = load_station(root)
+    assert station.ollama is None  # Ollama es opcional en una estación nueva
+    with pytest.raises(ConfigError, match=r"falta \[ollama\]"):
+        station.require_ollama()
     assert (root / "temarios").is_dir()
     with pytest.raises(ConfigError, match="no se sobrescribe"):
         init_station(root)

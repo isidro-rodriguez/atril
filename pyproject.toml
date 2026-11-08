@@ -1,6 +1,6 @@
 [project]
 name = "atril"
-version = "0.17.0"
+version = "0.18.0"
 description = "Gestiona una instalación local de DeepTutor y sus temarios"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -22,6 +22,7 @@ dependencies = [
   "acodo>=0.5.1,<1",
   "psutil>=7",
   "rich>=14",
+  "tomlkit>=0.13",
   "typer>=0.20",
 ]
 

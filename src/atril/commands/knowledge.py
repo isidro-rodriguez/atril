@@ -538,18 +538,17 @@ def _apply_settings(station: Station, dt: DeepTutor) -> None:
 
 def _embedding_preflight(station: Station) -> list[Finding]:
     """Ollama responde, no hay modelos ajenos en VRAM y el embedding funciona."""
-    status = ollama.get_status(station.ollama.url)
-    findings = [
-        f for f in ollama.check(status, station.ollama) if f.level is not Level.OK
-    ]
+    config = load_or_fail(station.require_ollama)
+    status = ollama.get_status(config.url)
+    findings = [f for f in ollama.check(status, config) if f.level is not Level.OK]
     if any(finding.level is Level.ERROR for finding in findings):
         return findings
-    with console.status(f"Cargando {escape(station.ollama.embedding)} en Ollama..."):
-        findings.extend(ollama.probe_embedding(station.ollama))
+    with console.status(f"Cargando {escape(config.embedding)} en Ollama..."):
+        findings.extend(ollama.probe_embedding(config))
     # Ya cargado, se ve si cabe entero en la VRAM.
-    loaded = ollama.get_status(station.ollama.url)
+    loaded = ollama.get_status(config.url)
     findings.extend(
-        w for w in ollama.offload_warnings(loaded, station.ollama) if w not in findings
+        w for w in ollama.offload_warnings(loaded, config) if w not in findings
     )
     return findings
 

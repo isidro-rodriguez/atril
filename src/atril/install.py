@@ -201,14 +201,15 @@ def setup_payload(station: Station) -> dict[str, Any]:
     """JSON para ``deeptutor config apply`` a partir de ``atril.toml``."""
     dt, embed = station.deeptutor, station.ollama
     payload: dict[str, Any] = {
-        "embedding": {
+        "system": {"backend_port": dt.backend_port, "frontend_port": dt.frontend_port},
+    }
+    if embed:
+        payload["embedding"] = {
             "provider": "ollama",
             "model": embed.embedding,
             "base_url": f"{embed.url.rstrip('/')}/api/embed",
             "dimension": embed.dimension,
-        },
-        "system": {"backend_port": dt.backend_port, "frontend_port": dt.frontend_port},
-    }
+        }
     if dt.llm:
         payload["llm"] = {"provider": dt.llm.provider, "model": dt.llm.model}
     if dt.search:
@@ -472,6 +473,8 @@ class Installer:
     def embedding_model(self) -> Finding:
         """Descarga el modelo de embedding si Ollama responde y no lo tiene."""
         config = self.station.ollama
+        if config is None:
+            return info("Sin [ollama]: no se descarga modelo de embedding.")
         status = ollama.get_status(config.url)
         if not status.running:
             return warning(f"Ollama no responde: descarga luego {config.embedding}.")

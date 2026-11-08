@@ -8,7 +8,7 @@ y sus temarios: fuentes, bases de conocimiento (KB), evaluación y backup.
 ```bash
 uv tool install atril            # instalar (o actualizar: uv tool upgrade atril)
 atril validar                    # comprueba atril.toml y los temarios (la 1.ª vez, elige la estación)
-atril instalar                   # instala DeepTutor en app\
+atril instalar                   # instala DeepTutor en app\ (Ollama es opcional: solo para indexar)
 atril arrancar                   # arranca DeepTutor y abre el navegador
 ```
 
@@ -38,7 +38,9 @@ atril parches [--comprobar]      # aplica los parches de atril.toml sobre app\
 
 ```bash
 atril temario lista              # temarios, KB y fuentes presentes, manuales y pendientes
+atril temario crear <nombre>     # temario nuevo con una KB para todas sus fuentes
 atril temario cobertura <t>      # fuentes de cada KB: fichero, estado y última comprobación
+atril fuentes añadir <t> <pdf|url>  # copia un PDF o declara una URL (conserva comentarios)
 atril fuentes descargar <t>      # descarga las fuentes que faltan
 atril fuentes comprobar <t>      # busca versiones nuevas; la anterior va al histórico
 ```

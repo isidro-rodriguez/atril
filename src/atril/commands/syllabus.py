@@ -16,7 +16,7 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from atril.checks import info, warning
+from atril.checks import info, ok, warning
 from atril.commands._common import (
     console,
     fail,
@@ -24,9 +24,12 @@ from atril.commands._common import (
     get_syllabus,
     load_or_fail,
     show,
+    success,
 )
 from atril.config import ConfigError, Syllabus, load_syllabi
 from atril.config.syllabus import Source
+from atril.errors import AtrilError
+from atril.ops import syllabus as operations
 from atril.sources import Outcome, Result, SourceManager, is_due
 from atril.sources import Progress as ProgressCallback
 
@@ -102,6 +105,32 @@ def list_syllabi(ctx: typer.Context) -> None:
     show(warning(message) for message in warnings)
 
 
+@syllabus_app.command("crear")
+def create_syllabus(
+    ctx: typer.Context,
+    name: Annotated[
+        str, typer.Argument(metavar="NOMBRE", help="Nombre visible del temario.")
+    ],
+    syllabus_id: Annotated[
+        str | None,
+        typer.Option("--id", help="Id (carpeta); por defecto, sale del nombre."),
+    ] = None,
+) -> None:
+    """Crea un temario vacío con una KB que recoge todas sus fuentes.
+
+    Genera [bold]temarios/<id>/temario.toml[/], [bold]prompt.md[/] y la carpeta
+    [bold]fuentes/[/]. Después, añade fuentes con [bold]atril fuentes añadir[/].
+    """
+    try:
+        syllabus = operations.create(get_station(ctx), name, syllabus_id)
+    except (AtrilError, ConfigError) as exc:
+        fail(str(exc))
+    success(f"Temario {syllabus.id} creado en {syllabus.root}.")
+    console.print(
+        f"Añade fuentes con: atril fuentes añadir {syllabus.id} <fichero.pdf | url>"
+    )
+
+
 @syllabus_app.command("cobertura")
 def coverage(ctx: typer.Context, syllabus_id: SyllabusId) -> None:
     """Muestra, KB a KB, qué fuentes están en disco y cuándo se comprobaron."""
@@ -149,6 +178,46 @@ def download_sources(
                 results.append(manager.fetch(source, callback))
             manager.registry.save()
     _report(syllabus, results, "Descarga")
+
+
+@sources_app.command("añadir")
+def add_source(
+    ctx: typer.Context,
+    syllabus_id: SyllabusId,
+    origin: Annotated[
+        str,
+        typer.Argument(metavar="ORIGEN", help="Fichero PDF o URL http(s) de un PDF."),
+    ],
+    source_id: Annotated[
+        str | None,
+        typer.Option("--id", help="Id; por defecto, se deduce."),
+    ] = None,
+    title: Annotated[str | None, typer.Option("--titulo", help="Título.")] = None,
+    kb_id: Annotated[
+        str | None,
+        typer.Option("--kb", help="KB, si el temario tiene varias."),
+    ] = None,
+) -> None:
+    """Añade una fuente PDF: copia un fichero local o declara una URL.
+
+    El fichero se copia a [bold]fuentes/<kb>/[/]; una URL se descarga después con
+    [bold]atril fuentes descargar[/]. [bold]temario.toml[/] conserva sus comentarios.
+    """
+    syllabus = get_syllabus(ctx, syllabus_id)
+    try:
+        source = operations.add_source(
+            syllabus, origin, source_id=source_id, title=title, kb_id=kb_id
+        )
+    except AtrilError as exc:
+        fail(str(exc))
+    kb = syllabus.knowledge_bases[0].id if kb_id is None else kb_id
+    findings = [ok(f"Fuente {source.id} añadida a la KB {kb}.")]
+    if source.url:
+        findings.append(
+            info(f"Descárgala con: atril fuentes descargar {syllabus.id} {source.id}")
+        )
+    findings.append(info(f"Para indexarla: atril kb indexar {syllabus.id} {kb}"))
+    show(findings)
 
 
 @sources_app.command("comprobar")

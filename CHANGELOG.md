@@ -5,6 +5,26 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.18.0] - 2026-11-08
+
+Fase 2 de la interfaz gráfica: un alumno puede crear sus temarios sin editar TOML a mano.
+
+### Added
+
+- `atril temario crear <nombre> [--id]`: temario nuevo con `temario.toml`, `prompt.md`,
+  `fuentes/` y una KB que recoge todas sus fuentes.
+- `atril fuentes añadir <temario> <pdf|url> [--id] [--titulo] [--kb]`: copia un PDF local a
+  `fuentes/<kb>/` o declara una URL. Comprueba que el fichero es un PDF, numera ids repetidos y,
+  si la KB no selecciona la fuente, añade su id. `temario.toml` conserva comentarios y orden y se
+  valida antes de sustituirlo.
+- Dependencia `tomlkit`: `tomllib` solo lee y regenerar el fichero borraría los comentarios.
+
+### Changed
+
+- `[ollama]` es opcional en `atril.toml`. Sin ella DeepTutor funciona (con un LLM en la nube) y
+  `arrancar` no busca Ollama; `kb indexar`, `reindexar` y `evaluar` explican que hace falta. Una
+  estación nueva la trae comentada.
+
 ## [0.17.0] - 2026-11-08
 
 Fase 1 de la interfaz gráfica: la lógica se separa de la CLI para que la GUI la reutilice.

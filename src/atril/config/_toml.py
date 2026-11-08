@@ -174,6 +174,10 @@ class Table:
             raise self.error(f"'{key}' debe ser una lista de textos no vacíos.")
         return list(value)
 
+    def has(self, key: str) -> bool:
+        """Indica si la tabla declara ``key``."""
+        return key in self._data
+
     def get_table(self, key: str, *, required: bool = True) -> "Table":
         """Subtabla ``key``; vacía si falta y no es obligatoria."""
         value = self._get(key, dict, _MISSING if required else {})
