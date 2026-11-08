@@ -49,6 +49,7 @@ def _held_elsewhere(station: Station):
     try:
         assert lock.try_lock(fd)
         holder = {"pid": 4242, "operacion": "indexado", "desde": "hoy"}
+        os.lseek(fd, 0, os.SEEK_SET)  # en Windows el bloqueo deja el puntero lejos
         os.write(fd, json.dumps(holder).encode())
         yield
     finally:
