@@ -27,6 +27,7 @@
 ├── pyproject.toml          # Project: deps, build, tools (ruff, ty, pytest, uv, poe)
 ├── README.md               # Minimal project overview
 ├── uv.lock                 # Lockfile, tracked by git
+├── scripts/recursos/       # Dev-only generator of gui/recursos (logo SVG, icons, fonts, card)
 ├── docs/
 │   ├── decisiones.md       # Design decisions (source of truth for scope and phases)
 │   ├── esquemas.md         # atril.toml and temario.toml reference
@@ -35,8 +36,10 @@
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
 │   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus,
 │   │                       #   sources, knowledge, installation)
-│   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), home, syllabi,
-│   │                       #   backups, admin, worker, model, style, desktop, recursos/
+│   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), widgets, style,
+│   │                       #   model, activity, worker, dialogs, desktop and one module per
+│   │                       #   section (home, syllabi, library, services, backups,
+│   │                       #   diagnostics, settings); recursos/ (logo, Lucide icons, Inter)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
@@ -110,8 +113,16 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   (one job at a time, events through a queue drained with `after`). Texts and backgrounds use
   `tk` widgets via `style.label`/`style.card` (sv-ttk's `tk_setPalette` overrides `ttk.Label`
   colors); `style.apply` processes `<<ThemeChanged>>` before building widgets. Buttons, bars and
-  scrollbars stay `ttk`. View logic without Tk lives in `gui/model.py` so it is tested without a
-  display; window tests skip when there is none.
+  scrollbars stay `ttk`. Every `ttk.Style.configure` queues another `<<ThemeChanged>>`, so
+  configure styles only in `style.apply` (it flushes them). Use the named fonts and colors of
+  `style`, Lucide icons via `style.icon` (pre-rendered PNGs; regenerate with
+  `scripts/recursos/generar.py`, never hand-edit) and never rely on color alone (level icons).
+  Glyphs must exist in Inter's latin subset (no ✓, ✗ or arrows). View logic without Tk lives in
+  `gui/model.py` and `gui/activity.py` so it is tested without a display; window tests skip when
+  there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`.
+- GUI deletions never erase user data: a deleted syllabus moves to `temarios/.papelera/`; its KBs
+  are deleted in DeepTutor only with the explicit checkbox. The Ajustes view edits only the keys
+  in `ops.settings.EDITABLE`.
 - Long operations (backup, restore, install, update, `kb indexar`/`reindexar`) hold the station
   lock (`lock.station_lock`, taken inside `ops`): an OS lock (`msvcrt`/`fcntl`) on `.atril.lock`,
   released by the OS if the process dies, reentrant within a process. Never delete the lock file.

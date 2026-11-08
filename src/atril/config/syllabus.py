@@ -335,7 +335,10 @@ def load_syllabi(syllabi_dir: Path) -> tuple[list[Syllabus], list[str]]:
     if not syllabi_dir.is_dir():
         return syllabi, [f"No existe la carpeta de temarios {syllabi_dir}."]
 
-    for folder in sorted(path for path in syllabi_dir.iterdir() if path.is_dir()):
+    folders = (
+        p for p in syllabi_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
+    )
+    for folder in sorted(folders):
         if not (folder / SYLLABUS_FILE).is_file():
             warnings.append(f"{folder.name}: carpeta sin {SYLLABUS_FILE}, se ignora.")
             continue

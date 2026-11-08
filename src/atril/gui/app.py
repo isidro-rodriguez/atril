@@ -1,17 +1,16 @@
 """Ventana principal de atril.
 
-Barra lateral con los apartados (Inicio, Temarios), cabecera, el apartado activo,
-la actividad reciente y la barra de estado. Toda la lógica está en
-:mod:`atril.ops`; aquí solo se presenta y se pregunta. Las operaciones van al
-:class:`~atril.gui.worker.Worker`: una cada vez, sin congelar la ventana.
+Tres zonas: navegación a la izquierda, el apartado en el centro y la actividad
+a la derecha (plegable), con cabecera arriba y barra de estado abajo. Toda la
+lógica está en :mod:`atril.ops`; aquí solo se presenta y se pregunta. Las
+operaciones van al :class:`~atril.gui.worker.Worker`: una cada vez, sin
+congelar la ventana, y cada una queda como un evento de actividad.
 """
 
 import contextlib
 import sys
-import time
 import tkinter as tk
 from collections.abc import Callable
-from importlib import resources
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -22,10 +21,16 @@ from atril.config.station import STATION_FILE, Station, init_station
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError, CancelledError
 from atril.gui import style
-from atril.gui.admin import AdminView
+from atril.gui.activity import ActivityLog, Event
 from atril.gui.backups import BackupsView
+from atril.gui.diagnostics import DiagnosticsView
 from atril.gui.home import HomeView
+from atril.gui.library import LibraryView
+from atril.gui.model import status_word
+from atril.gui.services import ServicesView
+from atril.gui.settings import SettingsView
 from atril.gui.syllabi import SyllabiView
+from atril.gui.widgets import ACTIVITY_WIDTH, ActivityPanel, Header, Sidebar
 from atril.gui.worker import Worker
 from atril.ops import Reporter, service
 from atril.ops.station import persist_station, saved_station
@@ -33,34 +38,57 @@ from atril.ops.station import persist_station, saved_station
 POLL_MS = 100
 """Cada cuánto se reparten los avisos del trabajo en segundo plano."""
 
-TAGLINE = "Aprende. Practica. Avanza."
-"""Lema de la cabecera."""
+NARROW = 1400
+"""Anchura (a 100 %) por debajo de la que el panel de actividad se pliega solo."""
 
-type View = HomeView | SyllabiView | BackupsView | AdminView
+type View = (
+    HomeView
+    | SyllabiView
+    | LibraryView
+    | ServicesView
+    | BackupsView
+    | DiagnosticsView
+    | SettingsView
+)
 """Apartado de la ventana: un marco con ``refresh()``."""
+
+SECTIONS = (
+    ("Inicio", "house"),
+    ("Temarios", "book-open"),
+    ("Biblioteca", "library"),
+    ("Servicios", "server"),
+    ("Copias", "shield-check"),
+    ("Diagnóstico", "stethoscope"),
+    ("Ajustes", "settings"),
+)
+"""Apartados de la navegación, con su icono."""
 
 
 class App(tk.Tk):
     """Ventana principal: navegación, apartados, actividad y barra de estado."""
 
     def __init__(self, station: Station) -> None:
-        """Construye la ventana para ``station`` y lanza la primera comprobación."""
+        """Construye la ventana para ``station`` y muestra Inicio."""
         super().__init__(className="Atril")
         self.station = station
         self.worker = Worker(self)
+        self.activity = ActivityLog(station.activity_file)
+        self._event: Event | None = None
         self._actions: list[ttk.Button] = []
         self._cancels: list[ttk.Button] = []
         self._idle = True
         self._closing = False
+        self._auto_collapsed = False
         self.closed = False
-        self._images = _load_icons(self)
         self.title("Atril")
-        self.iconphoto(True, *self._images.values())
-        self.minsize(980, 640)
-        self.geometry("1180x780")
         style.apply(self)
+        self.iconphoto(True, *(style.logo(self, size) for size in (256, 64, 32)))
+        factor = style.scale(self)
+        self.minsize(round(980 * factor), round(640 * factor))
+        self.geometry(f"{round(1340 * factor)}x{round(820 * factor)}")
         self._build()
         self.protocol("WM_DELETE_WINDOW", self.close)
+        self.bind("<Configure>", self._on_resize, add="+")
         self.after(POLL_MS, self._poll)
         self.show_view("Inicio")
 
@@ -73,19 +101,38 @@ class App(tk.Tk):
         on_done: Callable[[T], None],
         *,
         quiet: bool = False,
+        title: str | None = None,
     ) -> bool:
         """Lanza ``task`` en segundo plano si no hay otra operación en marcha.
 
-        Con ``quiet`` (lecturas al cambiar de apartado) no avisa si está ocupado.
+        Cada operación es un evento de actividad (``title`` o ``text``), salvo
+        las lecturas ``quiet`` (al cambiar de apartado), que solo dejan rastro si
+        fallan y no avisan si la ventana está ocupada.
         """
         if self._closing:
             return False
-        if not self.worker.submit(task, on_done, self._show_error):
+        name = title or text.rstrip(".… ")
+        event = None if quiet else self.activity.start(name)
+
+        def done(result: T) -> None:
+            self._finish(event)
+            on_done(result)
+
+        def failed(exc: Exception) -> None:
+            target = event or self.activity.start(name)
+            self._finish(target, exc)
+            self._show_error(exc)
+
+        if not self.worker.submit(task, done, failed):
+            if event is not None:
+                self.activity.events.remove(event)
             if not quiet:
                 self.log(Level.WARNING, "Espera a que termine la operación en curso.")
             return False
+        self._event = event
         self._set_idle(False)
         self.on_busy(text)
+        self._show_activity()
         return True
 
     def action(self, button: ttk.Button) -> ttk.Button:
@@ -103,25 +150,25 @@ class App(tk.Tk):
         """Pide a la operación en curso que pare en un punto seguro."""
         if self.worker.running:
             self.worker.cancel.set()
-            self.log(Level.INFO, "Cancelando: se para en cuanto sea seguro...")
+            self._status.configure(text="Cancelando: se para en cuanto sea seguro...")
 
     def log(self, level: Level, message: str) -> None:
-        """Añade una línea a la actividad."""
-        self._log.configure(state="normal")
-        self._log.insert("end", time.strftime("%H:%M:%S  "), "time")
-        line = f"{style.LEVEL_SYMBOLS[level]} {message}\n"
-        self._log.insert("end", line, level.value)
-        self._log.see("end")
-        self._log.configure(state="disabled")
+        """Deja un aviso suelto en la actividad (sin operación detrás)."""
+        event = self.activity.start(message)
+        event.finish(level, "")
+        self.activity.save(event)
+        self._show_activity()
+
+    def set_overall(self, level: Level) -> None:
+        """Indicador general de la cabecera."""
+        self._header.set_status(level, status_word(level))
 
     def show_view(self, name: str) -> None:
         """Muestra un apartado y lo actualiza."""
-        for key, (item, view) in self._views.items():
-            selected = key == name
-            item.configure(background=style.SELECTED if selected else style.SIDEBAR)
-            if selected:
-                view.tkraise()
-        self._views[name][1].refresh()
+        self._sidebar.select(name)
+        view = self.views[name]
+        view.tkraise()
+        view.refresh()
 
     def close(self) -> None:
         """Cierra la ventana sin dejar operaciones a medias.
@@ -144,7 +191,6 @@ class App(tk.Tk):
             ):
                 self._closing = True
                 self.worker.cancel.set()
-                self.log(Level.INFO, "Cerrando: esperando a que la operación pare...")
                 self._status.configure(text="Cerrando al terminar la operación...")
             return
         dt = DeepTutor(self.station)
@@ -165,131 +211,73 @@ class App(tk.Tk):
     # --- construcción -----------------------------------------------------------
 
     def _build(self) -> None:
-        """Barra lateral a la izquierda; cabecera, apartado y actividad a la derecha."""
+        """Navegación, cabecera, apartados, actividad y barra de estado."""
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(0, weight=1)
-        content = tk.Frame(self, background=style.PAGE)
-        content.grid(row=0, column=1, sticky="nsew")
-        content.columnconfigure(0, weight=1)
-        content.rowconfigure(1, weight=1)
-        self._build_banner(content).grid(row=0, column=0, sticky="ew")
+        self.rowconfigure(1, weight=1)
+        self._sidebar = Sidebar(self, self.show_view)
+        self._sidebar.grid(row=0, column=0, rowspan=2, sticky="nsw")
+        self._header = Header(self, lambda: self.show_view("Ajustes"))
+        self._header.grid(row=0, column=1, columnspan=2, sticky="ew")
 
-        stack = tk.Frame(content, background=style.PAGE)
-        stack.grid(row=1, column=0, sticky="nsew", padx=20, pady=(16, 12))
+        stack = tk.Frame(self, background=style.PAGE)
+        stack.grid(row=1, column=1, sticky="nsew", padx=(24, 12), pady=20)
         stack.columnconfigure(0, weight=1)
         stack.rowconfigure(0, weight=1)
-        views: list[tuple[str, str, View]] = [
-            ("Inicio", "⌂", HomeView(stack, self)),
-            ("Temarios", "☰", SyllabiView(stack, self)),
-            ("Copias", "⟲", BackupsView(stack, self)),
-            ("Administración", "⚙", AdminView(stack, self)),
-        ]
-        for _, _, view in views:
+        builders = {
+            "Inicio": HomeView,
+            "Temarios": SyllabiView,
+            "Biblioteca": LibraryView,
+            "Servicios": ServicesView,
+            "Copias": BackupsView,
+            "Diagnóstico": DiagnosticsView,
+            "Ajustes": SettingsView,
+        }
+        self.views: dict[str, View] = {}
+        for name, icon in SECTIONS:
+            self._sidebar.add(name, icon)
+            view = builders[name](stack, self)
             view.grid(row=0, column=0, sticky="nsew")
+            self.views[name] = view
 
-        self._build_activity(content).grid(
-            row=2, column=0, sticky="ew", padx=20, pady=(0, 16)
+        self._panel = ActivityPanel(self, lambda: self._show_history())
+        width = round(ACTIVITY_WIDTH * style.scale(self))
+        self._panel.configure(width=width)
+        self._panel.grid(row=1, column=2, sticky="nsew", padx=(0, 24), pady=20)
+        self._panel.grid_propagate(False)
+        self._panel.show(self.activity.events)
+        self._build_statusbar().grid(row=2, column=0, columnspan=3, sticky="ew")
+
+    def _build_statusbar(self) -> tk.Frame:
+        """Operación en curso a la izquierda y versión a la derecha."""
+        bar = tk.Frame(self, background=style.SIDEBAR, padx=16, pady=6)
+        bar.columnconfigure(1, weight=1)
+        self._status = style.label(
+            bar, "Listo", background=style.SIDEBAR, font=style.SMALL
         )
-        self._views = self._build_sidebar(views)
-        self.views = {name: view for name, _, view in views}
-        self._build_statusbar().grid(row=1, column=0, columnspan=2, sticky="ew")
-
-    def _build_sidebar(
-        self, views: list[tuple[str, str, View]]
-    ) -> dict[str, tuple[tk.Label, View]]:
-        """Apartados de la aplicación; devuelve cada uno con su entrada."""
-        bar = tk.Frame(self, background=style.SIDEBAR, width=220, padx=10, pady=16)
-        bar.grid(row=0, column=0, sticky="nsw")
-        bar.grid_propagate(False)
-        bar.columnconfigure(0, weight=1)
-        entries = {}
-        for row, (name, icon, view) in enumerate(views):
-            item = style.label(
-                bar,
-                f"{icon}   {name}",
-                background=style.SIDEBAR,
-                font=style.STRONG,
-                color=style.NAVY,
-                padx=14,
-                pady=8,
-            )
-            item.configure(cursor="hand2")
-            item.grid(row=row, column=0, sticky="ew", pady=2)
-            item.bind("<Button-1>", lambda _, n=name: self.show_view(n))
-            entries[name] = (item, view)
-        bar.rowconfigure(len(views), weight=1)
+        self._status.grid(row=0, column=0, sticky="w")
+        self._bar = ttk.Progressbar(bar, length=180, mode="indeterminate")
+        self._bar.grid(row=0, column=1, sticky="w", padx=12)
+        self._bar.grid_remove()
         style.label(
             bar,
             f"atril {__version__}",
             background=style.SIDEBAR,
-            font=style.CAPTION,
-            color=style.MUTED,
-            padx=8,
-        ).grid(row=len(views) + 1, column=0, sticky="w")
-        return entries
-
-    def _build_banner(self, parent: tk.Misc) -> tk.Frame:
-        """Cabecera con el icono, el nombre y el lema."""
-        banner = tk.Frame(parent, background=style.BANNER, padx=24, pady=14)
-        tk.Label(banner, image=self._images[64], background=style.BANNER).grid(
-            row=0, column=0, rowspan=2, padx=(0, 16)
-        )
-        style.label(
-            banner, "Atril", background=style.BANNER, font=style.TITLE, color=style.NAVY
-        ).grid(row=0, column=1, sticky="sw")
-        style.label(
-            banner,
-            TAGLINE,
-            background=style.BANNER,
-            font=style.SUBTITLE,
-            color=style.BLUE,
-        ).grid(row=1, column=1, sticky="nw")
-        return banner
-
-    def _build_activity(self, parent: tk.Misc) -> tk.Frame:
-        """Registro de lo que va haciendo atril, común a todos los apartados."""
-        frame = style.card(parent, "Actividad")
-        frame.columnconfigure(0, weight=1)
-        self._log = tk.Text(
-            frame,
-            height=6,
-            wrap="word",
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=0,
-            font=style.BODY,
-            background=style.CARD,
-            foreground=style.TEXT,
-            state="disabled",
-        )
-        self._log.grid(row=1, column=0, sticky="nsew")
-        scroll = ttk.Scrollbar(frame, command=self._log.yview)
-        scroll.grid(row=1, column=1, sticky="ns")
-        self._log.configure(yscrollcommand=scroll.set)
-        for level, color in style.LEVEL_COLORS.items():
-            self._log.tag_configure(level.value, foreground=color)
-        self._log.tag_configure("time", foreground=style.MUTED)
-        return frame
-
-    def _build_statusbar(self) -> tk.Frame:
-        """Estado del trabajo en curso y ruta de la estación."""
-        bar = tk.Frame(self, background=style.SIDEBAR, padx=12, pady=4)
-        bar.columnconfigure(1, weight=1)
-        self._status = style.label(
-            bar, "Listo", background=style.SIDEBAR, font=style.CAPTION
-        )
-        self._status.grid(row=0, column=0, sticky="w")
-        self._bar = ttk.Progressbar(bar, length=180, mode="indeterminate")
-        self._bar.grid(row=0, column=1, sticky="e", padx=12)
-        self._bar.grid_remove()
-        style.label(
-            bar,
-            str(self.station.root),
-            background=style.SIDEBAR,
-            font=style.CAPTION,
+            font=style.SMALL,
             color=style.MUTED,
         ).grid(row=0, column=2, sticky="e")
         return bar
+
+    def _on_resize(self, event: tk.Event) -> None:
+        """Pliega la actividad en ventanas estrechas y la recupera al ensanchar."""
+        if event.widget is not self:
+            return
+        narrow = event.width < NARROW * style.scale(self)
+        if narrow and self._panel.expanded:
+            self._panel.toggle()
+            self._auto_collapsed = True
+        elif not narrow and self._auto_collapsed and not self._panel.expanded:
+            self._panel.toggle()
+            self._auto_collapsed = False
 
     # --- avisos del trabajo en segundo plano ------------------------------------
 
@@ -305,9 +293,9 @@ class App(tk.Tk):
         self.after(POLL_MS, self._poll)
 
     def on_show(self, title: str | None, findings: list[Finding]) -> None:
-        """Escribe las comprobaciones en la actividad."""
-        for finding in findings:
-            self.log(finding.level, finding.message)
+        """Las comprobaciones van al detalle de la operación en curso."""
+        if self._event is not None:
+            self._event.add(findings)
 
     def on_busy(self, text: str | None) -> None:
         """Muestra la espera en la barra de estado."""
@@ -317,9 +305,8 @@ class App(tk.Tk):
             self._bar.grid_remove()
             return
         self._status.configure(text=text)
-        if (
-            str(self._bar.cget("mode")) != "indeterminate"
-            or not self._bar.winfo_ismapped()
+        if str(self._bar.cget("mode")) != "indeterminate" or not (
+            self._bar.winfo_ismapped()
         ):
             self._bar.configure(mode="indeterminate")
             self._bar.grid()
@@ -341,21 +328,44 @@ class App(tk.Tk):
 
     # --- auxiliares ---------------------------------------------------------------
 
-    def _show_error(self, exc: Exception) -> None:
-        """Muestra un error en la actividad y, salvo cancelaciones, en un diálogo."""
-        message = str(exc) if isinstance(exc, AtrilError) else repr(exc)
-        message = message[:1].upper() + message[1:]
-        if isinstance(exc, CancelledError) or self._closing:
-            self.log(Level.WARNING, message)
+    def _finish(self, event: Event | None, exc: Exception | None = None) -> None:
+        """Cierra el evento de la operación y lo guarda."""
+        if self._event is event:
+            self._event = None
+        if event is None:
             return
-        self.log(Level.ERROR, message)
+        if isinstance(exc, CancelledError):
+            event.finish(Level.WARNING, _sentence(str(exc)))
+        elif exc is not None:
+            text = str(exc) if isinstance(exc, AtrilError) else repr(exc)
+            event.add([Finding(Level.ERROR, text)])
+            if isinstance(exc, AtrilError):
+                event.detail.extend((Level.INFO.value, line) for line in exc.log)
+            event.finish(Level.ERROR, _sentence(text))
+        else:
+            event.finish()
+        self.activity.save(event)
+        self._show_activity()
+
+    def _show_activity(self) -> None:
+        """Repinta el panel de actividad."""
+        self._panel.show(self.activity.events)
+
+    def _show_history(self) -> None:
+        """«Ver todo»: el historial completo, en Diagnóstico."""
+        self.show_view("Diagnóstico")
+        view = self.views["Diagnóstico"]
+        if isinstance(view, DiagnosticsView):
+            view.show_history()
+
+    def _show_error(self, exc: Exception) -> None:
+        """Muestra un error en un diálogo (las cancelaciones, solo en la actividad)."""
+        if isinstance(exc, CancelledError) or self._closing:
+            return
+        message = _sentence(str(exc) if isinstance(exc, AtrilError) else repr(exc))
         detail = ""
         if isinstance(exc, AtrilError) and exc.log:
-            detail = f"\n\nÚltimas líneas de {exc.log_title}:\n" + "\n".join(
-                exc.log[-10:]
-            )
-            for line in exc.log:
-                self.log(Level.INFO, line)
+            detail = "\n\nEl detalle técnico está en Diagnóstico > Historial."
         messagebox.showerror("Atril", message + detail, parent=self)
 
     def _set_idle(self, idle: bool) -> None:
@@ -372,6 +382,11 @@ class App(tk.Tk):
         self.destroy()
 
 
+def _sentence(text: str) -> str:
+    """Primera letra en mayúscula."""
+    return text[:1].upper() + text[1:]
+
+
 def _stopper(station: Station) -> Callable[[Reporter], None]:
     """Trabajo que para DeepTutor."""
 
@@ -379,17 +394,6 @@ def _stopper(station: Station) -> Callable[[Reporter], None]:
         service.stop(service.installed(station), reporter)
 
     return stop
-
-
-def _load_icons(root: tk.Tk) -> dict[int, tk.PhotoImage]:
-    """Icono de atril en 256, 64 y 32 px (del paquete)."""
-    folder = resources.files("atril.gui") / "recursos"
-    return {
-        size: tk.PhotoImage(
-            master=root, data=(folder / f"icono-{size}.png").read_bytes()
-        )
-        for size in (256, 64, 32)
-    }
 
 
 # --- arranque ----------------------------------------------------------------------
@@ -474,6 +478,7 @@ def _prepare_windows() -> None:
 def run() -> None:
     """Abre la ventana principal (tras la primera ejecución, si hace falta)."""
     _prepare_windows()
+    style.register_fonts()
     station = choose_station()
     if station is None:
         return

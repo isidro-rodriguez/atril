@@ -9,8 +9,10 @@ La estación es la carpeta que contiene ``atril.toml`` y es también el
 """
 
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from acodo.utils import valid_path, valid_url
 
@@ -154,6 +156,11 @@ class Station:
         return self.knowledge_dir / kb_id
 
     @property
+    def activity_file(self) -> Path:
+        """Historial de actividad de la ventana (``atril-gui``)."""
+        return self.data_dir / "atril" / "actividad.jsonl"
+
+    @property
     def logs_dir(self) -> Path:
         """Logs de atril (indexados, evaluaciones); en ``data/``, entra en el backup."""
         return self.data_dir / "atril" / "logs"
@@ -237,7 +244,26 @@ def load_station(root: Path) -> Station:
         ConfigError: Si el fichero falta o no cumple el esquema.
     """
     path = root / STATION_FILE
-    top = Table(load_toml(path), path)
+    return _station(load_toml(path), path, root)
+
+
+def check_station_text(text: str, root: Path) -> Station:
+    """Valida un ``atril.toml`` aún no escrito, como si estuviera en ``root``.
+
+    Raises:
+        ConfigError: Si no es TOML válido o no cumple el esquema.
+    """
+    path = root / STATION_FILE
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"{path}: TOML no válido: {exc}.") from exc
+    return _station(data, path, root)
+
+
+def _station(data: dict[str, Any], path: Path, root: Path) -> Station:
+    """Construye la estación validando cada tabla."""
+    top = Table(data, path)
     station = Station(
         root=root.resolve(),
         deeptutor=_deeptutor(top.get_table("deeptutor")),

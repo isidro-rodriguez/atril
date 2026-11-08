@@ -8,6 +8,7 @@ fichero, y se escribe primero como ``.nuevo``: un error no deja nada a medias.
 import dataclasses
 import shutil
 import tempfile
+import time
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
@@ -15,10 +16,18 @@ import tomlkit
 from acodo.utils import parse_slug, valid_filename, valid_slug
 from tomlkit.items import AoT, Array, Table
 
+from atril import net
+from atril.checks import info
 from atril.config import ConfigError, Syllabus, load_syllabi, load_syllabus
 from atril.config.station import Station
 from atril.config.syllabus import SYLLABUS_FILE, KnowledgeBase, Source
 from atril.errors import AtrilError
+from atril.knowledge import KnowledgeApi
+from atril.lock import station_lock
+from atril.ops import Reporter, service
+
+RESTART_TIMEOUT = 900
+"""Segundos de espera si hay que arrancar DeepTutor para borrar KB."""
 
 PDF_HEADER = b"%PDF-"
 """Cabecera de un PDF válido."""
@@ -274,3 +283,91 @@ def _replace(path: Path, text: str) -> None:
     partial = path.with_name(path.name + ".nuevo")
     partial.write_text(text, encoding="utf-8")
     partial.replace(path)
+
+
+TRASH = ".papelera"
+"""Carpeta (oculta) de ``temarios/`` donde van los temarios eliminados."""
+
+
+def rename(syllabus: Syllabus, name: str) -> Syllabus:
+    """Cambia el nombre visible del temario (``[temario] nombre``); no su id.
+
+    Raises:
+        AtrilError: Si el nombre está vacío o el fichero no se puede escribir.
+    """
+    name = name.strip()
+    if not name:
+        raise AtrilError("el temario necesita un nombre.")
+    path = syllabus.root / SYLLABUS_FILE
+    doc = tomlkit.parse(path.read_text(encoding="utf-8"))
+    head = doc.get("temario")
+    if not isinstance(head, Table):
+        raise AtrilError(f"{path}: falta la tabla [temario].")
+    head["nombre"] = name
+    text = tomlkit.dumps(doc)
+    renamed = _validate(syllabus, text)
+    try:
+        _replace(path, text)
+    except OSError as exc:
+        raise AtrilError(f"no se puede escribir {SYLLABUS_FILE}: {exc}") from exc
+    return renamed
+
+
+def delete(
+    station: Station, syllabus: Syllabus, reporter: Reporter, *, delete_kbs: bool
+) -> Path:
+    """Elimina un temario moviéndolo a ``temarios/.papelera/<id>-<fecha>``.
+
+    Sus KB siguen en DeepTutor salvo ``delete_kbs`` (irreversible): entonces se
+    borran con su API, arrancando DeepTutor si hace falta.
+
+    Returns:
+        Carpeta de la papelera donde ha quedado el temario.
+
+    Raises:
+        AtrilError: Si no se puede mover o DeepTutor rechaza el borrado de una KB.
+    """
+    with station_lock(station, "eliminar temario"):
+        if delete_kbs:
+            dt = service.installed(station)
+            if not dt.ready():
+                service.start(dt, reporter, RESTART_TIMEOUT)
+            api = KnowledgeApi(station)
+            for kb in syllabus.knowledge_bases:
+                try:
+                    api.delete_kb(kb.id)
+                except net.HttpError as exc:
+                    if exc.status != 404:
+                        raise AtrilError(
+                            f"DeepTutor no ha borrado la KB {kb.id}: {exc.detail}"
+                        ) from exc
+                reporter.show([info(f"KB {kb.id} borrada de DeepTutor.")])
+        trash = station.syllabi_dir / TRASH
+        target = trash / f"{syllabus.id}-{time.strftime('%Y%m%d-%H%M%S')}"
+        try:
+            trash.mkdir(exist_ok=True)
+            shutil.move(syllabus.root, target)
+        except OSError as exc:
+            raise AtrilError(f"no se puede mover {syllabus.root}: {exc}") from exc
+        return target
+
+
+def recent(syllabi: list[Syllabus]) -> list[tuple[Syllabus, float]]:
+    """Temarios del más al menos recientemente modificado, con esa fecha.
+
+    Cuenta ``temario.toml``, la carpeta de fuentes y sus registros de descargas e
+    indexado: atril no sabe cuándo se *usa* un temario en DeepTutor.
+    """
+
+    def modified(syllabus: Syllabus) -> float:
+        candidates = (
+            syllabus.root / SYLLABUS_FILE,
+            syllabus.sources_dir,
+            syllabus.sources_dir / "registro.json",
+            syllabus.sources_dir / "indexado.json",
+        )
+        times = [path.stat().st_mtime for path in candidates if path.exists()]
+        return max(times, default=0.0)
+
+    dated = [(syllabus, modified(syllabus)) for syllabus in syllabi]
+    return sorted(dated, key=lambda pair: pair[1], reverse=True)

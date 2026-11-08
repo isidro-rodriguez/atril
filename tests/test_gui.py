@@ -106,7 +106,12 @@ def test_summary_rows_and_overall_level() -> None:
 
 def test_source_rows_and_actions(station_dir) -> None:
     from atril.config import load_station, load_syllabus
-    from atril.gui.model import actions_needed, source_rows
+    from atril.gui.model import (
+        SyllabusData,
+        actions_needed,
+        filter_rows,
+        source_rows,
+    )
     from atril.ops import knowledge as knowledge_ops
 
     station = load_station(station_dir)
@@ -116,10 +121,12 @@ def test_source_rows_and_actions(station_dir) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"%PDF-1.7")
 
-    statuses, _ = knowledge_ops.status(station, syllabus)
-    rows = source_rows(statuses)
+    statuses, pending = knowledge_ops.status(station, syllabus)
+    rows = source_rows([SyllabusData(syllabus, statuses, pending)])
 
     first = next(row for row in rows if row.source_id == syllabus.sources[0].id)
-    assert (first.state, first.level.value) == ("por indexar", "info")
-    assert any(row.state == "sin fichero" for row in rows)
+    assert (first.state, first.level.value) == ("Por indexar", "info")
+    assert first.syllabus_id == syllabus.id
+    assert any(row.state == "Sin fichero" for row in rows)
     assert actions_needed(statuses) == (True, [])
+    assert filter_rows(rows, syllabus_id="otro") == []

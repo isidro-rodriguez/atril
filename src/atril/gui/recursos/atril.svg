@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>Atril</title>
+  <!-- Libro: cantos azul (izquierda) y naranja (derecha) bajo las páginas -->
+  <path d="M8 76 Q36 66 64 80 L64 116 Q36 104 8 112 Z" fill="#2f7fe0"/>
+  <path d="M120 76 Q92 66 64 80 L64 116 Q92 104 120 112 Z" fill="#f5a623"/>
+  <path d="M14 72 Q38 63 64 76 L64 109 Q38 97 14 104 Z" fill="#ffffff" stroke="#c9daf5" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M114 72 Q90 63 64 76 L64 109 Q90 97 114 104 Z" fill="#ffffff" stroke="#c9daf5" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M22 80 Q40 74 56 82 M22 88 Q40 82 56 90 M72 82 Q88 74 106 80 M72 90 Q88 82 106 88" fill="none" stroke="#c9daf5" stroke-width="2" stroke-linecap="round"/>
+  <path d="M64 76 L64 109" stroke="#9fbdea" stroke-width="2"/>
+  <!-- Birrete -->
+  <path d="M38 44 L38 60 Q64 72 90 60 L90 44 Z" fill="#24418f"/>
+  <path d="M64 14 L114 35 L64 56 L14 35 Z" fill="#1b2f6b"/>
+  <path d="M64 35 L104 39 L104 58" fill="none" stroke="#1b2f6b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="100" y="56" width="8" height="10" rx="2" fill="#2f7fe0"/>
+  <circle cx="64" cy="35" r="3.5" fill="#2f7fe0"/>
+</svg>

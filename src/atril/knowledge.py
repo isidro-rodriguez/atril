@@ -437,6 +437,14 @@ class KnowledgeApi:
         reply = net.request_json(f"{self.base}/{kb_id}/files/{quoted}", method="DELETE")
         return bool(reply and reply.get("was_indexed"))
 
+    def delete_kb(self, kb_id: str) -> None:
+        """Borra una KB entera de DeepTutor (documentos, índice y configuración).
+
+        Raises:
+            net.HttpError: Si DeepTutor lo rechaza (404 si no existe).
+        """
+        net.request_json(f"{self.base}/{urllib.parse.quote(kb_id)}", method="DELETE")
+
     def reindex(self, kb_id: str, embedding_model: str) -> dict[str, Any]:
         """Lanza el reindexado completo (rehace chunks y embeddings).
 

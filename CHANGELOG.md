@@ -5,6 +5,41 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.23.0] - 2026-11-08
+
+Rediseño de la ventana (`atril-gui`) para que un alumno sin experiencia en consola la use sola.
+
+### Added
+
+- Navegación lateral con siete apartados: Inicio, Temarios, Biblioteca, Servicios, Copias,
+  Diagnóstico y Ajustes; cabecera con el estado general y panel de actividad plegable (se pliega
+  solo en ventanas estrechas).
+- Inicio: estado general con icono por nivel, última actividad y última copia, accesos rápidos y
+  temarios modificados recientemente.
+- Biblioteca: todas las fuentes de todos los temarios en una tabla, con búsqueda sin tildes y
+  filtro por temario; añadir PDF o URL, descargar lo que falta y buscar versiones nuevas.
+- Temarios: renombrar y eliminar. Eliminar mueve el temario a `temarios/.papelera/` (no se borra);
+  una casilla aparte borra también sus KB en DeepTutor.
+- Servicios: DeepTutor, Ollama y herramientas en lenguaje llano; instalar y actualizar DeepTutor.
+- Diagnóstico: informe técnico copiable (rutas, versiones, herramientas), `doctor`, parches,
+  validar, volver a un commit, abrir registros y el historial completo con el detalle de cada
+  operación.
+- Ajustes: destinos, formato y retención de copias y ritmo del indexado sin editar TOML; se
+  valida antes de guardar y se conservan los comentarios de `atril.toml`.
+- Actividad estructurada: cada operación es un evento con resumen y detalle, guardado en
+  `data/atril/actividad.jsonl` para conservar el historial entre sesiones.
+- Logotipo propio, iconos Lucide (ISC) y fuente Inter (OFL) incluidos en el paquete; Inter se
+  registra solo para atril en Windows.
+
+### Changed
+
+- El apartado Administración se reparte entre Servicios (uso diario) y Diagnóstico (técnico).
+- `load_syllabi` ignora las carpetas ocultas de `temarios/` (la papelera).
+
+### Fixed
+
+- sv-ttk volvía a aplicar su paleta tras configurar estilos y pisaba los fondos de la ventana.
+
 ## [0.22.0] - 2026-11-08
 
 Correcciones de la revisión externa de la 0.21.0, antes del rediseño de la GUI.

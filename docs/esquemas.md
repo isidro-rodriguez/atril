@@ -56,6 +56,17 @@ con su tamaño. Se escribe como `.part`, se verifica contra el inventario y se c
 el resto de destinos. Los enlaces simbólicos y uniones no se copian. Si algún fichero no se pudo
 leer, la copia queda como `atril-…-incompleta.zip`: no se restaura ni cuenta para `conservar`.
 
+La ventana (Ajustes) puede cambiar `[backup] destinos`, `formato` y `conservar`, y `[indexado]
+hilos`, `lote_embedding` y `pausa_embedding`: edita `atril.toml` con `tomlkit` (conserva
+comentarios), valida el resultado entero y solo entonces lo sustituye. Lo demás se edita a mano.
+
+### Ficheros de la ventana
+
+| Ruta (bajo la estación) | Contenido |
+|---|---|
+| `data\atril\actividad.jsonl` | Historial de la ventana: una línea JSON por operación (`title`, `category`, `level`, `summary`, `detail`, `when`, `id`), las 500 últimas. Informativo: las líneas que no se entienden se ignoran |
+| `temarios\.papelera\<id>-<AAAAMMDD-HHMMSS>\` | Temarios eliminados desde la ventana (no se borran; atril ignora las carpetas ocultas) |
+
 ## `temario.toml` (temario)
 
 `atril temario crear <nombre>` genera uno nuevo con una sola KB (mismo id que el temario,

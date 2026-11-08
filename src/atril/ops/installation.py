@@ -209,6 +209,23 @@ def revert_patches(station: Station) -> list[Finding]:
     return findings or [info("Sin parches configurados.")]
 
 
+@dataclass(frozen=True, slots=True)
+class Tool:
+    """Herramienta externa: si está, dónde y si es imprescindible."""
+
+    name: str
+    path: str | None
+    required: bool
+
+
+def tools() -> list[Tool]:
+    """Herramientas que usa atril (git, uv, Node.js...) y si están en el PATH."""
+    return [
+        Tool(name, shutil.which(name), name in install.REQUIRED_TOOLS)
+        for name in (*install.REQUIRED_TOOLS, *install.OPTIONAL_TOOLS)
+    ]
+
+
 def missing_tools() -> list[str]:
     """Herramientas que ``winget`` sabe instalar y no están en el PATH."""
     return [name for name in WINGET_IDS if shutil.which(name) is None]

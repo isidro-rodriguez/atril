@@ -47,8 +47,12 @@ SCRIPT = textwrap.dedent(
     config.write_text(text, encoding="utf-8")
     station = load_station(root)
 
-    from atril import install
-    install.check_tools = lambda: [ok("git: /usr/bin/git")]
+    from atril import ollama
+    from atril.ops import installation as installation_ops
+    from atril.ops.installation import Tool
+
+    installation_ops.tools = lambda: [Tool("git", "/usr/bin/git", True)]
+    ollama.get_status = lambda url, timeout=3.0: ollama.OllamaStatus(False)
     syllabus_ops.create(station, "Física")
     sections = [("DeepTutor", [ok("Instalado."), ok("En marcha: http://x")])]
     service.status = lambda station, reporter: sections
@@ -63,8 +67,9 @@ SCRIPT = textwrap.dedent(
     settle(app)
     home = app.views["Inicio"]
     assert isinstance(home, HomeView)
-    assert "Atril está listo" in str(home._overall.cget("text"))
+    assert str(home._headline.cget("text")) == "Preparado"
     assert home._rows.winfo_children()
+    assert home._recent.winfo_children()  # el temario recién creado
 
     app.show_view("Temarios")
     settle(app)
@@ -78,9 +83,30 @@ SCRIPT = textwrap.dedent(
     copies_view = app.views["Copias"]
     assert len(copies_view._table.get_children()) == 1
 
-    app.show_view("Administración")
+    app.show_view("Biblioteca")
     settle(app)
-    assert app.views["Administración"]._tools.winfo_children()
+    assert app.views["Biblioteca"]._table.get_children() == ()  # temario vacío
+
+    app.show_view("Servicios")
+    settle(app)
+    assert app.views["Servicios"]._tools.winfo_children()
+
+    app.show_view("Diagnóstico")
+    settle(app)
+    report = app.views["Diagnóstico"]._status.get("1.0", "end")
+    assert "Estación:" in report and "git: /usr/bin/git" in report
+    from atril.checks import Level
+
+    app.log(Level.WARNING, "Aviso de prueba")
+    app._show_history()
+    assert app.views["Diagnóstico"]._history.get_children()
+
+    app.show_view("Ajustes")
+    settings = app.views["Ajustes"]
+    settings._keep.set(3)
+    settings.save()
+    assert app.station.backup.keep == 3
+    assert "conservar = 3" in config.read_text(encoding="utf-8")
 
     # Cerrar con una operación en marcha: se cancela y se espera; no se corta.
     import threading
