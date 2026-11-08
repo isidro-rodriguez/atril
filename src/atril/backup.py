@@ -513,7 +513,7 @@ def station_findings(station: Station) -> list[Finding]:
 def latest_finding(latest: Archive | None) -> Finding:
     """Antigüedad de la última copia: aviso si no hay o si tiene más de una semana."""
     if latest is None:
-        return warning("No hay ninguna copia de seguridad: ejecuta atril backup.")
+        return warning("No hay ninguna copia de seguridad: haz un backup.")
     days = age_days(latest)
     text = f"Última copia: {latest.path.name} (hace {days:.0f} días)."
     return warning(text) if days > STALE_DAYS else ok(text)

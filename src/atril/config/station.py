@@ -161,6 +161,16 @@ class Station:
         return self.data_dir / "atril" / "actividad.jsonl"
 
     @property
+    def window_state_file(self) -> Path:
+        """Estado de la ventana (temario activo) para la próxima vez."""
+        return self.data_dir / "atril" / "ventana.json"
+
+    @property
+    def ollama_state_file(self) -> Path:
+        """Ollama arrancado por atril (PID y hora): solo ese se puede parar."""
+        return self.data_dir / "atril" / "ollama.json"
+
+    @property
     def logs_dir(self) -> Path:
         """Logs de atril (indexados, evaluaciones); en ``data/``, entra en el backup."""
         return self.data_dir / "atril" / "logs"

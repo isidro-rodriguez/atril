@@ -5,7 +5,8 @@ No forma parte del paquete. Necesita ``rsvg-convert`` y se ejecuta con::
     uv run --no-project --with fonttools --with brotli --with pillow
         python scripts/recursos/generar.py <lucide/icons> <fontsource/inter/files>
 
-Entradas: ``atril.svg`` (logotipo, fuente maestra), los SVG de Lucide (ISC) y los
+Entradas: ``atril.svg`` (logotipo, fuente maestra), ``marcas/`` (logotipos de las
+herramientas), los SVG de Lucide (ISC) y los
 ``.woff2`` latinos de Inter (OFL) de ``@fontsource/inter``. Salidas, en
 ``src/atril/gui/recursos/``: logotipo en PNG e ``.ico``, iconos recoloreados en
 1x, 1,5x y 2x, fuentes ``.ttf`` con su licencia y la imagen de las tarjetas.
@@ -26,26 +27,23 @@ OUT = HERE.parent.parent / "src" / "atril" / "gui" / "recursos"
 SCALES = (1.0, 1.5, 2.0)
 """Escalas de los PNG: 100 %, 150 % y 200 % de pantalla."""
 
-NAV, SELECTED, ACCENT = "#3d4f6e", "#0f5ec9", "#0f5ec9"
+NAV, SELECTED = "#3d4f6e", "#0f5ec9"
+BRAND = 36
+"""Lado de los logotipos de las herramientas a 100 %."""
 ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     # nombre Lucide: (tamaño base, ((variante, color), ...))
     "house": (22, (("nav", NAV), ("sel", SELECTED))),
-    "book-open": (22, (("nav", NAV), ("sel", SELECTED), ("acc", ACCENT))),
+    "book-open": (22, (("nav", NAV), ("sel", SELECTED))),
     "library": (22, (("nav", NAV), ("sel", SELECTED))),
-    "server": (22, (("nav", NAV), ("sel", SELECTED))),
     "shield-check": (22, (("nav", NAV), ("sel", SELECTED))),
-    "stethoscope": (22, (("nav", NAV), ("sel", SELECTED))),
+    "activity": (22, (("nav", NAV), ("sel", SELECTED))),
     "settings": (22, (("nav", NAV), ("sel", SELECTED))),
-    "circle-plus": (22, (("acc", ACCENT),)),
-    "folder-open": (22, (("acc", ACCENT),)),
-    "wrench": (22, (("acc", ACCENT),)),
+    "bot": (BRAND, (("marca", NAV),)),
     "circle-check": (18, (("ok", "#1a8f3c"),)),
     "info": (18, (("info", "#0f5ec9"),)),
     "triangle-alert": (18, (("aviso", "#d97706"),)),
     "circle-x": (18, (("error", "#c42b1c"),)),
     "loader-circle": (18, (("info", "#0f5ec9"),)),
-    "panel-right-close": (18, (("nav", NAV),)),
-    "panel-right-open": (18, (("nav", NAV),)),
 }
 
 FONTS = {
@@ -66,6 +64,7 @@ def main(lucide: Path, fontsource: Path) -> None:
     (OUT / "fuentes").mkdir(parents=True, exist_ok=True)
     logo()
     icons(lucide)
+    brands()
     fonts(fontsource)
     card()
     shutil.copy(lucide.parent / "LICENSE", OUT / "iconos" / "LICENSE-lucide.txt")
@@ -103,6 +102,40 @@ def icons(lucide: Path) -> None:
                     size = round(base * scale)
                     target = OUT / "iconos" / f"{name}-{variant}-{size}.png"
                     render(svg, size, target)
+
+
+def brands() -> None:
+    """Logotipos de las herramientas (``marcas/``), cuadrados y en cada escala.
+
+    Son marcas de sus dueños y solo identifican cada herramienta (ver
+    ``MARCAS.txt``). Se respetan sus proporciones y colores originales.
+    """
+    target = OUT / "marcas"
+    target.mkdir(exist_ok=True)
+    for old in target.glob("*.png"):
+        old.unlink()
+    with tempfile.TemporaryDirectory() as folder:
+        for source in sorted((HERE / "marcas").glob("*.[ps][nv]g")):
+            if source.suffix == ".svg":
+                image_path = Path(folder) / f"{source.stem}.png"
+                subprocess.run(
+                    ["rsvg-convert", "-h", "512", str(source), "-o", str(image_path)],
+                    check=True,
+                )
+            else:
+                image_path = source
+            image = Image.open(image_path).convert("RGBA")
+            image = image.crop(image.getbbox())
+            for scale in SCALES:
+                size = round(BRAND * scale)
+                fitted = image.copy()
+                fitted.thumbnail((size, size), Image.Resampling.LANCZOS)
+                square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+                square.paste(
+                    fitted, ((size - fitted.width) // 2, (size - fitted.height) // 2)
+                )
+                square.save(target / f"{source.stem}-{size}.png", optimize=True)
+    shutil.copy(HERE / "marcas" / "MARCAS.txt", target / "MARCAS.txt")
 
 
 def fonts(fontsource: Path) -> None:

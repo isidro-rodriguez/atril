@@ -126,7 +126,7 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 | Temarios del alumno | «Crear temario»: id slug a partir del nombre, `prompt.md` de plantilla, una KB `<id>` con `fuentes = ["*"]` y `vinculante = false`. «Añadir fuente»: PDF local (se copia a `fuentes/<carpeta>/`, fuente manual) o URL. Mismos casos de uso en la CLI: `atril temario crear` y `atril fuentes añadir` | Formato de temario paralelo |
 | Escritura de `temario.toml` | `tomlkit`: conserva comentarios y orden (`tomllib` solo lee); se valida con `load_syllabus` antes de guardar y se escribe vía `.nuevo` + renombrado | Regenerar el fichero (borra comentarios) |
 | Ollama | `[ollama]` pasa a ser opcional: sin ella no se indexa (`kb indexar`/`reindexar`/`evaluar` lo dicen claramente) y `arrancar` no lo levanta. El LLM puede ser de la nube, con su clave en los ajustes de DeepTutor (nunca en `atril.toml`) | |
-| Ajustes | La GUI muestra `atril.toml`, lo abre en el editor del sistema y valida al volver | Formulario completo de ajustes |
+| Ajustes | Desde 0.24.0, formulario completo de `atril.toml` en pestañas (ver «Segundo rediseño») | |
 | Bandeja | No: DeepTutor ya corre separado de la ventana; al cerrar se pregunta si pararlo | `pystray` (arrastra Pillow) |
 | Icono | `icon.png` del proyecto reducido a 256/64/32 px en `gui/recursos/` y `.ico` para el instalador | Original de 1,4 MB |
 | Distribución Windows | Instalador Inno Setup **por usuario** (sin administrador), publicado en las releases de GitHub: lleva `uv.exe`, ejecuta `uv tool install atril`, crea accesos directos con icono. Desinstalar quita programa y accesos, nunca la estación, las copias ni `ATRIL_ESTACION` | PyInstaller: no incluye git, Node.js, Ollama ni DeepTutor |
@@ -209,7 +209,29 @@ Referencia visual: «Panel educativo Atril en español» (dirección estética, 
 |---|---|---|
 | A ✅ | Correcciones de la revisión | 0.22.0 |
 | B+C ✅ | Base visual (recursos, componentes, navegación, cabecera, actividad estructurada) y apartados nuevos sin perder funciones; publicadas juntas | 0.23.0 |
+| B+C+ ✅ | Segundo rediseño (abajo) | 0.24.0 |
 | D | Validación de resoluciones y escalado; después, el instalador (en espera) | 1.0.0 |
+
+### Segundo rediseño (decidido el 2026-11-08, 0.24.0)
+
+Sustituye lo anterior donde choque.
+
+| Tema | Decisión |
+|---|---|
+| Ventana | Fija de 1024×700 px lógicos, sin redimensionar ni maximizar; se multiplica por la escala de Windows y se reduce si no cabe en la pantalla |
+| Estructura | Sin cabecera: logotipo y «Atril» en la navegación; pie con el estado de DeepTutor y Ollama, la operación en curso y la versión. Fondo único `#e9eff8`, sin hueco entre navegación y contenido |
+| Navegación | Inicio, Temarios, Biblioteca, Backups, Actividad, Ajustes. Servicios pasa a Inicio; Diagnóstico desaparece (sus herramientas van a Ajustes y el historial a Actividad) |
+| Inicio | Estado general con un botón ancho Arrancar/Parar (Arrancar abre Ollama si hace falta y DeepTutor en el navegador; Parar solo DeepTutor). Herramientas: DeepTutor, Ollama, Git, uv, Node.js y el asistente, cada una con logotipo, estado y una sola acción (Instalar, Arrancar, Parar o una marca de instalada) |
+| Logotipos | Los oficiales de cada herramienta, con sus colores, en `recursos/marcas` (marcas de sus titulares, solo para identificarlas; ver `MARCAS.txt`). El asistente usa un icono genérico |
+| Ollama | Está fuera de la estación: atril solo para el Ollama que abrió (PID y hora de arranque en `data/atril/ollama.json`); uno abierto aparte se muestra en marcha sin botón |
+| Temarios | Desplegable con el temario activo, «Nuevo temario» y «Borrar temario». El temario activo es el mismo en Biblioteca y se recuerda en `data/atril/ventana.json` |
+| Borrar temario | Definitivo: primera confirmación con lo que se pierde (ficheros, tamaño, KB) y «Abrir carpeta» para guardar lo que interese; la segunda exige escribir el nombre. Se borran primero las KB por la API y la carpeta solo si todas se borran. Sustituye a la papelera |
+| Biblioteca | Solo el temario activo (sin columna Temario); sin temarios, tabla desactivada con aviso. «Descargar» y «Actualizar» |
+| Ventanas emergentes | Centradas, sin barra de título y con la ventana oscurecida (velo semitransparente en Windows); todos los mensajes las usan |
+| Tablas | Margen de 1 em en las cabeceras; las celdas se sangran para alinearse con ellas |
+| Textos | Sin comandos ni opciones de la consola; una prueba lo comprueba en todos los módulos salvo `commands/` |
+| Ajustes | Todas las claves de `atril.toml` en pestañas: DeepTutor (asistente, búsqueda), Indexado (Ollama, ritmo), Backups, Avanzado (lo que obliga a reinstalar o reindexar) y Herramientas (instalar o reparar, actualizar, aplicar ajustes, diagnóstico, validar, copiar informe, volver a un commit, registros). Al guardar se dice qué hace falta (`ops.settings.effects`) y se ofrece aplicarlo |
+| Lecturas | Las lecturas de fondo no bloquean botones ni dejan rastro en Actividad; sus errores se muestran en el propio apartado (p. ej., un destino de backups desconectado) |
 
 ## Lecciones de la instalación previa
 

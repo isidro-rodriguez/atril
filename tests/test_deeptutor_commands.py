@@ -30,7 +30,7 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "get_status",
         lambda url: OllamaStatus(True, "0.12.0", ("qwen3-embedding:8b",)),
     )
-    monkeypatch.setattr(ollama, "app_path", lambda: None)
+    monkeypatch.setattr(ollama, "is_installed", lambda: False)
     clock = [0.0]  # reloj simulado: sleep avanza el tiempo sin esperar
 
     def fake_sleep(seconds: float) -> None:

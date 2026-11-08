@@ -293,7 +293,7 @@ def test_add_ignores_stale_run_and_explains_reindex_required(
     result = Indexer(station, env={}).add(kb.id, item, lambda run, t: seen.append(run))
 
     assert not result.ok
-    assert f"atril kb reindexar {kb.id}" in result.detail
+    assert f"reindexa antes la KB {kb.id}" in result.detail
     assert "35263" not in result.detail
     assert seen and all(run is None for run in seen)
 

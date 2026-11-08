@@ -236,9 +236,7 @@ def restore(
             source = manifest.station
             if not same_root(source, station.root) and not other_root:
                 raise OtherRootError(
-                    f"la copia se hizo desde {source or '?'}, no desde "
-                    f"{station.root}; si es lo que quieres, acepta la nueva ruta "
-                    "(--nueva-ruta)."
+                    f"la copia se hizo desde {source or '?'}, no desde {station.root}."
                 )
             try:
                 load_station(plan.staging)

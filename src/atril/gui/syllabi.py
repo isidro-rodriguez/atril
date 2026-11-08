@@ -1,17 +1,26 @@
-"""Apartado Temarios: crear, renombrar y eliminar temarios, y mantener sus KB."""
+"""Apartado Temarios: elegir, crear, renombrar y borrar temarios, e indexar sus KB.
+
+El temario elegido es el mismo en Temarios y Biblioteca y se recuerda para la
+próxima vez (:meth:`atril.gui.app.App.choose_syllabus`).
+"""
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import messagebox, ttk
+from tkinter import ttk
 from typing import TYPE_CHECKING
 
 from atril.checks import ok
 from atril.config import Syllabus
 from atril.gui import style
 from atril.gui.desktop import open_path
-from atril.gui.dialogs import ask_text, confirm_delete
-from atril.gui.library import LibraryView
-from atril.gui.model import SyllabusData, actions_needed, load_all
+from atril.gui.dialogs import ask_text, ask_yes_no, confirm_delete, show_message
+from atril.gui.model import (
+    SyllabusData,
+    actions_needed,
+    choose_syllabus,
+    load_all,
+    size_label,
+)
 from atril.knowledge import PlanState
 from atril.ops import Reporter
 from atril.ops import knowledge as knowledge_ops
@@ -22,49 +31,92 @@ if TYPE_CHECKING:
     from atril.gui.app import App
 
 
+class SyllabusPicker(tk.Frame):
+    """Desplegable de temarios, compartido por Temarios y Biblioteca."""
+
+    def __init__(
+        self, parent: tk.Misc, app: "App", on_change: Callable[[], None]
+    ) -> None:
+        """Construye la etiqueta y el desplegable."""
+        super().__init__(parent, background=style.CARD)
+        self.app = app
+        self._on_change = on_change
+        self._ids: list[str] = []
+        style.label(self, "Temario", font=style.STRONG).grid(
+            row=0, column=0, padx=(0, 10)
+        )
+        self._choice = tk.StringVar(self)
+        self.combo = ttk.Combobox(
+            self, textvariable=self._choice, state="readonly", width=34
+        )
+        self.combo.grid(row=0, column=1)
+        self.combo.bind("<<ComboboxSelected>>", self._changed)
+
+    def fill(self, data: list[SyllabusData]) -> str | None:
+        """Pone los temarios y elige el activo; devuelve su id."""
+        self._ids = [item.syllabus.id for item in data]
+        self.combo.configure(values=[item.syllabus.name for item in data])
+        current = choose_syllabus(self._ids, self.app.syllabus_id)
+        self.app.choose_syllabus(current)
+        self.combo.state(["!disabled"] if data else ["disabled"])
+        if current is None:
+            self._choice.set("Ningún temario")
+        else:
+            self.combo.current(self._ids.index(current))
+        return current
+
+    def _changed(self, _: object) -> None:
+        """El usuario elige otro temario."""
+        index = self.combo.current()
+        if 0 <= index < len(self._ids):
+            self.app.choose_syllabus(self._ids[index])
+            self._on_change()
+
+
 class SyllabiView(tk.Frame):
-    """Lista de temarios y, del elegido, sus KB y acciones."""
+    """Cabecera con el temario elegido y, debajo, sus KB y acciones."""
 
     def __init__(self, parent: tk.Misc, app: "App") -> None:
-        """Construye la lista y el detalle."""
+        """Construye la cabecera y el detalle."""
         super().__init__(parent, background=style.PAGE)
         self.app = app
         self._data: dict[str, SyllabusData] = {}
-        self._current: str | None = None
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(0, weight=1)
-        self._build_list().grid(row=0, column=0, sticky="nsew", padx=(0, 16))
-        self._build_detail().grid(row=0, column=1, sticky="nsew")
+        self._shown: str | None = None
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+        self._build_header().grid(row=0, column=0, sticky="ew", pady=(0, 14))
+        self._build_detail().grid(row=1, column=0, sticky="nsew")
 
     # --- construcción -----------------------------------------------------------
 
-    def _build_list(self) -> tk.Frame | ttk.Frame:
-        """Tarjeta con los temarios y el botón para crear uno."""
-        card = style.card(self, "Temarios")
-        card.rowconfigure(1, weight=1)
-        card.columnconfigure(0, weight=1)
-        self._list = ttk.Treeview(
-            card, columns=("nombre",), show="", selectmode="browse", height=10
-        )
-        self._list.column("nombre", width=round(230 * style.scale(self)))
-        self._list.grid(row=1, column=0, sticky="nsew")
-        self._list.bind("<<TreeviewSelect>>", self._on_select)
+    def _build_header(self) -> ttk.Frame:
+        """Desplegable de temarios y botones para crear y borrar."""
+        card = style.card(self)
+        card.columnconfigure(1, weight=1)
+        self._picker = SyllabusPicker(card, self.app, self._show_detail)
+        self._picker.grid(row=0, column=0, sticky="w")
         self.app.action(
             ttk.Button(
                 card,
-                text="Nuevo temario…",
+                text="Nuevo temario",
                 style="Accent.TButton",
                 command=self.new_syllabus,
             )
-        ).grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        ).grid(row=0, column=2, padx=(0, 8))
+        self._delete = self.app.action(
+            ttk.Button(card, text="Borrar temario", command=self.delete)
+        )
+        self._delete.grid(row=0, column=3)
         return card
 
-    def _build_detail(self) -> tk.Frame | ttk.Frame:
-        """Tarjeta con el temario elegido: KB, pendientes y acciones."""
+    def _build_detail(self) -> ttk.Frame:
+        """Tarjeta del temario: KB, pendientes y acciones."""
         card = style.card(self)
         card.columnconfigure(0, weight=1)
         card.rowconfigure(3, weight=1)
-        self._title = style.label(card, "Elige o crea un temario", font=style.TITLE)
+        self._title = style.label(
+            card, "Crea un temario para empezar", font=style.TITLE
+        )
         self._title.grid(row=0, column=0, sticky="w")
         self._subtitle = style.label(card, "", color=style.MUTED, font=style.SMALL)
         self._subtitle.grid(row=1, column=0, sticky="w", pady=(0, 12))
@@ -72,50 +124,46 @@ class SyllabiView(tk.Frame):
         tools = tk.Frame(card, background=style.CARD)
         tools.grid(row=2, column=0, sticky="w", pady=(0, 12))
         self._buttons: dict[str, ttk.Button] = {}
-        actions: list[tuple[str, Callable[[], None]]] = [
-            ("Indexar", self.index),
-            ("Reindexar", self.reindex),
-            ("Renombrar…", self.rename),
-            ("Eliminar…", self.delete),
-        ]
-        for column, (text, command) in enumerate(actions):
+        for column, (text, command) in enumerate(
+            (
+                ("Indexar", self.index),
+                ("Reindexar", self.reindex),
+                ("Renombrar…", self.rename),
+            )
+        ):
             button = self.app.action(ttk.Button(tools, text=text, command=command))
             button.grid(row=0, column=column, padx=(0, 8))
             self._buttons[text] = button
         self.app.cancel_button(
             ttk.Button(tools, text="Cancelar", command=self.app.cancel)
-        ).grid(row=0, column=len(actions), padx=(0, 8))
+        ).grid(row=0, column=3, padx=(0, 8))
         ttk.Button(tools, text="Abrir carpeta", command=self.open_folder).grid(
-            row=0, column=len(actions) + 1
+            row=0, column=4
         )
 
         columns = ("kb", "fuentes", "indexadas", "pendientes", "deeptutor")
         self._kbs = ttk.Treeview(card, columns=columns, show="headings", height=5)
-        for column, (title, width, anchor) in zip(
+        for column, (title, width, stretch) in zip(
             columns,
             (
-                ("Base de conocimiento", 220, "w"),
-                ("Fuentes", 90, "center"),
-                ("Indexadas", 100, "center"),
-                ("Pendientes", 110, "center"),
-                ("Último indexado", 160, "w"),
+                ("Base de conocimiento", 220, True),
+                ("Fuentes", 90, False),
+                ("Indexadas", 100, False),
+                ("Pendientes", 110, False),
+                ("Último indexado", 150, False),
             ),
             strict=True,
         ):
-            self._kbs.heading(column, text=title, anchor=anchor)
+            self._kbs.heading(column, text=title, anchor="w")
             self._kbs.column(
                 column,
                 width=round(width * style.scale(self)),
-                anchor=anchor,
-                stretch=column == "kb",
+                anchor="w",
+                stretch=stretch,
             )
         self._kbs.grid(row=3, column=0, sticky="nsew")
-        self._pending = style.label(card, "", color=style.MUTED, wraplength=640)
+        self._pending = style.label(card, "", color=style.MUTED, wraplength=700)
         self._pending.grid(row=4, column=0, sticky="ew", pady=(12, 0))
-        more = style.label(card, "Ver sus fuentes en la Biblioteca", color=style.ACCENT)
-        more.configure(cursor="hand2")
-        more.grid(row=5, column=0, sticky="w", pady=(8, 0))
-        more.bind("<Button-1>", lambda _: self._open_library())
         return card
 
     # --- datos ------------------------------------------------------------------
@@ -130,45 +178,30 @@ class SyllabiView(tk.Frame):
             quiet=True,
         )
 
-    def select(self, syllabus_id: str) -> None:
-        """Elige un temario (si aún no está cargado, al cargar)."""
-        self._current = syllabus_id
-        if syllabus_id in self._data:
-            self._list.selection_set(syllabus_id)
-            self._show_detail()
+    def follow_syllabus(self) -> None:
+        """Muestra el temario activo si se eligió en otro apartado."""
+        if self._data and self._shown != self.app.syllabus_id:
+            self._show(list(self._data.values()))
 
     def _show(self, data: list[SyllabusData]) -> None:
-        """Pinta la lista de temarios y mantiene el elegido."""
+        """Rellena el desplegable y el detalle del temario activo."""
         self._data = {item.syllabus.id: item for item in data}
-        self._list.delete(*self._list.get_children())
-        for item in data:
-            self._list.insert(
-                "", "end", iid=item.syllabus.id, values=(item.syllabus.name,)
-            )
-        if self._current not in self._data:
-            self._current = data[0].syllabus.id if data else None
-        if self._current:
-            self._list.selection_set(self._current)
+        self._picker.fill(data)
         self._show_detail()
-
-    def _on_select(self, _: object) -> None:
-        """Cambia el temario elegido."""
-        selected = self._list.selection()
-        if selected and selected[0] != self._current:
-            self._current = selected[0]
-            self._show_detail()
 
     def _show_detail(self) -> None:
         """KB del temario elegido, con sus recuentos y el último indexado."""
         self._kbs.delete(*self._kbs.get_children())
-        data = self._data.get(self._current or "")
+        self._shown = self.app.syllabus_id
+        data = self._data.get(self._shown or "")
+        for button in (*self._buttons.values(), self._delete):
+            button.state(["!disabled"] if data else ["disabled"])
         if data is None:
-            self._title.configure(text="Elige o crea un temario")
-            self._subtitle.configure(text="")
+            self._title.configure(text="Crea un temario para empezar")
+            self._subtitle.configure(text="Pulsa «Nuevo temario».")
             self._pending.configure(text="")
             return
-        syllabus = data.syllabus
-        self._title.configure(text=syllabus.name)
+        self._title.configure(text=data.syllabus.name)
         total = sum(len(status.items) for status in data.statuses)
         self._subtitle.configure(
             text=f"{len(data.statuses)} bases de conocimiento · {total} fuentes"
@@ -180,7 +213,7 @@ class SyllabiView(tk.Frame):
             self._kbs.insert(
                 "",
                 "end",
-                values=(
+                values=style.cells(
                     status.kb.id,
                     len(status.items),
                     status.count(PlanState.INDEXED),
@@ -198,22 +231,22 @@ class SyllabiView(tk.Frame):
 
     def _selected(self) -> SyllabusData | None:
         """Temario elegido; si no hay, lo explica."""
-        data = self._data.get(self._current or "")
+        data = self._data.get(self.app.syllabus_id or "")
         if data is None:
-            messagebox.showinfo("Atril", "Elige antes un temario.", parent=self)
+            show_message(self, "Temarios", "Crea antes un temario.")
         return data
 
     # --- acciones ---------------------------------------------------------------
 
     def new_syllabus(self) -> None:
-        """Crea un temario a partir de su nombre."""
+        """Crea un temario a partir de su nombre y lo deja elegido."""
         name = ask_text(self, "Nuevo temario", "Nombre del temario:")
         if not name:
             return
         station = self.app.station
 
         def created(syllabus: Syllabus) -> None:
-            self._current = syllabus.id
+            self.app.choose_syllabus(syllabus.id)
             self.refresh()
 
         def create(reporter: Reporter) -> Syllabus:
@@ -241,31 +274,33 @@ class SyllabiView(tk.Frame):
         )
 
     def delete(self) -> None:
-        """Mueve el temario a la papelera (y, si se pide, borra sus KB)."""
+        """Borra el temario para siempre, tras dos confirmaciones."""
         data = self._selected()
         if data is None:
             return
         syllabus = data.syllabus
-        kbs = [kb.id for kb in syllabus.knowledge_bases]
-        delete_kbs = confirm_delete(self, syllabus.name, kbs)
-        if delete_kbs is None:
+        found = syllabus_ops.contents(syllabus)
+        kbs = ", ".join(found.knowledge_bases) or "ninguna"
+        summary = (
+            f"{found.files} ficheros ({size_label(found.size)}) y sus bases de "
+            f"conocimiento ({kbs})"
+        )
+        if not confirm_delete(
+            self, syllabus.name, summary, lambda: open_path(syllabus.root)
+        ):
             return
         station = self.app.station
 
         def run(reporter: Reporter) -> None:
-            target = syllabus_ops.delete(
-                station, syllabus, reporter, delete_kbs=delete_kbs
-            )
-            reporter.show(
-                [ok(f"«{syllabus.name}» movido a la papelera ({target.name}).")]
-            )
+            syllabus_ops.delete(station, syllabus, reporter)
+            reporter.show([ok(f"Temario «{syllabus.name}» borrado.")])
 
-        self._current = None
+        self.app.choose_syllabus(None)
         self.app.run(
-            "Eliminando el temario...",
+            "Borrando el temario...",
             run,
             lambda _: self.refresh(),
-            title="Eliminar temario",
+            title="Borrar temario",
         )
 
     def index(self) -> None:
@@ -295,15 +330,16 @@ class SyllabiView(tk.Frame):
             return
         _, stale = actions_needed(data.statuses)
         if not stale:
-            messagebox.showinfo(
-                "Atril", "No hay nada que reindexar en este temario.", parent=self
+            show_message(
+                self, "Reindexar", "No hay nada que reindexar en este temario."
             )
             return
-        if not messagebox.askyesno(
-            "Atril",
+        if not ask_yes_no(
+            self,
+            "Reindexar",
             f"Se reindexará {', '.join(stale)}. Puede tardar y DeepTutor se "
-            "reiniciará si hace falta. ¿Continuar?",
-            parent=self,
+            "reiniciará si hace falta.",
+            "Reindexar",
         ):
             return
         station, cancel = self.app.station, self.app.worker.cancel
@@ -324,12 +360,5 @@ class SyllabiView(tk.Frame):
 
     def open_folder(self) -> None:
         """Abre la carpeta del temario elegido (o la de temarios)."""
-        data = self._data.get(self._current or "")
+        data = self._data.get(self.app.syllabus_id or "")
         open_path(data.syllabus.root if data else self.app.station.syllabi_dir)
-
-    def _open_library(self) -> None:
-        """Muestra la Biblioteca filtrada por este temario."""
-        self.app.show_view("Biblioteca")
-        view = self.app.views["Biblioteca"]
-        if self._current and isinstance(view, LibraryView):
-            view.filter_syllabus(self._current)

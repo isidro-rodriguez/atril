@@ -1,8 +1,10 @@
+import dataclasses
 import threading
 
-from atril.checks import error, info, ok, warning
+from atril.checks import Level, ok, warning
+from atril.config.station import LlmConfig
 from atril.errors import AtrilError
-from atril.gui.model import overall, summarize
+from atril.gui.model import Action, Facts, overall, service_states, tool_cards
 from atril.gui.worker import Worker
 from atril.ops import Reporter
 
@@ -83,25 +85,80 @@ def test_worker_reports_errors_and_runs_one_job_at_a_time() -> None:
     assert not worker.running
 
 
-def test_summary_rows_and_overall_level() -> None:
-    sections = [
-        ("DeepTutor", [ok("Instalado en app."), ok("En marcha: http://x")]),
-        ("Ollama", [info("Sin [ollama]")]),
-        ("Estación y copias", [ok("50 GiB libres"), warning("Copia de hace 9 días")]),
-    ]
-
-    rows = summarize(sections)
-
-    assert [row.message for row in rows] == [
-        "En marcha: http://x",
-        "Sin [ollama]",
-        "Copia de hace 9 días",
-    ]
-    assert overall(rows)[0].value == "aviso"
-    assert overall(summarize([("DeepTutor", [error("No instalado")])]))[0].value == (
-        "error"
+def _facts(**changes: object) -> Facts:
+    """Estación instalada y parada, con todas las herramientas."""
+    base = Facts(
+        deeptutor_installed=True,
+        backend_up=False,
+        frontend_up=False,
+        ollama_installed=True,
+        ollama_running=True,
+        ollama_ours=False,
+        ollama_models=("qwen3:8b",),
+        tools={"git": True, "uv": True, "node": True, "claude": True},
+        llm=LlmConfig("claude_code", "claude-code/opus"),
+        ollama_required=True,
     )
-    assert overall(summarize(sections[:2]))[0].value == "ok"
+    return dataclasses.replace(base, **changes)
+
+
+def test_tool_cards_offer_one_action_each() -> None:
+    cards = {card.key: card for card in tool_cards(_facts())}
+
+    assert [c.key for c in tool_cards(_facts())] == [
+        "deeptutor",
+        "ollama",
+        "git",
+        "uv",
+        "node",
+        "asistente",
+    ]
+    assert cards["deeptutor"].action is Action.START
+    assert cards["ollama"].action is Action.NONE  # abierto aparte: no se para
+    assert cards["git"].action is Action.NONE and cards["git"].level is Level.OK
+    assert cards["asistente"].name == "Claude Code"
+
+    stopped = {
+        c.key: c
+        for c in tool_cards(
+            _facts(
+                backend_up=True,
+                frontend_up=True,
+                ollama_ours=True,
+                tools={"git": False, "uv": True, "node": True, "claude": False},
+            )
+        )
+    }
+    assert stopped["deeptutor"].action is Action.STOP
+    assert stopped["ollama"].action is Action.STOP
+    assert stopped["git"].action is Action.INSTALL
+    assert stopped["asistente"].action is Action.INSTALL
+
+    missing = {
+        c.key: c
+        for c in tool_cards(
+            _facts(
+                deeptutor_installed=False,
+                ollama_installed=False,
+                llm=LlmConfig("ollama", "ollama/llama3:8b"),
+            )
+        )
+    }
+    assert missing["deeptutor"].action is Action.INSTALL
+    assert missing["ollama"].action is Action.INSTALL
+    assert missing["asistente"].action is Action.PULL
+
+
+def test_overall_and_footer_states() -> None:
+    assert overall(_facts())[:2] == (Level.INFO, "Parado")
+    assert overall(_facts(backend_up=True, frontend_up=True))[0] is Level.OK
+    assert overall(_facts(deeptutor_installed=False))[0] is Level.ERROR
+    pending = _facts(pending=[warning("paginas-citas: pendiente")])
+    assert overall(pending)[2] == "Paginas-citas: pendiente."
+    assert service_states(_facts()) == {
+        "DeepTutor": (Level.INFO, "Parado"),
+        "Ollama": (Level.OK, "En marcha"),
+    }
 
 
 def test_source_rows_and_actions(station_dir) -> None:
@@ -122,11 +179,10 @@ def test_source_rows_and_actions(station_dir) -> None:
     path.write_bytes(b"%PDF-1.7")
 
     statuses, pending = knowledge_ops.status(station, syllabus)
-    rows = source_rows([SyllabusData(syllabus, statuses, pending)])
+    rows = source_rows(SyllabusData(syllabus, statuses, pending))
 
     first = next(row for row in rows if row.source_id == syllabus.sources[0].id)
     assert (first.state, first.level.value) == ("Por indexar", "info")
-    assert first.syllabus_id == syllabus.id
     assert any(row.state == "Sin fichero" for row in rows)
     assert actions_needed(statuses) == (True, [])
-    assert filter_rows(rows, syllabus_id="otro") == []
+    assert filter_rows(rows, "no existe") == []

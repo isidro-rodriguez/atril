@@ -2,11 +2,14 @@
 
 Solo se cierran procesos cuya línea de comandos tiene una ruta de la estación
 (:meth:`atril.processes.PortOwner.belongs_to`); los ajenos se señalan y no se tocan.
+Ollama está fuera de la estación: solo se cierra el que abrió atril
+(:func:`ollama_owner`).
 """
 
+import json
 import time
 
-from atril import backup, ollama
+from atril import backup, ollama, processes
 from atril.checks import Finding, error, info, ok, warning
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
@@ -153,7 +156,10 @@ def service_findings(dt: DeepTutor) -> list[Finding]:
         findings.extend(foreign_findings(orphans.foreign))
     if orphans.own and not (backend and frontend):
         findings.append(
-            warning(f"Procesos huérfanos: {pids(orphans.own)} (atril parar).")
+            warning(
+                f"Procesos huérfanos: {pids(orphans.own)}; se cierran al parar "
+                "DeepTutor."
+            )
         )
     return findings
 
@@ -164,7 +170,9 @@ def patch_finding(name: str, state: PatchState) -> Finding:
         case PatchState.APPLIED:
             return ok(f"{name}: aplicado.")
         case PatchState.PENDING:
-            return warning(f"{name}: pendiente (atril parches).")
+            return warning(
+                f"{name}: pendiente; aplica los parches con DeepTutor parado."
+            )
         case PatchState.CHANGED:
             return error(
                 f"{name}: el código de DeepTutor ha cambiado; revisa el parche."
@@ -187,17 +195,72 @@ def ensure_ollama(station: Station, reporter: Reporter) -> list[Finding]:
     if config is None:
         return []
     current = ollama.get_status(config.url)
-    if not current.running and (app := ollama.app_path()):
-        ollama.launch_app(app)
-        deadline = time.monotonic() + OLLAMA_START_TIMEOUT
-        with reporter.busy("Abriendo Ollama..."):
-            while not current.running and time.monotonic() < deadline:
-                time.sleep(2)
-                current = ollama.get_status(config.url)
+    if not current.running and ollama.is_installed():
+        start_ollama(station, reporter)
+        current = ollama.get_status(config.url)
     findings = ollama.check(current, config)
     if not current.running:
         findings.append(warning("Sin Ollama, el RAG no funcionará."))
     return findings
+
+
+def ollama_url(station: Station) -> str:
+    """Dirección de Ollama: la de ``[ollama]`` o la de por defecto."""
+    return station.ollama.url if station.ollama else ollama.DEFAULT_URL
+
+
+def start_ollama(station: Station, reporter: Reporter) -> None:
+    """Abre Ollama, recuerda que lo arrancó atril y espera a que responda.
+
+    Raises:
+        AtrilError: Si no está instalado o no responde a tiempo.
+    """
+    pid = ollama.launch()
+    if pid is None:
+        raise AtrilError("Ollama no está instalado.")
+    started = processes.started_at(pid)
+    state = station.ollama_state_file
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(json.dumps({"pid": pid, "inicio": started}), encoding="utf-8")
+    url = ollama_url(station)
+    deadline = time.monotonic() + OLLAMA_START_TIMEOUT
+    with reporter.busy("Abriendo Ollama..."):
+        while not ollama.get_status(url).running:
+            if time.monotonic() > deadline:
+                raise AtrilError(
+                    f"Ollama no responde tras {OLLAMA_START_TIMEOUT:.0f} s."
+                )
+            time.sleep(1)
+
+
+def ollama_owner(station: Station) -> int | None:
+    """PID del Ollama que arrancó atril, si sigue siendo ese proceso.
+
+    Se compara también la hora de arranque: Windows reutiliza los PID, y un
+    Ollama abierto por el usuario (o por otro programa) nunca se toca.
+    """
+    try:
+        data = json.loads(station.ollama_state_file.read_text(encoding="utf-8"))
+        pid, started = int(data["pid"]), data["inicio"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if started is None or processes.started_at(pid) != started:
+        return None
+    return pid
+
+
+def stop_ollama(station: Station, reporter: Reporter) -> None:
+    """Cierra el Ollama que arrancó atril (y solo ese).
+
+    Raises:
+        AtrilError: Si Ollama no lo arrancó atril.
+    """
+    pid = ollama_owner(station)
+    if pid is None:
+        raise AtrilError("este Ollama no lo abrió atril; ciérralo desde su icono.")
+    with reporter.busy("Cerrando Ollama..."):
+        processes.kill_tree(pid)
+    station.ollama_state_file.unlink(missing_ok=True)
 
 
 def _ollama_findings(station: Station) -> list[Finding]:

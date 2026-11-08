@@ -27,7 +27,8 @@
 ├── pyproject.toml          # Project: deps, build, tools (ruff, ty, pytest, uv, poe)
 ├── README.md               # Minimal project overview
 ├── uv.lock                 # Lockfile, tracked by git
-├── scripts/recursos/       # Dev-only generator of gui/recursos (logo SVG, icons, fonts, card)
+├── scripts/recursos/       # Dev-only generator of gui/recursos (logo SVG, tool logos in
+│                           #   marcas/, icons, fonts, card)
 ├── docs/
 │   ├── decisiones.md       # Design decisions (source of truth for scope and phases)
 │   ├── esquemas.md         # atril.toml and temario.toml reference
@@ -38,8 +39,8 @@
 │   │                       #   sources, knowledge, installation)
 │   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), widgets, style,
 │   │                       #   model, activity, worker, dialogs, desktop and one module per
-│   │                       #   section (home, syllabi, library, services, backups,
-│   │                       #   diagnostics, settings); recursos/ (logo, Lucide icons, Inter)
+│   │                       #   section (home, syllabi, library, backups, history,
+│   │                       #   settings); recursos/ (logo, tool logos, Lucide icons, Inter)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
@@ -120,15 +121,27 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   Glyphs must exist in Inter's latin subset (no ✓, ✗ or arrows). View logic without Tk lives in
   `gui/model.py` and `gui/activity.py` so it is tested without a display; window tests skip when
   there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`.
+- GUI layout: fixed 1024x700 window (logical px, scaled with Windows and reduced if the screen is
+  smaller), not resizable; no header; sidebar with logo and name; footer with service status,
+  current operation and version. Every message or question is a `gui.dialogs.Modal` (centered,
+  no title bar, veil over the window on Windows); `messagebox` only before the window exists
+  (first run). Never name widget attributes like tkinter internals (`_name`, `_root`, `_w`).
+- GUI texts never mention CLI commands or options (`tests/test_textos.py` scans every module
+  except `commands/`): shared `ops` messages say what to do, the CLI adds its own hint.
 - GUI performance (it is a launcher; it must feel instant): switching sections never waits.
   `App.show_view` reloads a view only the first time, after an operation, or past
-  `STATUS_TTL` for the service views; hidden views are `grid_remove`d. Keep `ttk` image elements
-  large (it tiles them) and keep references to named fonts. Never hash or scan files on the Tk
+  `STATUS_TTL` for Inicio; hidden views are `grid_remove`d. Quiet reads (`run(quiet=True)`) do
+  not block buttons nor leave activity events; their errors go to `on_error`. Keep `ttk` image
+  elements large (it tiles them) and keep references to named fonts. Never hash or scan files on the Tk
   thread; `knowledge.file_digest` caches big files. Local HTTP goes through `net.local_url`
   (fast port probe: Windows takes ~2 s per refused loopback address).
-- GUI deletions never erase user data: a deleted syllabus moves to `temarios/.papelera/`; its KBs
-  are deleted in DeepTutor only with the explicit checkbox. The Ajustes view edits only the keys
-  in `ops.settings.EDITABLE`.
+- Deleting a syllabus from the GUI is permanent, after two confirmations (the first lists what is
+  lost and offers to open the folder; the second requires typing its name): `ops.syllabus.delete`
+  deletes its KBs through the API first and the folder only if all succeed. Ajustes edits every
+  key in `ops.settings.EDITABLE` (all of `atril.toml`); delicate ones live in the Avanzado tab,
+  and `ops.settings.effects` says what a change needs (apply, reinstall, reindex).
+- Ollama lives outside the station: atril only stops the Ollama it started, identified by PID and
+  start time in `data/atril/ollama.json` (`ops.service.ollama_owner`).
 - Long operations (backup, restore, install, update, `kb indexar`/`reindexar`) hold the station
   lock (`lock.station_lock`, taken inside `ops`): an OS lock (`msvcrt`/`fcntl`) on `.atril.lock`,
   released by the OS if the process dies, reentrant within a process. Never delete the lock file.

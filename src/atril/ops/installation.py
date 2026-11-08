@@ -157,6 +157,30 @@ def update_deeptutor(
         return result
 
 
+def apply_settings(station: Station, reporter: Reporter) -> None:
+    """Aplica ``atril.toml`` a DeepTutor sin reinstalar (LLM, puertos, parches...).
+
+    Si DeepTutor está en marcha, lo para, aplica y lo vuelve a arrancar.
+
+    Raises:
+        AtrilError: Si DeepTutor no está instalado o un paso falla.
+    """
+    with station_lock(station, "aplicar ajustes"):
+        dt = service.installed(station)
+        was_running = dt.backend_up() or dt.frontend_up()
+        if was_running:
+            service.stop(dt, reporter)
+        installer = Installer(station, dt.env())
+        _step(reporter, "Configuración de DeepTutor", installer.configure)
+        _step(reporter, "Parser y chunks", installer.runtime_settings)
+        patches = apply_patches(station)
+        reporter.show(patches, "Parches")
+        if _has_errors(patches):
+            raise AtrilError("algún parche no encaja; revisa los puntos marcados.")
+        if was_running:
+            service.start(dt, reporter, RESTART_TIMEOUT)
+
+
 def doctor(station: Station, reporter: Reporter) -> list[Finding]:
     """Diagnóstico de DeepTutor (``deeptutor doctor``)."""
     dt = service.installed(station)

@@ -446,7 +446,9 @@ class Installer:
                 self._run([*pip, *DOCLING_PACKAGES], "Docling", cwd=self.app)
                 findings.append(ok("Parser Docling instalado."))
             else:
-                findings.append(warning("Docling sin instalar (--sin-docling)."))
+                findings.append(
+                    warning("Docling sin instalar (se pidió no instalarlo).")
+                )
         return findings
 
     # --- frontend ----------------------------------------------------------

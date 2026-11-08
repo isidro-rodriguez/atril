@@ -1,254 +1,298 @@
-"""Apartado Inicio: estado general, accesos rápidos y temarios recientes."""
+"""Apartado Inicio: estado general con Arrancar/Parar y las herramientas.
 
-import time
+Arrancar abre Ollama (si hace falta para indexar) y DeepTutor, y lo abre en el
+navegador; Parar solo detiene DeepTutor. Cada herramienta tiene una sola acción
+(instalar, arrancar o parar). Ollama solo se para si lo abrió atril.
+"""
+
+import shutil
 import tkinter as tk
 import webbrowser
-from dataclasses import dataclass
+from collections.abc import Callable
 from tkinter import ttk
 from typing import TYPE_CHECKING
 
-from atril import backup
-from atril.config import load_syllabi
+from atril import ollama
+from atril.checks import Level, ok
 from atril.config.station import Station
+from atril.deeptutor import DeepTutor
+from atril.errors import AtrilError
 from atril.gui import style
-from atril.gui.activity import when_label
-from atril.gui.model import Row, ago_label, archive_label, overall, summarize
-from atril.gui.syllabi import SyllabiView
-from atril.gui.widgets import QuickTile
+from atril.gui.dialogs import ask_yes_no
+from atril.gui.model import Action, Facts, ToolCard, overall, tool_cards
+from atril.gui.widgets import ToolTile
+from atril.install import run_command, tool
 from atril.ops import Reporter, service
-from atril.ops import syllabus as syllabus_ops
-from atril.ops.service import Section
+from atril.ops import installation as installation_ops
 
 if TYPE_CHECKING:
     from atril.gui.app import App
 
-RECENT = 4
-"""Temarios recientes que se muestran."""
+CLAUDE_CODE_URL = "https://docs.claude.com/en/docs/claude-code/setup"
+"""Instrucciones oficiales para instalar Claude Code."""
+
+WINGET_TOOLS = {"git": "git", "uv": "uv", "node": "node", "ollama": "ollama"}
+"""Herramientas de Inicio que se instalan con ``winget``."""
 
 
-@dataclass(frozen=True, slots=True)
-class HomeData:
-    """Lo que necesita Inicio, leído en segundo plano."""
-
-    sections: list[Section]
-    last_backup: str | None
-    """Fecha de la última copia completa, ya en texto."""
-    recent: list[tuple[str, str, str]]
-    """Temarios recientes: id, nombre y antigüedad."""
-
-
-def load_home(station: Station, reporter: Reporter) -> HomeData:
-    """Estado de servicios, última copia y temarios recientes."""
-    sections = service.status(station, reporter)
-    stamps = [
-        archive.stamp
-        for folder in station.backup.destinations
-        if backup.is_reachable(folder)
-        for archive in backup.archives(folder)
-    ]
-    last = archive_label(max(stamps)) if stamps else None
-    try:
-        syllabi, _ = load_syllabi(station.syllabi_dir)
-    except Exception:
-        syllabi = []
-    now = time.time()
-    recent = [
-        (syllabus.id, syllabus.name, ago_label(modified, now))
-        for syllabus, modified in syllabus_ops.recent(syllabi)[:RECENT]
-    ]
-    return HomeData(sections, last, recent)
+def load_facts(station: Station) -> Facts:
+    """Estado de DeepTutor, Ollama y herramientas (sondeos rápidos, sin escaneos)."""
+    dt = DeepTutor(station)
+    installed = dt.installed
+    status = ollama.get_status(service.ollama_url(station))
+    return Facts(
+        deeptutor_installed=installed,
+        backend_up=installed and dt.backend_up(),
+        frontend_up=installed and dt.frontend_up(),
+        ollama_installed=ollama.is_installed(),
+        ollama_running=status.running,
+        ollama_ours=status.running and service.ollama_owner(station) is not None,
+        ollama_models=tuple(status.installed),
+        tools={
+            name: shutil.which(name) is not None
+            for name in ("git", "uv", "node", "claude")
+        },
+        llm=station.deeptutor.llm,
+        ollama_required=station.ollama is not None,
+        pending=service.patch_findings(station) if installed else [],
+    )
 
 
 class HomeView(tk.Frame):
-    """Estado general, accesos rápidos y temarios modificados recientemente."""
+    """Estado general con el botón Arrancar/Parar y las seis herramientas."""
 
     def __init__(self, parent: tk.Misc, app: "App") -> None:
-        """Construye las tres tarjetas."""
+        """Construye las dos tarjetas."""
         super().__init__(parent, background=style.PAGE)
         self.app = app
+        self._facts: Facts | None = None
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(2, weight=1)
         self._build_status().grid(row=0, column=0, sticky="ew")
-        self._build_quick().grid(row=1, column=0, sticky="ew", pady=16)
-        self._build_recent().grid(row=2, column=0, sticky="nsew")
+        self._build_tools().grid(row=1, column=0, sticky="ew", pady=(14, 0))
 
-    def _build_status(self) -> tk.Frame | ttk.Frame:
-        """Tarjeta de estado general: icono, titular, servicios y fechas."""
+    def _build_status(self) -> ttk.Frame:
+        """Tarjeta de estado: icono, titular, frase y el botón ancho."""
         card = style.card(self, "Estado general")
         card.columnconfigure(1, weight=1)
         self._icon = tk.Label(card, background=style.CARD)
-        self._icon.grid(row=1, column=0, rowspan=2, sticky="nw", padx=(0, 16))
+        self._icon.grid(row=1, column=0, rowspan=2, sticky="nw", padx=(0, 14))
         self._headline = style.label(card, "Comprobando…", font=style.TITLE)
         self._headline.grid(row=1, column=1, sticky="sw")
-        self._sentence = style.label(card, "", color=style.MUTED)
+        self._sentence = style.label(card, "", color=style.MUTED, wraplength=640)
         self._sentence.grid(row=2, column=1, sticky="nw")
-        self._rows = tk.Frame(card, background=style.CARD)
-        self._rows.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-        self._rows.columnconfigure(2, weight=1)
-
-        side = tk.Frame(card, background=style.CARD)
-        side.grid(row=1, column=2, rowspan=3, sticky="ne", padx=(24, 0))
-        style.label(side, "Última actividad", font=style.SMALL, color=style.MUTED).grid(
-            row=0, column=0, sticky="w"
-        )
-        self._last_activity = style.label(side, "—", font=style.STRONG)
-        self._last_activity.grid(row=1, column=0, sticky="w", pady=(0, 10))
-        style.label(side, "Última copia", font=style.SMALL, color=style.MUTED).grid(
-            row=2, column=0, sticky="w"
-        )
-        self._last_backup = style.label(side, "—", font=style.STRONG)
-        self._last_backup.grid(row=3, column=0, sticky="w")
-        return card
-
-    def _build_quick(self) -> tk.Frame | ttk.Frame:
-        """Accesos rápidos en baldosas."""
-        card = style.card(self, "Accesos rápidos")
-        tiles = (
-            ("book-open-acc", "Estudiar", "Abrir DeepTutor", self.open_deeptutor),
-            ("circle-plus-acc", "Crear", "Nuevo temario", self._new_syllabus),
-            (
-                "folder-open-acc",
-                "Biblioteca",
-                "Consultar materiales",
-                lambda: self.app.show_view("Biblioteca"),
-            ),
-            (
-                "wrench-acc",
-                "Ajustes",
-                "Copias e indexado",
-                lambda: self.app.show_view("Ajustes"),
-            ),
-        )
-        for column, (icon, title, subtitle, command) in enumerate(tiles):
-            card.columnconfigure(column, weight=1, uniform="tiles")
-            tile = QuickTile(card, icon, title, subtitle, command)
-            tile.grid(
-                row=1, column=column, sticky="ew", padx=(0 if column == 0 else 10, 0)
+        buttons = tk.Frame(card, background=style.CARD)
+        buttons.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(16, 0))
+        buttons.columnconfigure(0, weight=1)
+        self._toggle = self.app.action(
+            ttk.Button(
+                buttons, text="Arrancar", style="Accent.TButton", command=self.toggle
             )
+        )
+        self._toggle.grid(row=0, column=0, sticky="ew", ipady=6)
+        self._open = ttk.Button(
+            buttons, text="Abrir en el navegador", command=self.open_browser
+        )
+        self._open.grid(row=0, column=1, sticky="e", padx=(10, 0), ipady=6)
+        self._open.grid_remove()
         return card
 
-    def _build_recent(self) -> tk.Frame | ttk.Frame:
-        """Temarios modificados recientemente."""
-        card = style.card(self)
+    def _build_tools(self) -> ttk.Frame:
+        """Tarjeta de herramientas: baldosas en tres columnas."""
+        card = style.card(self, "Herramientas")
+        grid = tk.Frame(card, background=style.CARD)
+        grid.grid(row=1, column=0, sticky="ew")
         card.columnconfigure(0, weight=1)
-        head = tk.Frame(card, background=style.CARD)
-        head.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        head.columnconfigure(0, weight=1)
-        style.label(head, "Modificados recientemente", font=style.SUBTITLE).grid(
-            row=0, column=0, sticky="w"
-        )
-        more = style.label(head, "Ver todos", font=style.STRONG, color=style.ACCENT)
-        more.configure(cursor="hand2")
-        more.grid(row=0, column=1)
-        more.bind("<Button-1>", lambda _: self.app.show_view("Temarios"))
-        self._recent = tk.Frame(card, background=style.CARD)
-        self._recent.grid(row=1, column=0, sticky="nsew")
-        self._recent.columnconfigure(1, weight=1)
+        self._tiles: list[ToolTile] = []
+        for index in range(6):
+            grid.columnconfigure(index % 3, weight=1, uniform="tools")
+            tile = ToolTile(grid, self.act)
+            tile.grid(
+                row=index // 3,
+                column=index % 3,
+                sticky="nsew",
+                padx=(0 if index % 3 == 0 else 10, 0),
+                pady=(0 if index < 3 else 10, 0),
+            )
+            self.app.action(tile.button)
+            self._tiles.append(tile)
         return card
 
     # --- datos ------------------------------------------------------------------
 
     def refresh(self) -> bool:
-        """Comprueba el estado de la estación en segundo plano."""
+        """Comprueba servicios y herramientas en segundo plano."""
         station = self.app.station
-        started = self.app.run(
-            "Comprobando el estado...",
-            lambda reporter: load_home(station, reporter),
+        return self.app.run(
+            "Comprobando...",
+            lambda reporter: load_facts(station),
             self._show,
             quiet=True,
         )
-        self._show_last_activity()
-        return started
 
-    def shown(self) -> None:
-        """Al volver a Inicio sin releer: solo la última actividad."""
-        self._show_last_activity()
-
-    def _show(self, data: HomeData) -> None:
-        """Pinta estado, fechas y recientes."""
-        rows = summarize(data.sections)
-        level, headline, sentence = overall(rows)
-        self.app.set_overall(level)
-        self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 40))
-        self._headline.configure(text=headline, foreground=style.LEVEL_COLORS[level])
+    def _show(self, facts: Facts) -> None:
+        """Pinta el estado general, el botón y las herramientas."""
+        self._facts = facts
+        self.app.set_facts(facts)
+        level, headline, sentence = overall(facts)
+        self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 36))
+        self._headline.configure(text=headline)
         self._sentence.configure(text=sentence)
-        for widget in self._rows.winfo_children():
-            widget.destroy()
-        for index, row in enumerate(rows):
-            self._status_row(index, row)
-        self._last_backup.configure(text=data.last_backup or "Ninguna todavía")
-        self._show_last_activity()
-        for widget in self._recent.winfo_children():
-            widget.destroy()
-        if not data.recent:
-            style.label(
-                self._recent, "Aún no hay temarios: crea uno.", color=style.MUTED
-            ).grid(row=0, column=0, columnspan=3, sticky="w")
-        for index, (syllabus_id, name, ago) in enumerate(data.recent):
-            self._recent_row(index, syllabus_id, name, ago)
-
-    def _show_last_activity(self) -> None:
-        """Fecha de la última operación terminada."""
-        done = [event for event in self.app.activity.events if not event.running]
-        self._last_activity.configure(text=when_label(done[0].when) if done else "—")
-
-    def _status_row(self, index: int, row: Row) -> None:
-        """Un servicio: icono de nivel, nombre y estado."""
-        tk.Label(
-            self._rows,
-            image=style.icon(self, style.LEVEL_ICONS[row.level], 18),
-            background=style.CARD,
-        ).grid(row=index, column=0, sticky="w", padx=(0, 8), pady=2)
-        style.label(self._rows, row.title, font=style.STRONG).grid(
-            row=index, column=1, sticky="w", padx=(0, 12), pady=2
+        running = facts.backend_up or facts.frontend_up
+        text = "Parar" if running else "Arrancar"
+        if not facts.deeptutor_installed:
+            text = "Instalar DeepTutor"
+        self._toggle.configure(
+            text=text, style="TButton" if running else "Accent.TButton"
         )
-        style.label(self._rows, row.message, wraplength=520).grid(
-            row=index, column=2, sticky="w", pady=2
-        )
-
-    def _recent_row(self, index: int, syllabus_id: str, name: str, ago: str) -> None:
-        """Un temario reciente; al pulsarlo se abre en Temarios."""
-        widgets = (
-            tk.Label(
-                self._recent,
-                image=style.icon(self, "book-open-acc", 18),
-                background=style.CARD,
-            ),
-            style.label(self._recent, name),
-            style.label(self._recent, ago, color=style.MUTED, font=style.SMALL),
-        )
-        for column, widget in enumerate(widgets):
-            widget.configure(cursor="hand2")
-            widget.grid(row=index, column=column, sticky="w", padx=(0, 10), pady=4)
-            widget.bind("<Button-1>", lambda _, s=syllabus_id: self._open(s))
+        if facts.deeptutor_running:
+            self._open.grid()
+        else:
+            self._open.grid_remove()
+        for tile, card in zip(self._tiles, tool_cards(facts), strict=True):
+            tile.show(card)
 
     # --- acciones ---------------------------------------------------------------
 
-    def open_deeptutor(self) -> None:
-        """Arranca DeepTutor si hace falta y lo abre en el navegador."""
+    def toggle(self) -> None:
+        """Arranca (y abre) o para atril según su estado."""
+        facts = self._facts
+        if facts is not None and not facts.deeptutor_installed:
+            self.install_deeptutor()
+        elif facts is not None and (facts.backend_up or facts.frontend_up):
+            self.stop_deeptutor()
+        else:
+            self.start()
+
+    def start(self) -> None:
+        """Abre Ollama si hace falta, arranca DeepTutor y lo abre en el navegador."""
         station = self.app.station
+
+        def run(reporter: Reporter) -> str:
+            url = service.open_url(station, reporter)
+            reporter.show([ok("DeepTutor en marcha.")])
+            return url
 
         def opened(url: str) -> None:
             webbrowser.open(url)
             self.refresh()
 
         self.app.run(
-            "Abriendo DeepTutor (la primera vez tarda unos minutos)...",
-            lambda reporter: service.open_url(station, reporter),
+            "Arrancando (la primera vez tarda unos minutos)...",
+            run,
             opened,
-            title="Abrir DeepTutor",
+            title="Arrancar",
         )
 
-    def _new_syllabus(self) -> None:
-        """Va a Temarios y abre «Nuevo temario»."""
-        self.app.show_view("Temarios")
-        view = self.app.views["Temarios"]
-        if isinstance(view, SyllabiView):
-            view.new_syllabus()
+    def open_browser(self) -> None:
+        """Abre DeepTutor en el navegador."""
+        webbrowser.open(DeepTutor(self.app.station).frontend_url)
 
-    def _open(self, syllabus_id: str) -> None:
-        """Abre un temario en el apartado Temarios."""
-        self.app.show_view("Temarios")
-        view = self.app.views["Temarios"]
-        if isinstance(view, SyllabiView):
-            view.select(syllabus_id)
+    def stop_deeptutor(self) -> None:
+        """Detiene DeepTutor y sus procesos de la estación."""
+        station = self.app.station
+
+        def stop(reporter: Reporter) -> None:
+            service.stop(service.installed(station), reporter)
+            reporter.show([ok("DeepTutor detenido.")])
+
+        self.app.run(
+            "Parando DeepTutor...", stop, lambda _: self.refresh(), title="Parar"
+        )
+
+    def install_deeptutor(self) -> None:
+        """Instala DeepTutor (con Docling si el parser lo usa)."""
+        if not ask_yes_no(
+            self,
+            "Instalar DeepTutor",
+            "Se descargará DeepTutor y sus dependencias (varios GB). Puede tardar "
+            "bastante.",
+            "Instalar",
+        ):
+            return
+        station = self.app.station
+
+        def run(reporter: Reporter) -> None:
+            installation_ops.install_deeptutor(station, reporter)
+            reporter.show([ok("DeepTutor instalado.")])
+
+        self.app.run(
+            "Instalando DeepTutor...",
+            run,
+            lambda _: self.refresh(),
+            title="Instalar DeepTutor",
+        )
+
+    def act(self, card: ToolCard) -> None:
+        """Acción de una baldosa."""
+        match card.key, card.action:
+            case "deeptutor", Action.INSTALL:
+                self.install_deeptutor()
+            case "deeptutor", Action.START:
+                self.start()
+            case "deeptutor", Action.STOP:
+                self.stop_deeptutor()
+            case "ollama", Action.START:
+                self._ollama(
+                    service.start_ollama, "Arrancando Ollama...", "Arrancar Ollama"
+                )
+            case "ollama", Action.STOP:
+                self._ollama(service.stop_ollama, "Parando Ollama...", "Parar Ollama")
+            case "asistente", Action.INSTALL:
+                webbrowser.open(CLAUDE_CODE_URL)
+            case "asistente", Action.PULL:
+                self._pull(card.name)
+            case key, Action.INSTALL if key in WINGET_TOOLS:
+                self._winget(WINGET_TOOLS[key], card.name)
+
+    def _ollama(
+        self, action: Callable[[Station, Reporter], None], text: str, title: str
+    ) -> None:
+        """Arranca o para Ollama."""
+        station = self.app.station
+        self.app.run(
+            text,
+            lambda reporter: action(station, reporter),
+            lambda _: self.refresh(),
+            title=title,
+        )
+
+    def _pull(self, model: str) -> None:
+        """Descarga un modelo de chat de Ollama."""
+
+        def run(reporter: Reporter) -> None:
+            with reporter.busy(f"Descargando {model} (puede tardar)..."):
+                code = run_command([tool("ollama"), "pull", model])
+            if code != 0:
+                raise AtrilError(f"Ollama no ha podido descargar {model}.")
+            reporter.show([ok(f"{model} descargado.")])
+
+        self.app.run(
+            "Descargando el modelo...",
+            run,
+            lambda _: self.refresh(),
+            title="Descargar modelo",
+        )
+
+    def _winget(self, name: str, label: str) -> None:
+        """Instala una herramienta con winget."""
+        if not ask_yes_no(
+            self,
+            f"Instalar {label}",
+            f"Se instalará {label} con winget. Windows puede pedir permiso de "
+            "administrador.",
+            "Instalar",
+        ):
+            return
+
+        def run(reporter: Reporter) -> None:
+            findings = installation_ops.install_tools([name], reporter)
+            reporter.show(findings)
+            if any(f.level is Level.ERROR for f in findings):
+                raise AtrilError(f"no se ha podido instalar {label}.")
+
+        self.app.run(
+            f"Instalando {label}...",
+            run,
+            lambda _: self.refresh(),
+            title=f"Instalar {label}",
+        )

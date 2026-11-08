@@ -1,15 +1,16 @@
-"""Casos de uso para la GUI: renombrar y eliminar temarios, recientes y ajustes."""
+"""Casos de uso para la GUI: renombrar y borrar temarios, ajustes y Ollama."""
 
-import os
 from pathlib import Path
 
 import pytest
 
+from atril import net
 from atril.config import load_station, load_syllabi, load_syllabus
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError
 from atril.knowledge import KnowledgeApi
-from atril.ops import Recorder
+from atril.ollama import OllamaStatus
+from atril.ops import Recorder, service
 from atril.ops import settings as settings_ops
 from atril.ops import syllabus as syllabus_ops
 
@@ -25,44 +26,42 @@ def test_rename_keeps_id_and_comments(station_dir: Path) -> None:
         syllabus_ops.rename(renamed, "  ")
 
 
-def test_delete_moves_to_trash_and_keeps_kbs(station_dir: Path) -> None:
-    station = load_station(station_dir)
-    syllabus = syllabus_ops.create(station, "Física")
-
-    target = syllabus_ops.delete(station, syllabus, Recorder(), delete_kbs=False)
-
-    assert target.parent == station.syllabi_dir / ".papelera"
-    assert (target / "temario.toml").is_file()
-    syllabi, warnings = load_syllabi(station.syllabi_dir)
-    assert [s.id for s in syllabi] == ["normativa"]  # la papelera no es un temario
-    assert not any(".papelera" in w for w in warnings)
-
-
-def test_delete_can_remove_kbs_from_deeptutor(
+def test_delete_removes_folder_and_kbs(
     station_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     station = load_station(station_dir)
     syllabus = syllabus_ops.create(station, "Física")
+    (syllabus.sources_dir / "tema.pdf").write_bytes(b"%PDF-1.7 tema")
+    found = syllabus_ops.contents(syllabus)
+    assert found.files >= 2 and found.knowledge_bases == ("fisica",)
     deleted: list[str] = []
     monkeypatch.setattr(DeepTutor, "installed", property(lambda self: True))
     monkeypatch.setattr(DeepTutor, "ready", lambda self: True)
     monkeypatch.setattr(KnowledgeApi, "delete_kb", lambda self, kb: deleted.append(kb))
 
-    syllabus_ops.delete(station, syllabus, Recorder(), delete_kbs=True)
+    syllabus_ops.delete(station, syllabus, Recorder())
 
     assert deleted == ["fisica"]
+    assert not syllabus.root.exists()
+    syllabi, _ = load_syllabi(station.syllabi_dir)
+    assert [s.id for s in syllabi] == ["normativa"]
 
 
-def test_recent_orders_by_modification(station_dir: Path) -> None:
+def test_delete_keeps_folder_if_a_kb_fails(
+    station_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     station = load_station(station_dir)
-    older = syllabus_ops.create(station, "Antiguo")
-    newer = syllabus_ops.create(station, "Nuevo")
-    for path in (older.root / "temario.toml", older.sources_dir):
-        os.utime(path, (1_000_000, 1_000_000))
+    syllabus = syllabus_ops.create(station, "Física")
+    monkeypatch.setattr(DeepTutor, "installed", property(lambda self: True))
+    monkeypatch.setattr(DeepTutor, "ready", lambda self: True)
 
-    order = [s.id for s, _ in syllabus_ops.recent([older, newer])]
+    def refuse(self: KnowledgeApi, kb: str) -> None:
+        raise net.HttpError(500, "fallo")
 
-    assert order == ["nuevo", "antiguo"]
+    monkeypatch.setattr(KnowledgeApi, "delete_kb", refuse)
+    with pytest.raises(AtrilError, match="no ha borrado"):
+        syllabus_ops.delete(station, syllabus, Recorder())
+    assert syllabus.root.is_dir()
 
 
 def test_settings_update_validates_before_writing(station_dir: Path) -> None:
@@ -78,5 +77,70 @@ def test_settings_update_validates_before_writing(station_dir: Path) -> None:
     with pytest.raises(AtrilError, match="dentro de la estación"):
         settings_ops.update(updated, {"backup": {"destinos": [inside]}})
     with pytest.raises(AtrilError, match="no se cambia"):
-        settings_ops.update(updated, {"deeptutor": {"rama": "main"}})
+        settings_ops.update(updated, {"deeptutor": {"inventada": 1}})
     assert path.read_text(encoding="utf-8") == before
+
+
+def test_settings_edit_nested_tables_and_remove_optional(station_dir: Path) -> None:
+    station = load_station(station_dir)
+    path = station_dir / "atril.toml"
+
+    updated = settings_ops.update(
+        station,
+        {
+            "deeptutor.puertos": {"backend": 8101},
+            "deeptutor.llm": None,
+            "indexado": {"hilos": None},
+        },
+    )
+
+    assert updated.deeptutor.backend_port == 8101
+    assert updated.deeptutor.llm is None
+    text = path.read_text(encoding="utf-8")
+    assert "backend = 8101" in text and "[deeptutor.llm]" not in text
+    assert "# por defecto" in text  # conserva comentarios
+    assert settings_ops.effects(station, updated) == [settings_ops.Effect.APPLY]
+
+    no_ollama = settings_ops.update(updated, {"ollama": None})
+    assert no_ollama.ollama is None
+    with pytest.raises(AtrilError, match="no se puede quitar"):
+        settings_ops.update(no_ollama, {"backup": None})
+
+
+def test_settings_effects(station_dir: Path) -> None:
+    station = load_station(station_dir)
+    effect = settings_ops.Effect
+
+    pace = settings_ops.update(station, {"indexado": {"lote_embedding": 2}})
+    assert settings_ops.effects(station, pace) == []
+    vectors = settings_ops.update(pace, {"ollama": {"dimension": 1024}})
+    assert settings_ops.effects(pace, vectors) == [effect.APPLY, effect.REINDEX]
+    branch = settings_ops.update(vectors, {"deeptutor": {"rama": "main"}})
+    assert settings_ops.effects(vectors, branch) == [effect.REINSTALL]
+
+
+def test_only_the_ollama_started_by_atril_is_stopped(
+    station_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    station = load_station(station_dir)
+    monkeypatch.setattr(service.ollama, "launch", lambda: 4242)
+    monkeypatch.setattr(service.processes, "started_at", lambda pid: 100.0)
+    monkeypatch.setattr(
+        service.ollama, "get_status", lambda url: OllamaStatus(running=True)
+    )
+    killed: list[int] = []
+    monkeypatch.setattr(service.processes, "kill_tree", killed.append)
+
+    service.start_ollama(station, Recorder())
+    assert service.ollama_owner(station) == 4242
+
+    monkeypatch.setattr(service.processes, "started_at", lambda pid: 999.0)
+    assert service.ollama_owner(station) is None  # PID reutilizado: no es el nuestro
+    with pytest.raises(AtrilError, match="no lo abrió atril"):
+        service.stop_ollama(station, Recorder())
+    assert killed == []
+
+    monkeypatch.setattr(service.processes, "started_at", lambda pid: 100.0)
+    service.stop_ollama(station, Recorder())
+    assert killed == [4242]
+    assert service.ollama_owner(station) is None

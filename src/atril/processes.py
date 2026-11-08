@@ -128,6 +128,17 @@ def is_alive(pid: int) -> bool:
     return psutil.pid_exists(pid)
 
 
+def started_at(pid: int) -> float | None:
+    """Momento en que arrancó ``pid`` (``None`` si no existe).
+
+    Junto con el PID identifica un proceso: Windows reutiliza los PID.
+    """
+    try:
+        return psutil.Process(pid).create_time()
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+
+
 def kill_tree(pid: int) -> None:
     """Cierra ``pid`` y todos sus descendientes; ignora los que ya no existen."""
     try:

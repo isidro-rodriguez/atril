@@ -5,6 +5,43 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.24.0] - 2026-11-08
+
+Segundo rediseño de la ventana: más simple, fija y sin rastro de la consola.
+
+### Added
+
+- Inicio con un botón ancho Arrancar/Parar y las herramientas (DeepTutor, Ollama, Git, uv,
+  Node.js y el asistente) con su logotipo, su estado y una sola acción: instalar, arrancar,
+  parar o una marca de instalada.
+- Ollama se puede arrancar desde la ventana y parar solo si lo abrió atril (se recuerda su PID y
+  su hora de arranque): un Ollama abierto aparte nunca se cierra.
+- Temario activo compartido por Temarios y Biblioteca, elegido en un desplegable y recordado
+  para la próxima vez.
+- Ajustes con todas las claves de `atril.toml` en pestañas (DeepTutor, Indexado, Backups y
+  Avanzado para lo delicado). Al guardar se dice qué hace falta (aplicar, reinstalar o
+  reindexar) y se ofrece aplicarlo; nueva acción «Aplicar ajustes» sin reinstalar.
+- Pestaña Herramientas en Ajustes: instalar o reparar, actualizar, volver a un commit,
+  diagnóstico, validar, copiar un informe técnico y abrir registros o `atril.toml`.
+- Apartado Actividad con todas las operaciones y su detalle técnico.
+- Ventanas emergentes propias: centradas, fijas y con la ventana oscurecida.
+
+### Changed
+
+- Ventana fija de 1024×700 (escalada con Windows y reducida si no cabe), sin cabecera: nombre
+  bajo el logotipo y estado de los servicios en el pie. Fondo único y tablas con margen.
+- Borrar un temario es definitivo tras dos confirmaciones (la primera dice qué se pierde y deja
+  abrir la carpeta; la segunda pide escribir el nombre). Sustituye a la papelera.
+- Biblioteca muestra solo el temario activo; «Descargar» y «Actualizar».
+- «Copias» pasa a llamarse «Backups». Servicios pasa a Inicio y Diagnóstico desaparece.
+- Los mensajes compartidos con la ventana ya no citan comandos ni opciones de la consola; una
+  prueba lo vigila.
+
+### Fixed
+
+- Las lecturas de fondo (por ejemplo, un destino de backups desconectado) dejaban errores en la
+  actividad y abrían diálogos al cambiar de apartado; ahora se muestran en el propio apartado.
+
 ## [0.23.1] - 2026-11-08
 
 Rendimiento de la ventana: era inaceptable para un panel de arranque.

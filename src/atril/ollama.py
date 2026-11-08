@@ -8,6 +8,7 @@ Lecciones de la instalación previa que se comprueban aquí:
 """
 
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -19,6 +20,10 @@ from acodo.utils import parse_size
 from atril import net
 from atril.checks import Finding, error, info, ok, warning
 from atril.config.station import OllamaConfig
+from atril.processes import no_window
+
+DEFAULT_URL = "http://localhost:11434"
+"""Dirección de Ollama sin ``[ollama]`` en ``atril.toml``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +199,26 @@ def app_path() -> Path | None:
     return path if path and path.is_file() else None
 
 
-def launch_app(path: Path) -> None:
-    """Abre la aplicación de Ollama sin esperar a que termine."""
-    subprocess.Popen([str(path)], close_fds=True)
+def is_installed() -> bool:
+    """Ollama está instalado (aplicación de escritorio o ``ollama`` en el PATH)."""
+    return app_path() is not None or shutil.which("ollama") is not None
+
+
+def launch() -> int | None:
+    """Abre Ollama sin esperar: la aplicación o, si no hay, ``ollama serve``.
+
+    Returns:
+        PID del proceso lanzado, o ``None`` si Ollama no está instalado.
+    """
+    if app := app_path():
+        return subprocess.Popen([str(app)], close_fds=True).pid
+    if exe := shutil.which("ollama"):
+        return subprocess.Popen(
+            [exe, "serve"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=no_window(),
+        ).pid
+    return None

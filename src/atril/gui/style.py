@@ -18,12 +18,10 @@ import sv_ttk
 
 from atril.checks import Level
 
-PAGE = "#f3f6fb"
-"""Fondo general (gris azulado muy claro)."""
-SIDEBAR = "#e9eff8"
-"""Fondo de la navegación y de la barra inferior."""
-HEADER = "#e4eefc"
-"""Fondo de la cabecera."""
+PAGE = "#e9eff8"
+"""Fondo general, el mismo de la navegación (azul grisáceo muy claro)."""
+SIDEBAR = PAGE
+"""Fondo de la navegación y del pie de ventana."""
 CARD = "#ffffff"
 """Fondo de las tarjetas."""
 BORDER = "#dfe5ee"
@@ -130,7 +128,8 @@ def apply(root: tk.Tk) -> None:
     for widget in ("TButton", "Accent.TButton", "TCheckbutton", "TEntry", "TCombobox"):
         style.configure(widget, font=BODY)
     style.configure("Treeview", font=BODY, rowheight=round(28 * scale(root)))
-    style.configure("Treeview.Heading", font=STRONG)
+    em = round(13 * scale(root))  # 1 em de BODY (10 pt) en píxeles
+    style.configure("Treeview.Heading", font=STRONG, padding=(em, 4))
     # Cada «style configure» programa otro <<ThemeChanged>> y sv-ttk vuelve a
     # aplicar su paleta: se procesa ya, antes de que existan los widgets.
     root.update()
@@ -188,6 +187,21 @@ def _resource(name: str) -> bytes:
     return path.read_bytes()
 
 
+CELL_PAD = "   "
+"""Sangría de las celdas de las tablas, para alinearlas con el margen de 1 em de
+sus cabeceras (``ttk`` no admite margen por celda)."""
+
+
+def cells(*values: object) -> tuple[str, ...]:
+    """Valores de una fila de tabla con la sangría de :data:`CELL_PAD`.
+
+    Examples:
+        >>> cells("Ley 39/2015", 3)
+        ('   Ley 39/2015', '   3')
+    """
+    return tuple(f"{CELL_PAD}{value}" for value in values)
+
+
 _images: dict[tuple[str, int], tk.PhotoImage] = {}
 _sizes: dict[str, list[int]] = {}
 
@@ -209,6 +223,23 @@ def icon(root: tk.Misc, name: str, base: int = 22) -> tk.PhotoImage:
     if key not in _images:
         _images[key] = tk.PhotoImage(
             master=root, data=_resource(f"iconos/{name}-{size}.png")
+        )
+    return _images[key]
+
+
+def brand(root: tk.Misc, name: str, base: int = 36) -> tk.PhotoImage:
+    """Logotipo de una herramienta (``marcas/``) al tamaño más cercano a ``base``."""
+    wanted = base * scale(root)
+    sizes = [
+        int(entry.name.removesuffix(".png").rpartition("-")[2])
+        for entry in (_RESOURCES / "marcas").iterdir()
+        if entry.name.startswith(f"{name}-") and entry.name.endswith(".png")
+    ]
+    size = min(sizes, key=lambda candidate: abs(candidate - wanted))
+    key = (f"marca-{name}", size)
+    if key not in _images:
+        _images[key] = tk.PhotoImage(
+            master=root, data=_resource(f"marcas/{name}-{size}.png")
         )
     return _images[key]
 

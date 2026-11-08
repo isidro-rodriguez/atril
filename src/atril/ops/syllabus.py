@@ -8,7 +8,7 @@ fichero, y se escribe primero como ``.nuevo``: un error no deja nada a medias.
 import dataclasses
 import shutil
 import tempfile
-import time
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
@@ -21,6 +21,7 @@ from atril.checks import info
 from atril.config import ConfigError, Syllabus, load_syllabi, load_syllabus
 from atril.config.station import Station
 from atril.config.syllabus import SYLLABUS_FILE, KnowledgeBase, Source
+from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError
 from atril.knowledge import KnowledgeApi
 from atril.lock import station_lock
@@ -285,10 +286,6 @@ def _replace(path: Path, text: str) -> None:
     partial.replace(path)
 
 
-TRASH = ".papelera"
-"""Carpeta (oculta) de ``temarios/`` donde van los temarios eliminados."""
-
-
 def rename(syllabus: Syllabus, name: str) -> Syllabus:
     """Cambia el nombre visible del temario (``[temario] nombre``); no su id.
 
@@ -313,23 +310,40 @@ def rename(syllabus: Syllabus, name: str) -> Syllabus:
     return renamed
 
 
-def delete(
-    station: Station, syllabus: Syllabus, reporter: Reporter, *, delete_kbs: bool
-) -> Path:
-    """Elimina un temario moviéndolo a ``temarios/.papelera/<id>-<fecha>``.
+@dataclass(frozen=True, slots=True)
+class Contents:
+    """Lo que se pierde al borrar un temario."""
 
-    Sus KB siguen en DeepTutor salvo ``delete_kbs`` (irreversible): entonces se
-    borran con su API, arrancando DeepTutor si hace falta.
+    files: int
+    size: int
+    """Bytes de su carpeta."""
+    knowledge_bases: tuple[str, ...]
 
-    Returns:
-        Carpeta de la papelera donde ha quedado el temario.
+
+def contents(syllabus: Syllabus) -> Contents:
+    """Ficheros, tamaño y KB de un temario (para avisar antes de borrarlo)."""
+    files = [path for path in syllabus.root.rglob("*") if path.is_file()]
+    return Contents(
+        len(files),
+        sum(path.stat().st_size for path in files),
+        tuple(kb.id for kb in syllabus.knowledge_bases),
+    )
+
+
+def delete(station: Station, syllabus: Syllabus, reporter: Reporter) -> None:
+    """Borra un temario para siempre: sus KB en DeepTutor y su carpeta.
+
+    Las KB se borran con la API de DeepTutor (arrancándolo si hace falta); si
+    DeepTutor no está instalado no hay KB que borrar. La carpeta se borra
+    después: si falla una KB, el temario queda intacto.
 
     Raises:
-        AtrilError: Si no se puede mover o DeepTutor rechaza el borrado de una KB.
+        AtrilError: Si DeepTutor rechaza el borrado de una KB o la carpeta no
+            se puede borrar.
     """
-    with station_lock(station, "eliminar temario"):
-        if delete_kbs:
-            dt = service.installed(station)
+    with station_lock(station, "borrar temario"):
+        dt = DeepTutor(station)
+        if dt.installed and syllabus.knowledge_bases:
             if not dt.ready():
                 service.start(dt, reporter, RESTART_TIMEOUT)
             api = KnowledgeApi(station)
@@ -342,32 +356,7 @@ def delete(
                             f"DeepTutor no ha borrado la KB {kb.id}: {exc.detail}"
                         ) from exc
                 reporter.show([info(f"KB {kb.id} borrada de DeepTutor.")])
-        trash = station.syllabi_dir / TRASH
-        target = trash / f"{syllabus.id}-{time.strftime('%Y%m%d-%H%M%S')}"
         try:
-            trash.mkdir(exist_ok=True)
-            shutil.move(syllabus.root, target)
+            shutil.rmtree(syllabus.root)
         except OSError as exc:
-            raise AtrilError(f"no se puede mover {syllabus.root}: {exc}") from exc
-        return target
-
-
-def recent(syllabi: list[Syllabus]) -> list[tuple[Syllabus, float]]:
-    """Temarios del más al menos recientemente modificado, con esa fecha.
-
-    Cuenta ``temario.toml``, la carpeta de fuentes y sus registros de descargas e
-    indexado: atril no sabe cuándo se *usa* un temario en DeepTutor.
-    """
-
-    def modified(syllabus: Syllabus) -> float:
-        candidates = (
-            syllabus.root / SYLLABUS_FILE,
-            syllabus.sources_dir,
-            syllabus.sources_dir / "registro.json",
-            syllabus.sources_dir / "indexado.json",
-        )
-        times = [path.stat().st_mtime for path in candidates if path.exists()]
-        return max(times, default=0.0)
-
-    dated = [(syllabus, modified(syllabus)) for syllabus in syllabi]
-    return sorted(dated, key=lambda pair: pair[1], reverse=True)
+            raise AtrilError(f"no se puede borrar {syllabus.root}: {exc}") from exc

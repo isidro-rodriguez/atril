@@ -25,13 +25,14 @@ SCRIPT = textwrap.dedent(
         print("SIN-PANTALLA", flush=True)
         os._exit(0)
 
-    from atril.checks import Level, ok
+    from atril.checks import Level
     from atril.config import load_station
     from atril.config.station import init_station
+    from atril.gui import app as app_module
     from atril.gui.app import App
     from atril.gui.home import HomeView
+    from atril.gui.library import LibraryView
     from atril.gui.syllabi import SyllabiView
-    from atril.ops import service
     from atril.ops import syllabus as syllabus_ops
 
     root = Path(sys.argv[1])
@@ -48,14 +49,10 @@ SCRIPT = textwrap.dedent(
     station = load_station(root)
 
     from atril import ollama
-    from atril.ops import installation as installation_ops
-    from atril.ops.installation import Tool
 
-    installation_ops.tools = lambda: [Tool("git", "/usr/bin/git", True)]
     ollama.get_status = lambda url, timeout=3.0: ollama.OllamaStatus(False)
     syllabus_ops.create(station, "Física")
-    sections = [("DeepTutor", [ok("Instalado."), ok("En marcha: http://x")])]
-    service.status = lambda station, reporter: sections
+    syllabus_ops.create(station, "Historia")
 
     def settle(app):
         thread = app.worker._thread
@@ -65,63 +62,65 @@ SCRIPT = textwrap.dedent(
 
     app = App(station)
     settle(app)
+    factor = app.tk.call("tk", "scaling") / (96 / 72)
+    assert not app.resizable()[0] and not app.resizable()[1]  # ventana fija
     home = app.views["Inicio"]
     assert isinstance(home, HomeView)
-    assert str(home._headline.cget("text")) == "Preparado"
-    assert home._rows.winfo_children()
-    assert home._recent.winfo_children()  # el temario recién creado
+    assert str(home._headline.cget("text")) == "Necesita atención"  # sin instalar
+    assert str(home._toggle.cget("text")) == "Instalar DeepTutor"
+    assert [t._card.key for t in home._tiles][0] == "deeptutor"
 
     app.show_view("Temarios")
     settle(app)
     syllabi = app.views["Temarios"]
     assert isinstance(syllabi, SyllabiView)
-    assert syllabi._list.get_children() == ("fisica",)
+    assert syllabi._picker.combo.cget("values") == ("Física", "Historia")
     assert "Física" in str(syllabi._title.cget("text"))
 
-    app.show_view("Copias")
+    # El temario elegido se comparte con la Biblioteca y se recuerda.
+    syllabi._picker.combo.current(1)
+    syllabi._picker._changed(None)
+    assert app.syllabus_id == "historia"
+    app.show_view("Biblioteca")
     settle(app)
-    copies_view = app.views["Copias"]
-    assert len(copies_view._table.get_children()) == 1
+    library = app.views["Biblioteca"]
+    assert isinstance(library, LibraryView)
+    assert library._picker.combo.get() == "Historia"
+    assert "historia" in station.window_state_file.read_text(encoding="utf-8")
+
+    app.show_view("Backups")
+    settle(app)
+    backups = app.views["Backups"]
+    assert len(backups._table.get_children()) == 1
 
     # Volver a un apartado ya leído no vuelve a consultar nada.
     calls = []
-    copies_view.refresh = lambda: calls.append(1) or True
+    backups.refresh = lambda: calls.append(1) or True
     app.show_view("Inicio")
-    app.show_view("Copias")
+    app.show_view("Backups")
     assert calls == []
     app.log(Level.INFO, "x")  # no es una operación: no caduca nada
-    app.show_view("Copias")
+    app.show_view("Backups")
     assert calls == []
 
-    app.show_view("Biblioteca")
-    settle(app)
-    assert app.views["Biblioteca"]._table.get_children() == ()  # temario vacío
-
-    app.show_view("Servicios")
-    settle(app)
-    assert app.views["Servicios"]._tools.winfo_children()
-
-    app.show_view("Diagnóstico")
-    settle(app)
-    report = app.views["Diagnóstico"]._status.get("1.0", "end")
-    assert "Estación:" in report and "git: /usr/bin/git" in report
     app.log(Level.WARNING, "Aviso de prueba")
-    app._show_history()
-    assert app.views["Diagnóstico"]._history.get_children()
+    app.show_view("Actividad")
+    assert app.views["Actividad"]._list.get_children()
 
+    # Ajustes: un cambio sencillo se guarda sin preguntar nada más.
     app.show_view("Ajustes")
     settings = app.views["Ajustes"]
-    settings._keep.set(3)
+    settings._vars[("backup", "conservar")].set("3")
     settings.save()
     assert app.station.backup.keep == 3
     assert "conservar = 3" in config.read_text(encoding="utf-8")
+    assert settings.changes() == {}
 
     # Cerrar con una operación en marcha: se cancela y se espera; no se corta.
     import threading
-    from tkinter import messagebox
     from atril.errors import CancelledError
 
-    messagebox.askyesno = lambda *args, **kwargs: True
+    app_module.ask_yes_no = lambda *args, **kwargs: True
     started = threading.Event()
 
     def slow(reporter):

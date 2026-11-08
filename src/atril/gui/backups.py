@@ -1,8 +1,8 @@
-"""Apartado Copias: hacer, comprobar y restaurar copias de seguridad."""
+"""Apartado Backups: hacer, comprobar y restaurar copias de seguridad."""
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import ttk
 from typing import TYPE_CHECKING
 
 from acodo.utils import parse_size
@@ -10,6 +10,7 @@ from acodo.utils import parse_size
 from atril.checks import Level, info, ok, warning
 from atril.gui import style
 from atril.gui.desktop import open_path
+from atril.gui.dialogs import ask_yes_no, show_message
 from atril.gui.model import archive_label
 from atril.ops import Reporter
 from atril.ops import backup as backup_ops
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from atril.gui.app import App
 
 PENDING = "Sin comprobar"
-"""Estado de verificación hasta pulsar «Comprobar copias»."""
+"""Estado de verificación hasta pulsar «Comprobar»."""
 
 
 class BackupsView(tk.Frame):
@@ -34,14 +35,13 @@ class BackupsView(tk.Frame):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        card = style.card(self, "Copias de seguridad")
+        card = style.card(self, "Backups")
         card.grid(row=0, column=0, sticky="nsew")
         card.columnconfigure(0, weight=1)
         card.rowconfigure(3, weight=1)
         style.label(
             card,
-            "Guardan tus temarios, bases de conocimiento y ajustes. Las claves de "
-            "API no viajan: tras restaurar hay que volver a escribirlas en DeepTutor.",
+            "Backups de temarios, bases de conocimientos y ajustes.",
             color=style.MUTED,
             wraplength=760,
         ).grid(row=1, column=0, sticky="w")
@@ -50,8 +50,8 @@ class BackupsView(tk.Frame):
         tools.grid(row=2, column=0, sticky="w", pady=12)
         for column, (text, command, accent) in enumerate(
             (
-                ("Hacer copia ahora", self.create, True),
-                ("Comprobar copias", self.check, False),
+                ("Hacer backup", self.create, True),
+                ("Comprobar", self.check, False),
                 ("Restaurar…", self.restore, False),
             )
         ):
@@ -97,17 +97,32 @@ class BackupsView(tk.Frame):
         scroll = ttk.Scrollbar(table, command=self._table.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self._table.configure(yscrollcommand=scroll.set)
-        self._note = style.label(card, "", color=style.MUTED, font=style.SMALL)
+        self._note = style.label(
+            card,
+            "",
+            color=style.MUTED,
+            font=style.SMALL,
+            wraplength=round(740 * style.scale(self)),
+        )
         self._note.grid(row=4, column=0, sticky="w", pady=(8, 0))
 
     def refresh(self) -> bool:
         """Lista las copias de cada destino (sin verificarlas)."""
         station = self.app.station
         return self.app.run(
-            "Buscando copias...",
+            "Buscando backups...",
             lambda reporter: backup_ops.listing(station, reporter),
             self._show,
             quiet=True,
+            on_error=self._unreachable,
+        )
+
+    def _unreachable(self, exc: Exception) -> None:
+        """Sin destinos accesibles (disco desconectado...): se dice en la tabla."""
+        self._table.delete(*self._table.get_children())
+        self._paths.clear()
+        self._note.configure(
+            text=_sentence(str(exc)), foreground=style.LEVEL_COLORS[Level.WARNING]
         )
 
     def _show(self, reports: list[FolderReport]) -> None:
@@ -117,10 +132,12 @@ class BackupsView(tk.Frame):
         for report in reports:
             folder = report.folder.name or str(report.folder)
             if not report.archives:
-                self._table.insert("", "end", values=("Sin copias", "", folder, ""))
+                self._table.insert(
+                    "", "end", values=style.cells("Sin backups", "", folder, "")
+                )
             for archive in reversed(report.archives):
                 state, level = self._verified.get(archive.path, (PENDING, Level.INFO))
-                values = (
+                values = style.cells(
                     archive_label(archive.stamp),
                     parse_size(archive.size),
                     folder,
@@ -129,8 +146,10 @@ class BackupsView(tk.Frame):
                 item = self._table.insert("", "end", values=values, tags=(level.value,))
                 self._paths[item] = archive.path
         self._note.configure(
-            text="Selecciona una copia para restaurarla; sin selección se usa la "
-            "más reciente."
+            text="Selecciona un backup para restaurarlo; sin selección se usa el "
+            "más reciente. Las claves de API no se guardan: tras restaurar hay que "
+            "volver a escribirlas en DeepTutor.",
+            foreground=style.MUTED,
         )
 
     def create(self) -> None:
@@ -140,14 +159,14 @@ class BackupsView(tk.Frame):
         def run(reporter: Reporter) -> Path:
             created = backup_ops.create(station, reporter, cancel=cancel)
             size = parse_size(created.size)
-            reporter.show([ok(f"Copia completada correctamente ({size}).")])
+            reporter.show([ok(f"Backup completado correctamente ({size}).")])
             return created.archive
 
         def done(archive: Path) -> None:
             self._verified[archive] = ("Verificada", Level.OK)  # se verifica al crear
             self.refresh()
 
-        self.app.run("Haciendo la copia...", run, done, title="Copia de seguridad")
+        self.app.run("Haciendo el backup...", run, done, title="Hacer backup")
 
     def check(self) -> None:
         """Verifica la copia más reciente de cada destino."""
@@ -171,7 +190,7 @@ class BackupsView(tk.Frame):
                     )
             self._show(reports)
 
-        self.app.run("Verificando copias...", run, done, title="Comprobar copias")
+        self.app.run("Verificando backups...", run, done, title="Comprobar backups")
 
     def restore(self) -> None:
         """Restaura la copia elegida (o la más reciente), tras confirmarlo."""
@@ -183,13 +202,20 @@ class BackupsView(tk.Frame):
             lambda reporter: backup_ops.plan_restore(station, reporter, archive),
             self._confirm_restore,
             quiet=True,
+            on_error=lambda exc: show_message(
+                self, "Restaurar", _sentence(str(exc)), Level.WARNING
+            ),
         )
 
     def _confirm_restore(self, plan: RestorePlan, other_root: bool = False) -> None:
         """Pide confirmación y restaura; ofrece aceptar una copia de otra ruta."""
         station = self.app.station
-        if not other_root and not messagebox.askyesno(
-            "Restaurar copia", plan.question(station), icon="warning", parent=self
+        if not other_root and not ask_yes_no(
+            self,
+            "Restaurar backup",
+            plan.question(station),
+            "Restaurar",
+            level=Level.WARNING,
         ):
             return
 
@@ -205,17 +231,19 @@ class BackupsView(tk.Frame):
 
         def done(result: Restored | OtherRootError) -> None:
             if isinstance(result, OtherRootError):
-                if messagebox.askyesno(
-                    "Restaurar copia",
-                    f"{result}\n\n¿Restaurarla de todos modos en esta estación?",
-                    icon="warning",
-                    parent=self,
+                if ask_yes_no(
+                    self,
+                    "Restaurar backup",
+                    f"{_sentence(str(result))} ¿Restaurarlo de todos modos en esta "
+                    "estación?",
+                    "Restaurar",
+                    level=Level.WARNING,
                 ):
                     self._confirm_restore(plan, other_root=True)
                 return
             self.refresh()
 
-        self.app.run("Restaurando...", run, done, title="Restaurar copia")
+        self.app.run("Restaurando...", run, done, title="Restaurar backup")
 
     def open_folder(self) -> None:
         """Abre el primer destino de copias."""
@@ -223,9 +251,14 @@ class BackupsView(tk.Frame):
         if destinations and destinations[0].is_dir():
             open_path(destinations[0])
         else:
-            messagebox.showinfo(
-                "Atril", "El destino de copias no está accesible.", parent=self
+            show_message(
+                self, "Backups", "El destino de los backups no está accesible."
             )
+
+
+def _sentence(text: str) -> str:
+    """Primera letra en mayúscula."""
+    return text[:1].upper() + text[1:]
 
 
 def _restored_findings(result: Restored) -> list:

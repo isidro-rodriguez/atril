@@ -13,6 +13,7 @@ from atril.checks import info, ok, warning
 from atril.commands._common import (
     ask_yes,
     console,
+    fail,
     fail_error,
     get_station,
     reporter,
@@ -108,6 +109,8 @@ def restore(
         if not yes and not ask_yes(plan.question(station)):
             raise typer.Exit(1)
         restored = operations.restore(station, plan, reporter, other_root=other_path)
+    except operations.OtherRootError as exc:
+        fail(f"{exc} Para aceptarla: --nueva-ruta.")
     except AtrilError as exc:
         fail_error(exc)
     findings = [

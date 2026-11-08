@@ -56,16 +56,20 @@ con su tamaño. Se escribe como `.part`, se verifica contra el inventario y se c
 el resto de destinos. Los enlaces simbólicos y uniones no se copian. Si algún fichero no se pudo
 leer, la copia queda como `atril-…-incompleta.zip`: no se restaura ni cuenta para `conservar`.
 
-La ventana (Ajustes) puede cambiar `[backup] destinos`, `formato` y `conservar`, y `[indexado]
-hilos`, `lote_embedding` y `pausa_embedding`: edita `atril.toml` con `tomlkit` (conserva
-comentarios), valida el resultado entero y solo entonces lo sustituye. Lo demás se edita a mano.
+La ventana (Ajustes) puede cambiar todas las claves de `atril.toml`, y quitar `[ollama]` o
+`[deeptutor.llm]`: edita el fichero con `tomlkit` (conserva comentarios), valida el resultado
+entero y solo entonces lo sustituye. Después indica qué hace falta para que el cambio surta
+efecto: aplicarlo a DeepTutor (asistente, búsqueda, puertos, Ollama, parser, parches), reinstalar
+(repositorio, rama, Python, paquetes) o reindexar (modelo o dimensión de embedding, parser,
+fragmento, solape).
 
 ### Ficheros de la ventana
 
 | Ruta (bajo la estación) | Contenido |
 |---|---|
 | `data\atril\actividad.jsonl` | Historial de la ventana: una línea JSON por operación (`title`, `category`, `level`, `summary`, `detail`, `when`, `id`), las 500 últimas. Informativo: las líneas que no se entienden se ignoran |
-| `temarios\.papelera\<id>-<AAAAMMDD-HHMMSS>\` | Temarios eliminados desde la ventana (no se borran; atril ignora las carpetas ocultas) |
+| `data\atril\ventana.json` | Temario activo de la ventana (`{"temario": "<id>"}`), compartido por Temarios y Biblioteca |
+| `data\atril\ollama.json` | Ollama abierto por atril (`pid` e `inicio`): solo ese se puede parar desde la ventana |
 
 ## `temario.toml` (temario)
 

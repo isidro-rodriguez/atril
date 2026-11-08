@@ -431,7 +431,7 @@ def _failure(
     if REINDEX_REQUIRED in output:
         return (
             "la KB no tiene un índice listo porque un indexado anterior quedó a "
-            f"medias; ejecuta antes atril kb reindexar {kb_id}"
+            f"medias; reindexa antes la KB {kb_id}"
         )
     if run is not None and run.error:
         return run.error
