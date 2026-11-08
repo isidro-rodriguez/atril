@@ -150,7 +150,7 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 | 1 ✅ | `ops/` para servicio (arrancar, parar, estado) y copias; `AtrilError`; bloqueo de estación; `CREATE_NO_WINDOW`. La CLI pasa a usar `ops` sin cambios visibles | 0.17.0 |
 | 2 ✅ | Temarios del alumno en la CLI: `[ollama]` opcional, `temario crear`, `fuentes añadir` (`tomlkit`, `ops.syllabus`). Los `ops` de descarga e indexado pasan a la fase 4, cuando la GUI los use | 0.18.0 |
 | 3 ✅ | GUI mínima: primera ejecución, Inicio, abrir y parar DeepTutor, `atril-gui`. Se prueba con el alumno | 0.19.0 |
-| 4 | `ops` de descarga, comprobación e indexado; GUI de Temarios (crear, añadir fuentes, descargar, comprobar, indexar con progreso y cancelación) | 0.20.0 |
+| 4 ✅ | `ops` de descarga, comprobación, indexado y reindexado; GUI de Temarios (crear, añadir PDF o URL, descargar, buscar versiones, indexar y reindexar con avance y cancelación) | 0.20.0 |
 | 5 | GUI de Copias y Administración (instalar DeepTutor con comprobación de dependencias, actualizar, parches, validar, doctor) | 0.21.0 |
 | 6 | Instalador Inno Setup en las releases (job `windows-latest`), guía del alumno | 1.0.0 |
 

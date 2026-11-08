@@ -1,15 +1,15 @@
 """Ventana principal de atril.
 
-Pantalla de inicio: estado real de la estación (DeepTutor, Ollama, copias), abrir
-DeepTutor en el navegador, pararlo y la actividad reciente. Toda la lógica está en
-:mod:`atril.ops`; aquí solo se presenta y se pregunta.
+Barra lateral con los apartados (Inicio, Temarios), cabecera, el apartado activo,
+la actividad reciente y la barra de estado. Toda la lógica está en
+:mod:`atril.ops`; aquí solo se presenta y se pregunta. Las operaciones van al
+:class:`~atril.gui.worker.Worker`: una cada vez, sin congelar la ventana.
 """
 
 import contextlib
 import sys
 import time
 import tkinter as tk
-import webbrowser
 from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
@@ -20,12 +20,12 @@ from atril.checks import Finding, Level
 from atril.config import ConfigError, load_station
 from atril.config.station import STATION_FILE, Station, init_station
 from atril.deeptutor import DeepTutor
-from atril.errors import AtrilError
+from atril.errors import AtrilError, CancelledError
 from atril.gui import style
-from atril.gui.model import Row, overall, summarize
+from atril.gui.home import HomeView
+from atril.gui.syllabi import SyllabiView
 from atril.gui.worker import Worker
 from atril.ops import Reporter, service
-from atril.ops.service import Section
 from atril.ops.station import persist_station, saved_station
 
 POLL_MS = 100
@@ -34,59 +34,167 @@ POLL_MS = 100
 TAGLINE = "Aprende. Practica. Avanza."
 """Lema de la cabecera."""
 
+type View = HomeView | SyllabiView
+"""Apartado de la ventana: un marco con ``refresh()``."""
+
 
 class App(tk.Tk):
-    """Ventana principal: barra lateral, cabecera, inicio y barra de estado."""
+    """Ventana principal: navegación, apartados, actividad y barra de estado."""
 
     def __init__(self, station: Station) -> None:
         """Construye la ventana para ``station`` y lanza la primera comprobación."""
         super().__init__(className="Atril")
         self.station = station
         self.worker = Worker(self)
+        self._actions: list[ttk.Button] = []
+        self._cancels: list[ttk.Button] = []
+        self._idle = True
         self._images = _load_icons(self)
         self.title("Atril")
         self.iconphoto(True, *self._images.values())
-        self.minsize(900, 600)
-        self.geometry("1120x720")
+        self.minsize(980, 640)
+        self.geometry("1180x780")
         style.apply(self)
         self._build()
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.after(POLL_MS, self._poll)
-        self.refresh()
+        self.show_view("Inicio")
 
-    # --- construcción -----------------------------------------------------
+    # --- servicios para los apartados -----------------------------------------
+
+    def run[T](
+        self,
+        text: str,
+        task: Callable[[Reporter], T],
+        on_done: Callable[[T], None],
+        *,
+        quiet: bool = False,
+    ) -> bool:
+        """Lanza ``task`` en segundo plano si no hay otra operación en marcha.
+
+        Con ``quiet`` (lecturas al cambiar de apartado) no avisa si está ocupado.
+        """
+        if not self.worker.submit(task, on_done, self._show_error):
+            if not quiet:
+                self.log(Level.WARNING, "Espera a que termine la operación en curso.")
+            return False
+        self._set_idle(False)
+        self.on_busy(text)
+        return True
+
+    def action(self, button: ttk.Button) -> ttk.Button:
+        """Registra un botón que se desactiva mientras hay una operación."""
+        self._actions.append(button)
+        return button
+
+    def cancel_button(self, button: ttk.Button) -> ttk.Button:
+        """Registra un botón que solo se activa mientras hay una operación."""
+        self._cancels.append(button)
+        button.state(["disabled"])
+        return button
+
+    def cancel(self) -> None:
+        """Pide a la operación en curso que pare en un punto seguro."""
+        if self.worker.running:
+            self.worker.cancel.set()
+            self.log(Level.INFO, "Cancelando: se para en cuanto sea seguro...")
+
+    def log(self, level: Level, message: str) -> None:
+        """Añade una línea a la actividad."""
+        self._log.configure(state="normal")
+        self._log.insert("end", time.strftime("%H:%M:%S  "), "time")
+        line = f"{style.LEVEL_SYMBOLS[level]} {message}\n"
+        self._log.insert("end", line, level.value)
+        self._log.see("end")
+        self._log.configure(state="disabled")
+
+    def show_view(self, name: str) -> None:
+        """Muestra un apartado y lo actualiza."""
+        for key, (item, view) in self._views.items():
+            selected = key == name
+            item.configure(background=style.SELECTED if selected else style.SIDEBAR)
+            if selected:
+                view.tkraise()
+        self._views[name][1].refresh()
+
+    def close(self) -> None:
+        """Cierra la ventana; si DeepTutor está en marcha, pregunta si pararlo."""
+        if self.worker.running and not messagebox.askyesno(
+            "Atril",
+            "Hay una operación en curso. Si sales ahora quedará a medias. ¿Salir?",
+            icon="warning",
+            parent=self,
+        ):
+            return
+        dt = DeepTutor(self.station)
+        if not self.worker.running and dt.installed and dt.backend_up():
+            answer = messagebox.askyesnocancel(
+                "Atril",
+                "DeepTutor sigue en marcha. ¿Pararlo antes de salir?\n\n"
+                "Si no lo paras, podrás seguir usándolo en el navegador.",
+                parent=self,
+            )
+            if answer is None:
+                return
+            if answer:
+                self.run("Deteniendo DeepTutor...", _stopper(self.station), self._quit)
+                return
+        self._quit(None)
+
+    # --- construcción -----------------------------------------------------------
 
     def _build(self) -> None:
-        """Barra lateral a la izquierda y contenido a la derecha."""
+        """Barra lateral a la izquierda; cabecera, apartado y actividad a la derecha."""
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
-        self._build_sidebar().grid(row=0, column=0, sticky="nsw")
         content = tk.Frame(self, background=style.PAGE)
         content.grid(row=0, column=1, sticky="nsew")
         content.columnconfigure(0, weight=1)
-        content.rowconfigure(2, weight=1)
+        content.rowconfigure(1, weight=1)
         self._build_banner(content).grid(row=0, column=0, sticky="ew")
-        self._build_home(content).grid(row=1, column=0, sticky="ew", padx=20, pady=16)
+
+        stack = tk.Frame(content, background=style.PAGE)
+        stack.grid(row=1, column=0, sticky="nsew", padx=20, pady=(16, 12))
+        stack.columnconfigure(0, weight=1)
+        stack.rowconfigure(0, weight=1)
+        views: list[tuple[str, str, View]] = [
+            ("Inicio", "⌂", HomeView(stack, self)),
+            ("Temarios", "☰", SyllabiView(stack, self)),
+        ]
+        for _, _, view in views:
+            view.grid(row=0, column=0, sticky="nsew")
+
         self._build_activity(content).grid(
-            row=2, column=0, sticky="nsew", padx=20, pady=(0, 16)
+            row=2, column=0, sticky="ew", padx=20, pady=(0, 16)
         )
+        self._views = self._build_sidebar(views)
+        self.views = {name: view for name, _, view in views}
         self._build_statusbar().grid(row=1, column=0, columnspan=2, sticky="ew")
 
-    def _build_sidebar(self) -> tk.Frame:
-        """Apartados de la aplicación (de momento, solo Inicio)."""
+    def _build_sidebar(
+        self, views: list[tuple[str, str, View]]
+    ) -> dict[str, tuple[tk.Label, View]]:
+        """Apartados de la aplicación; devuelve cada uno con su entrada."""
         bar = tk.Frame(self, background=style.SIDEBAR, width=220, padx=10, pady=16)
+        bar.grid(row=0, column=0, sticky="nsw")
         bar.grid_propagate(False)
         bar.columnconfigure(0, weight=1)
-        bar.rowconfigure(1, weight=1)
-        style.label(
-            bar,
-            "⌂   Inicio",
-            background=style.SELECTED,
-            font=style.STRONG,
-            color=style.NAVY,
-            padx=14,
-            pady=8,
-        ).grid(row=0, column=0, sticky="ew")
+        entries = {}
+        for row, (name, icon, view) in enumerate(views):
+            item = style.label(
+                bar,
+                f"{icon}   {name}",
+                background=style.SIDEBAR,
+                font=style.STRONG,
+                color=style.NAVY,
+                padx=14,
+                pady=8,
+            )
+            item.configure(cursor="hand2")
+            item.grid(row=row, column=0, sticky="ew", pady=2)
+            item.bind("<Button-1>", lambda _, n=name: self.show_view(n))
+            entries[name] = (item, view)
+        bar.rowconfigure(len(views), weight=1)
         style.label(
             bar,
             f"atril {__version__}",
@@ -94,12 +202,12 @@ class App(tk.Tk):
             font=style.CAPTION,
             color=style.MUTED,
             padx=8,
-        ).grid(row=2, column=0, sticky="w")
-        return bar
+        ).grid(row=len(views) + 1, column=0, sticky="w")
+        return entries
 
     def _build_banner(self, parent: tk.Misc) -> tk.Frame:
         """Cabecera con el icono, el nombre y el lema."""
-        banner = tk.Frame(parent, background=style.BANNER, padx=24, pady=16)
+        banner = tk.Frame(parent, background=style.BANNER, padx=24, pady=14)
         tk.Label(banner, image=self._images[64], background=style.BANNER).grid(
             row=0, column=0, rowspan=2, padx=(0, 16)
         )
@@ -115,55 +223,13 @@ class App(tk.Tk):
         ).grid(row=1, column=1, sticky="nw")
         return banner
 
-    def _build_home(self, parent: tk.Misc) -> tk.Frame:
-        """Tarjetas de estado general y de accesos rápidos."""
-        home = tk.Frame(parent, background=style.PAGE)
-        home.columnconfigure(0, weight=3)
-        home.columnconfigure(1, weight=2)
-
-        status = style.card(home, "Estado general")
-        status.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
-        status.columnconfigure(0, weight=1)
-        self._overall = style.label(
-            status, "Comprobando…", background=style.CARD, font=style.STRONG
-        )
-        self._overall.grid(row=1, column=0, sticky="w")
-        self._checked = style.label(
-            status, background=style.CARD, font=style.CAPTION, color=style.MUTED
-        )
-        self._checked.grid(row=2, column=0, sticky="w", pady=(0, 10))
-        self._rows = tk.Frame(status, background=style.CARD)
-        self._rows.grid(row=3, column=0, sticky="ew")
-        self._rows.columnconfigure(2, weight=1)
-
-        actions = style.card(home, "Accesos rápidos")
-        actions.grid(row=0, column=1, sticky="nsew")
-        actions.columnconfigure(0, weight=1)
-        self._buttons = [
-            ttk.Button(
-                actions,
-                text="Abrir DeepTutor",
-                style="Accent.TButton",
-                command=self.open_deeptutor,
-            ),
-            ttk.Button(actions, text="Parar DeepTutor", command=self.stop_deeptutor),
-            ttk.Button(actions, text="Comprobar estado", command=self.refresh),
-            ttk.Button(
-                actions, text="Abrir carpeta de la estación", command=self.open_folder
-            ),
-        ]
-        for row, button in enumerate(self._buttons, start=1):
-            button.grid(row=row, column=0, sticky="ew", pady=4)
-        return home
-
     def _build_activity(self, parent: tk.Misc) -> tk.Frame:
-        """Registro de lo que va haciendo atril."""
+        """Registro de lo que va haciendo atril, común a todos los apartados."""
         frame = style.card(parent, "Actividad")
         frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(1, weight=1)
         self._log = tk.Text(
             frame,
-            height=8,
+            height=6,
             wrap="word",
             relief="flat",
             borderwidth=0,
@@ -202,92 +268,20 @@ class App(tk.Tk):
         ).grid(row=0, column=2, sticky="e")
         return bar
 
-    # --- acciones -----------------------------------------------------------
-
-    def refresh(self) -> None:
-        """Comprueba el estado de la estación en segundo plano."""
-        self._run(
-            "Comprobando el estado...",
-            lambda reporter: service.status(self.station, reporter),
-            self._show_status,
-        )
-
-    def open_deeptutor(self) -> None:
-        """Arranca DeepTutor si hace falta y lo abre en el navegador."""
-
-        def opened(url: str) -> None:
-            self._append(Level.OK, f"DeepTutor listo: {url}")
-            webbrowser.open(url)
-            self.refresh()
-
-        self._run(
-            "Abriendo DeepTutor (la primera vez tarda unos minutos)...",
-            lambda reporter: service.open_url(self.station, reporter),
-            opened,
-        )
-
-    def stop_deeptutor(self) -> None:
-        """Detiene DeepTutor y sus procesos de la estación."""
-
-        def stopped(_: None) -> None:
-            self._append(Level.OK, "DeepTutor detenido.")
-            self.refresh()
-
-        self._run("Deteniendo DeepTutor...", _stopper(self.station), stopped)
-
-    def open_folder(self) -> None:
-        """Abre la carpeta de la estación en el explorador de archivos."""
-        webbrowser.open(self.station.root.as_uri())
-
-    def close(self) -> None:
-        """Cierra la ventana; si DeepTutor está en marcha, pregunta si pararlo."""
-        if self.worker.running and not messagebox.askyesno(
-            "Atril",
-            "Hay una operación en curso. Si sales ahora quedará a medias. ¿Salir?",
-            icon="warning",
-            parent=self,
-        ):
-            return
-        dt = DeepTutor(self.station)
-        if not self.worker.running and dt.installed and dt.backend_up():
-            answer = messagebox.askyesnocancel(
-                "Atril",
-                "DeepTutor sigue en marcha. ¿Pararlo antes de salir?\n\n"
-                "Si no lo paras, podrás seguir usándolo en el navegador.",
-                parent=self,
-            )
-            if answer is None:
-                return
-            if answer:
-                self._run("Deteniendo DeepTutor...", _stopper(self.station), self._quit)
-                return
-        self._quit(None)
-
-    # --- trabajo en segundo plano --------------------------------------------
-
-    def _run[T](
-        self, text: str, task: Callable[[Reporter], T], on_done: Callable[[T], None]
-    ) -> None:
-        """Lanza ``task`` si no hay otra en marcha y bloquea los botones mientras."""
-        if not self.worker.submit(task, on_done, self._show_error):
-            self._append(Level.WARNING, "Espera a que termine la operación en curso.")
-            return
-        self._set_buttons(enabled=False)
-        self.on_busy(text)
+    # --- avisos del trabajo en segundo plano ------------------------------------
 
     def _poll(self) -> None:
         """Reparte los avisos del trabajo y vuelve a programarse."""
         self.worker.poll()
-        if not self.worker.running:
-            self._set_buttons(enabled=True)
-            if str(self._status.cget("text")) != "Listo":
-                self.on_busy(None)
+        if not self.worker.running and not self._idle:
+            self._set_idle(True)
+            self.on_busy(None)
         self.after(POLL_MS, self._poll)
 
     def on_show(self, title: str | None, findings: list[Finding]) -> None:
         """Escribe las comprobaciones en la actividad."""
         for finding in findings:
-            self._append(finding.level, finding.message)
+            self.log(finding.level, finding.message)
 
     def on_busy(self, text: str | None) -> None:
         """Muestra la espera en la barra de estado."""
@@ -297,9 +291,13 @@ class App(tk.Tk):
             self._bar.grid_remove()
             return
         self._status.configure(text=text)
-        self._bar.configure(mode="indeterminate")
-        self._bar.grid()
-        self._bar.start(15)
+        if (
+            str(self._bar.cget("mode")) != "indeterminate"
+            or not self._bar.winfo_ismapped()
+        ):
+            self._bar.configure(mode="indeterminate")
+            self._bar.grid()
+            self._bar.start(15)
 
     def on_progress(self, text: str | None, total: int) -> None:
         """Barra de avance de un trabajo medible."""
@@ -315,73 +313,32 @@ class App(tk.Tk):
         """Avanza la barra."""
         self._bar.step(amount)
 
-    # --- presentación ---------------------------------------------------------
-
-    def _show_status(self, sections: list[Section]) -> None:
-        """Pinta el resumen del estado."""
-        rows = summarize(sections)
-        level, text = overall(rows)
-        self._overall.configure(
-            text=f"{style.LEVEL_SYMBOLS[level]}  {text}",
-            foreground=style.LEVEL_COLORS[level],
-        )
-        self._checked.configure(text=f"Comprobado a las {time.strftime('%H:%M')}")
-        for widget in self._rows.winfo_children():
-            widget.destroy()
-        for index, row in enumerate(rows):
-            self._status_row(index, row)
-
-    def _status_row(self, index: int, row: Row) -> None:
-        """Una fila: símbolo de nivel, sección y mensaje."""
-        cells = (
-            (
-                style.LEVEL_SYMBOLS[row.level],
-                style.STRONG,
-                style.LEVEL_COLORS[row.level],
-            ),
-            (row.title, style.STRONG, style.TEXT),
-            (row.message, style.BODY, style.TEXT),
-        )
-        for column, (text, font, color) in enumerate(cells):
-            style.label(
-                self._rows,
-                text,
-                background=style.CARD,
-                font=font,
-                color=color,
-                wraplength=440 if column == 2 else 0,
-            ).grid(row=index, column=column, sticky="nw", padx=(0, 10), pady=3)
+    # --- auxiliares ---------------------------------------------------------------
 
     def _show_error(self, exc: Exception) -> None:
-        """Muestra un error en la actividad y en un diálogo."""
+        """Muestra un error en la actividad y, salvo cancelaciones, en un diálogo."""
         message = str(exc) if isinstance(exc, AtrilError) else repr(exc)
-        self._append(Level.ERROR, message)
+        message = message[:1].upper() + message[1:]
+        if isinstance(exc, CancelledError):
+            self.log(Level.WARNING, message)
+            return
+        self.log(Level.ERROR, message)
         detail = ""
         if isinstance(exc, AtrilError) and exc.log:
-            detail = (
-                "\n\nÚltimas líneas de "
-                + exc.log_title
-                + ":\n"
-                + "\n".join(exc.log[-10:])
+            detail = f"\n\nÚltimas líneas de {exc.log_title}:\n" + "\n".join(
+                exc.log[-10:]
             )
             for line in exc.log:
-                self._append(Level.INFO, line)
-        text = message[:1].upper() + message[1:] + detail
-        messagebox.showerror("Atril", text, parent=self)
+                self.log(Level.INFO, line)
+        messagebox.showerror("Atril", message + detail, parent=self)
 
-    def _append(self, level: Level, message: str) -> None:
-        """Añade una línea a la actividad."""
-        self._log.configure(state="normal")
-        self._log.insert("end", time.strftime("%H:%M:%S  "), "time")
-        line = f"{style.LEVEL_SYMBOLS[level]} {message}\n"
-        self._log.insert("end", line, level.value)
-        self._log.see("end")
-        self._log.configure(state="disabled")
-
-    def _set_buttons(self, *, enabled: bool) -> None:
-        """Activa o desactiva los accesos rápidos (salvo abrir la carpeta)."""
-        for button in self._buttons[:-1]:
-            button.state(["!disabled"] if enabled else ["disabled"])
+    def _set_idle(self, idle: bool) -> None:
+        """Activa los botones de acción o los de cancelar según haya operación."""
+        self._idle = idle
+        for button in self._actions:
+            button.state(["!disabled"] if idle else ["disabled"])
+        for button in self._cancels:
+            button.state(["disabled"] if idle else ["!disabled"])
 
     def _quit(self, _: object) -> None:
         """Cierra la aplicación."""
@@ -408,7 +365,7 @@ def _load_icons(root: tk.Tk) -> dict[int, tk.PhotoImage]:
     }
 
 
-# --- arranque ------------------------------------------------------------------
+# --- arranque ----------------------------------------------------------------------
 
 
 def choose_station() -> Station | None:

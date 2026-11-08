@@ -16,6 +16,9 @@ from atril.checks import Finding
 Advance = Callable[[int], None]
 """Suma unidades (bytes, ficheros...) a la barra de avance."""
 
+Update = Callable[[str], None]
+"""Cambia el texto de una espera en curso (p. ej. minutos y fase del indexado)."""
+
 
 class Reporter(Protocol):
     """Destino del avance de una operación: consola Rich, ventana o nada."""
@@ -24,8 +27,8 @@ class Reporter(Protocol):
         """Muestra comprobaciones, con un título de sección opcional."""
         ...
 
-    def busy(self, text: str) -> AbstractContextManager[None]:
-        """Indica una espera sin avance medible (arrancar, verificar...)."""
+    def busy(self, text: str) -> AbstractContextManager[Update]:
+        """Indica una espera sin avance medible; devuelve con qué cambiar su texto."""
         ...
 
     def progress(self, text: str, total: int) -> AbstractContextManager[Advance]:
@@ -46,10 +49,10 @@ class Recorder:
         self.findings.extend(findings)
 
     @contextlib.contextmanager
-    def busy(self, text: str) -> Generator[None]:
-        """Guarda el texto de la espera."""
+    def busy(self, text: str) -> Generator[Update]:
+        """Guarda el texto de la espera y sus cambios."""
         self.steps.append(text)
-        yield
+        yield self.steps.append
 
     @contextlib.contextmanager
     def progress(self, text: str, total: int) -> Generator[Advance]:

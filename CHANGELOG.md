@@ -5,6 +5,28 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.20.0] - 2026-11-08
+
+Fase 4: el alumno gestiona sus temarios desde la ventana.
+
+### Added
+
+- Apartado **Temarios** en `atril-gui`: lista de temarios, «Nuevo temario…», tabla de fuentes
+  con su estado de indexado (por indexar, indexada, cambiada, sin fichero) y botones para añadir
+  PDF (uno o varios) o una URL (se descarga al momento), descargar, buscar versiones nuevas,
+  indexar y reindexar. Los botones que tocan se resaltan y «Cancelar» para en un punto seguro.
+- La actividad es común a todos los apartados.
+
+### Changed
+
+- Descarga, comprobación de versiones, estado, indexado y reindexado de KB pasan a `atril.ops`
+  (`ops.sources`, `ops.knowledge`); la CLI los usa sin cambios de comportamiento. Las esperas
+  largas se actualizan en el mismo indicador (minutos y fase del indexado, tamaño descargado) y
+  la descarga muestra el tamaño en el spinner en lugar de una barra.
+- El indexado y el reindexado reservan la estación desde `ops`, también desde la ventana.
+- Los avisos de KB pendientes dicen «hay que reindexarla» sin nombrar el comando, porque también
+  los lee el alumno en la ventana.
+
 ## [0.19.0] - 2026-11-08
 
 Fase 3: primera interfaz gráfica, para usar atril sin consola.

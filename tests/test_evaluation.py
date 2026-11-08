@@ -7,7 +7,6 @@ from support import write
 from typer.testing import CliRunner
 
 from atril import evaluation
-from atril.checks import ok
 from atril.commands import knowledge as commands
 from atril.config import load_station
 from atril.config.station import Station
@@ -20,6 +19,7 @@ from atril.evaluation import (
     run_evaluation,
 )
 from atril.main import app
+from atril.ops import knowledge as knowledge_ops
 
 DT_REPORT = {
     "metrics": {
@@ -147,7 +147,7 @@ def evaluable(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     write(station.deeptutor_cli, "")
     write(station.kb_dir("norm-edificacion-cte") / "metadata.json", "{}")
     write(station.syllabi_dir / "normativa" / "eval" / "cte-v2.jsonl", "{}\n")
-    monkeypatch.setattr(commands, "_embedding_preflight", lambda station: [ok("embed")])
+    monkeypatch.setattr(knowledge_ops, "preflight", lambda station, reporter: None)
     return station_dir
 
 

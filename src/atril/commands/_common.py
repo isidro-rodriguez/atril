@@ -31,7 +31,7 @@ from atril.config.station import STATION_FILE, init_station
 from atril.config.syllabus import KnowledgeBase
 from atril.errors import AtrilError
 from atril.lock import BusyError, station_lock
-from atril.ops import Advance
+from atril.ops import Advance, Update
 from atril.ops.station import STATION_VARIABLE, persist_station, saved_station
 
 console = Console(soft_wrap=True)
@@ -200,10 +200,10 @@ class ConsoleReporter:
         show(findings, title)
 
     @contextlib.contextmanager
-    def busy(self, text: str) -> Generator[None]:
+    def busy(self, text: str) -> Generator[Update]:
         """Spinner con ``text`` mientras dura la espera."""
-        with console.status(escape(text)):
-            yield
+        with console.status(escape(text)) as status:
+            yield lambda new: status.update(escape(new))
 
     @contextlib.contextmanager
     def progress(self, text: str, total: int) -> Generator[Advance]:

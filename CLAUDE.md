@@ -33,8 +33,10 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
-│   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus)
-│   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app, worker, model, style, recursos/
+│   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus,
+│   │                       #   sources, knowledge)
+│   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), home, syllabi,
+│   │                       #   worker, model, style, recursos/
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
@@ -100,7 +102,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   `Finding`s, report progress to an `ops.Reporter` (`show`, `busy`, `progress`) and raise
   `atril.errors.AtrilError` (every module error derives from it). Confirmations are asked by the
   interface before calling them. `commands/` only parses options, prints (`ConsoleReporter`,
-  `fail_error`) and sets the exit code; the GUI does the same with widgets.
+  `fail_error`) and sets the exit code; the GUI does the same with widgets. `Reporter.busy`
+  yields an `update(text)` callable for long waits (indexing minutes and phase, download size).
+  Cancellation is a `threading.Event` checked at safe points: between sources, or in the indexing
+  tick (it kills DeepTutor's process, like Ctrl+C, and the next run continues from that source).
 - **GUI** (`atril.gui`): never blocks Tk's thread; every operation goes through `gui.worker.Worker`
   (one job at a time, events through a queue drained with `after`). Texts and backgrounds use
   `tk` widgets via `style.label`/`style.card` (sv-ttk's `tk_setPalette` overrides `ttk.Label`
@@ -108,8 +113,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   scrollbars stay `ttk`. View logic without Tk lives in `gui/model.py` so it is tested without a
   display; window tests skip when there is none.
 - Long operations (backup, restore, install, update, `kb indexar`/`reindexar`) hold the station
-  lock (`lock.station_lock`, `commands._common.reserve`); it is reentrant within a process and an
-  abandoned lock (dead PID or reused PID) is replaced.
+  lock (`lock.station_lock` inside `ops`, or `commands._common.reserve` for commands not yet in
+  `ops`); it is reentrant within a process and an abandoned lock (dead PID or reused PID) is
+  replaced.
 - Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,
   `pythonw`) Windows would open an empty console window per child.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;

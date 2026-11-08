@@ -6,10 +6,12 @@ import pytest
 from support import write
 from typer.testing import CliRunner
 
+from atril import ollama
 from atril.checks import ok
 from atril.commands import knowledge as commands
 from atril.config import load_station, load_syllabus
 from atril.deeptutor import DeepTutor
+from atril.install import Installer
 from atril.knowledge import (
     AddResult,
     IndexedSource,
@@ -21,6 +23,8 @@ from atril.knowledge import (
 )
 from atril.main import app
 from atril.ollama import OllamaStatus
+from atril.ops import knowledge as knowledge_ops
+from atril.ops import service
 
 runner = CliRunner()
 
@@ -44,15 +48,13 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(time, "sleep", fake_sleep)
     monkeypatch.setattr(time, "monotonic", lambda: clock[0])
     monkeypatch.setattr(
-        commands.ollama,
+        ollama,
         "get_status",
         lambda url: OllamaStatus(True, "0.12.0", ("qwen3-embedding:8b",)),
     )
+    monkeypatch.setattr(ollama, "probe_embedding", lambda config: [ok("embed")])
     monkeypatch.setattr(
-        commands.ollama, "probe_embedding", lambda config: [ok("embed")]
-    )
-    monkeypatch.setattr(
-        commands.Installer, "runtime_settings", lambda self: [ok("ajustes aplicados")]
+        Installer, "runtime_settings", lambda self: [ok("ajustes aplicados")]
     )
     return station_dir
 
@@ -134,7 +136,7 @@ def test_index_skips_changed_and_asks_for_reindex(
     assert result.exit_code == 0, result.output
     assert added == []
     assert "cambiada" in result.output
-    assert "atril kb reindexar norm-edificacion-cte" in result.output
+    assert "hay que reindexarla" in result.output
 
 
 def test_index_failure_shows_log(
@@ -152,7 +154,7 @@ def test_index_failure_shows_log(
 
     assert result.exit_code == 1
     assert "CUDA error" in result.output
-    assert "Vuelve a ejecutar" in result.output
+    assert "Vuelve a indexar" in result.output
 
 
 def test_index_stops_when_embedding_fails(
@@ -160,9 +162,7 @@ def test_index_stops_when_embedding_fails(
 ) -> None:
     from atril.checks import error
 
-    monkeypatch.setattr(
-        commands.ollama, "probe_embedding", lambda config: [error("CUDA error")]
-    )
+    monkeypatch.setattr(ollama, "probe_embedding", lambda config: [error("CUDA error")])
     added = _record_adds(monkeypatch)
 
     result = _invoke(station, "kb", "indexar", "normativa")
@@ -198,7 +198,7 @@ def reindex_env(station: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, lis
     calls: dict[str, list] = {"deleted": [], "reindexed": [], "lifecycle": []}
     monkeypatch.setattr(DeepTutor, "backend_up", lambda self: True)
     monkeypatch.setattr(
-        commands, "embedding_selection", lambda station, env: '{"m": 1}'
+        knowledge_ops, "embedding_selection", lambda station, env: '{"m": 1}'
     )
 
     def fake_delete(self: KnowledgeApi, kb_id: str, filename: str) -> bool:
@@ -216,10 +216,12 @@ def reindex_env(station: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, lis
     monkeypatch.setattr(KnowledgeApi, "delete_file", fake_delete)
     monkeypatch.setattr(KnowledgeApi, "reindex", fake_reindex)
     monkeypatch.setattr(
-        commands, "shutdown", lambda dt: calls["lifecycle"].append("parar")
+        service, "stop", lambda dt, reporter: calls["lifecycle"].append("parar")
     )
     monkeypatch.setattr(
-        commands, "launch", lambda dt, timeout: calls["lifecycle"].append("arrancar")
+        service,
+        "start",
+        lambda dt, reporter, timeout: calls["lifecycle"].append("arrancar"),
     )
     calls["added"] = _record_adds(monkeypatch)
     return calls
@@ -338,3 +340,45 @@ def test_status_reports_running_run(station: Path, wide: None) -> None:
     assert result.exit_code == 0, result.output
     # El proceso dueño no existe: un run "running" huérfano cuenta como interrumpido.
     assert "interrumpido" in result.output
+
+
+def test_index_cancel_stops_in_tick_and_keeps_source_pending(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import threading
+
+    from atril.errors import CancelledError
+    from atril.ops import Recorder
+
+    cancel = threading.Event()
+
+    def add(self, kb_id, item, tick=None):
+        cancel.set()  # el usuario pulsa «Cancelar» mientras se indexa
+        assert tick is not None
+        tick(None, 30.0)
+        pytest.fail("el tick debía cancelar")
+
+    monkeypatch.setattr(Indexer, "add", add)
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+
+    with pytest.raises(CancelledError, match="continúa por ella"):
+        knowledge_ops.index(load_station(station), syllabus, Recorder(), cancel=cancel)
+
+    ledger = Ledger(ledger_path(syllabus))
+    assert not ledger.kb("norm-edificacion-cte").sources  # nada se da por indexado
+    assert not load_station(station).lock_file.exists()
+
+
+def test_download_cancel_between_sources(station: Path) -> None:
+    import threading
+
+    from atril.errors import CancelledError
+    from atril.ops import Recorder
+    from atril.ops import sources as source_ops
+
+    cancel = threading.Event()
+    cancel.set()
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+
+    with pytest.raises(CancelledError):
+        source_ops.download(syllabus, Recorder(), cancel=cancel)

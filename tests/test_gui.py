@@ -102,3 +102,24 @@ def test_summary_rows_and_overall_level() -> None:
         "error"
     )
     assert overall(summarize(sections[:2]))[0].value == "ok"
+
+
+def test_source_rows_and_actions(station_dir) -> None:
+    from atril.config import load_station, load_syllabus
+    from atril.gui.model import actions_needed, source_rows
+    from atril.ops import knowledge as knowledge_ops
+
+    station = load_station(station_dir)
+    syllabus = load_syllabus(station.syllabi_dir / "normativa")
+    path = syllabus.source_path(syllabus.sources[0])
+    assert path is not None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"%PDF-1.7")
+
+    statuses, _ = knowledge_ops.status(station, syllabus)
+    rows = source_rows(statuses)
+
+    first = next(row for row in rows if row.source_id == syllabus.sources[0].id)
+    assert (first.state, first.level.value) == ("por indexar", "info")
+    assert any(row.state == "sin fichero" for row in rows)
+    assert actions_needed(statuses) == (True, [])

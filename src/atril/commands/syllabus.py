@@ -1,19 +1,9 @@
 """Comandos de temarios y fuentes: ``atril temario ...`` y ``atril fuentes ...``."""
 
-from collections.abc import Generator
-from contextlib import contextmanager
 from typing import Annotated
 
 import typer
-from acodo.utils import get_now
 from rich.markup import escape
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    Progress,
-    TextColumn,
-    TransferSpeedColumn,
-)
 from rich.table import Table
 
 from atril.checks import info, ok, warning
@@ -23,15 +13,15 @@ from atril.commands._common import (
     get_station,
     get_syllabus,
     load_or_fail,
+    reporter,
     show,
     success,
 )
 from atril.config import ConfigError, Syllabus, load_syllabi
-from atril.config.syllabus import Source
 from atril.errors import AtrilError
+from atril.ops import sources as source_ops
 from atril.ops import syllabus as operations
-from atril.sources import Outcome, Result, SourceManager, is_due
-from atril.sources import Progress as ProgressCallback
+from atril.sources import Outcome, Result, SourceManager
 
 syllabus_app = typer.Typer(
     help="Temarios de la estación.", no_args_is_help=True, rich_markup_mode="rich"
@@ -170,13 +160,10 @@ def download_sources(
 ) -> None:
     """Descarga las fuentes que faltan (no toca las que ya están en disco)."""
     syllabus = get_syllabus(ctx, syllabus_id)
-    manager = load_or_fail(lambda: SourceManager(syllabus))
-    results = []
-    with _progress() as progress:
-        for source in _select(syllabus, source_ids):
-            with _task(progress, source) as callback:
-                results.append(manager.fetch(source, callback))
-            manager.registry.save()
+    try:
+        results = source_ops.download(syllabus, reporter, source_ids)
+    except AtrilError as exc:
+        fail(str(exc))
     _report(syllabus, results, "Descarga")
 
 
@@ -237,63 +224,17 @@ def check_sources(
     Por defecto revisa solo las que tocan según su frecuencia ([bold]comprobar[/]).
     """
     syllabus = get_syllabus(ctx, syllabus_id)
-    manager = load_or_fail(lambda: SourceManager(syllabus))
-    now = get_now()
-    candidates = [source for source in _select(syllabus, source_ids) if source.url]
-    explicit = bool(source_ids) or check_all
-    due = [
-        s for s in candidates if explicit or is_due(s, manager.registry.get(s.id), now)
-    ]
-    skipped = len(candidates) - len(due)
-
-    results = []
-    with _progress() as progress:
-        for source in due:
-            with _task(progress, source) as callback:
-                results.append(manager.check(source, callback))
-            manager.registry.save()
+    try:
+        results, skipped = source_ops.check(
+            syllabus, reporter, source_ids, check_all=check_all
+        )
+    except AtrilError as exc:
+        fail(str(exc))
     if skipped:
         show(
             [info(f"{skipped} fuentes no tocan todavía (usa --todas para forzarlas).")]
         )
     _report(syllabus, results, "Comprobación")
-
-
-def _select(syllabus: Syllabus, source_ids: list[str] | None) -> list[Source]:
-    """Fuentes pedidas, en el orden del temario; termina si algún id no existe."""
-    if not source_ids:
-        return list(syllabus.sources)
-    known = {source.id: source for source in syllabus.sources}
-    unknown = [item for item in source_ids if item not in known]
-    if unknown:
-        fail(f"fuentes desconocidas en {syllabus.id}: {', '.join(unknown)}.")
-    return [known[item] for item in source_ids]
-
-
-def _progress() -> Progress:
-    """Barra de progreso de descargas (se oculta al terminar cada una)."""
-    return Progress(
-        TextColumn("{task.description}"),
-        BarColumn(),
-        DownloadColumn(),
-        TransferSpeedColumn(),
-        console=console,
-        transient=True,
-    )
-
-
-@contextmanager
-def _task(progress: Progress, source: Source) -> Generator[ProgressCallback]:
-    """Tarea de progreso para una fuente; devuelve la función de avance."""
-    task = progress.add_task(escape(source.id), total=None)
-
-    def update(done: int, total: int | None) -> None:
-        progress.update(task, completed=done, total=total)
-
-    try:
-        yield update
-    finally:
-        progress.remove_task(task)
 
 
 def _report(syllabus: Syllabus, results: list[Result], title: str) -> None:
@@ -312,10 +253,7 @@ def _report(syllabus: Syllabus, results: list[Result], title: str) -> None:
             )
         console.print(table)
 
-    changed = sorted(
-        {syllabus.kb_of(r.source).id for r in results if r.outcome is Outcome.UPDATED}
-    )
-    if changed:
+    if changed := source_ops.changed_kbs(syllabus, results):
         show(
             [
                 warning(

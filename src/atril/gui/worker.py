@@ -12,7 +12,7 @@ from collections.abc import Callable, Generator, Sequence
 from typing import Any, Protocol
 
 from atril.checks import Finding
-from atril.ops import Advance, Reporter
+from atril.ops import Advance, Reporter, Update
 
 
 class Listener(Protocol):
@@ -41,19 +41,28 @@ class QueueReporter:
     def __init__(self, events: queue.Queue[tuple[str, Any]]) -> None:
         """Usa ``events`` como cola de salida."""
         self._events = events
+        self._waits: list[str] = []
+        """Esperas anidadas: al acabar una, vuelve el texto de la anterior."""
 
     def show(self, findings: Sequence[Finding], title: str | None = None) -> None:
         """Encola las comprobaciones."""
         self._events.put(("show", (title, list(findings))))
 
     @contextlib.contextmanager
-    def busy(self, text: str) -> Generator[None]:
-        """Encola el principio y el final de la espera."""
+    def busy(self, text: str) -> Generator[Update]:
+        """Encola el principio, los cambios y el final de la espera."""
+        self._waits.append(text)
         self._events.put(("busy", text))
+
+        def update(new: str) -> None:
+            self._waits[-1] = new
+            self._events.put(("busy", new))
+
         try:
-            yield
+            yield update
         finally:
-            self._events.put(("busy", None))
+            self._waits.pop()
+            self._events.put(("busy", self._waits[-1] if self._waits else None))
 
     @contextlib.contextmanager
     def progress(self, text: str, total: int) -> Generator[Advance]:
