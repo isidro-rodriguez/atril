@@ -235,6 +235,7 @@ Sustituye lo anterior donde choque.
 | Retoques (0.25.0) | Inicio recupera última actividad y último backup. Herramientas de dos en dos y en este orden: DeepTutor y Ollama, Python y uv, Node.js y npm, Git y Asistente; el logotipo abre la web de cada una (con su logotipo oficial, salvo el asistente). El Asistente comprueba el modelo activo en DeepTutor (Claude Code instalado, modelo de Ollama descargado o clave presente en la nube) sin leer la clave. Ajustes con una descripción de una línea por clave, 0,5 em entre claves y Avanzado en una columna desplazable por partes. Sin punto y coma en los textos |
 | Tablas ordenables (0.26.0) | Pulsar la cabecera ordena ascendente y, otra vez, descendente, con una flecha de Lucide en la cabecera (Inter no tiene flechas). Los empates, por la primera columna ascendente (alfabética, o por fecha en Backups y Actividad). Se conserva el orden al refrescar |
 | Pestañas (0.27.0) | Ajustes usa `widgets.TabBar` en vez de `ttk.Notebook`: pestañas de texto con el estilo de la navegación (azul y subrayado de 3 px, fondo azul claro al pasar) en la cabecera de una sola tarjeta, separadas del contenido por una línea. Sin iconos ni atajos de teclado. «Guardar» se oculta en Herramientas |
+| Recuadros de texto (0.27.1) | Fondo de las tablas (`#fafafa`, imagen `campo.png` con borde redondeado: `style.tile(field=True)`), barra de desplazamiento solo si hace falta y selección como las filas de las tablas (`#e7e7e7` y texto `#191919`, por encima del color de nivel) |
 
 ## Lecciones de la instalación previa
 

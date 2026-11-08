@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.27.1] - 2026-11-08
+
+### Fixed
+
+- Actividad: el detalle tiene el fondo de las tablas (`#fafafa`), muestra la barra de
+  desplazamiento cuando no cabe y el texto seleccionado se ve como las filas elegidas de las
+  tablas (fondo `#e7e7e7`, texto `#191919`) en vez del azul fuerte del sistema.
+- Ajustes > Herramientas: 0,3 em más de separación bajo la lista de botones.
+
 ## [0.27.0] - 2026-11-08
 
 ### Changed

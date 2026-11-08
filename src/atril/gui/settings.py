@@ -618,9 +618,14 @@ class SettingsView(tk.Frame):
                 self.copy_report,
             ),
         )
+        below = 3 + round(0.3 * 13 * style.scale(self))  # 0,3 em más tras el último
         for row, (title, text, command) in enumerate(rows):
             self.app.action(ttk.Button(tab, text=title, command=command)).grid(
-                row=row, column=0, sticky="ew", pady=3, padx=(0, 14)
+                row=row,
+                column=0,
+                sticky="ew",
+                pady=(3, below if row == len(rows) - 1 else 3),
+                padx=(0, 14),
             )
             style.label(tab, text, color=style.MUTED).grid(
                 row=row, column=1, sticky="w"

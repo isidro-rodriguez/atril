@@ -9,7 +9,7 @@ Entradas: ``atril.svg`` (logotipo, fuente maestra), ``marcas/`` (logotipos de la
 herramientas), los SVG de Lucide (ISC) y los
 ``.woff2`` latinos de Inter (OFL) de ``@fontsource/inter``. Salidas, en
 ``src/atril/gui/recursos/``: logotipo en PNG e ``.ico``, iconos recoloreados en
-1x, 1,5x y 2x, fuentes ``.ttf`` con su licencia y la imagen de las tarjetas.
+1x, 1,5x y 2x, fuentes ``.ttf`` con su licencia y las imágenes de las tarjetas.
 """
 
 import shutil
@@ -56,6 +56,8 @@ FONTS = {
 
 CARD_RADIUS = 10
 """Radio de las esquinas de las tarjetas (px a 100 %)."""
+FIELD = (250, 250, 250, 255)
+"""Fondo de las tablas de sv-ttk (``#fafafa``), para los recuadros de texto."""
 CARD_SIZE = 640
 """Lado de la imagen de tarjeta a 100 %: grande para que ``ttk`` la repita poco."""
 
@@ -150,7 +152,17 @@ def fonts(fontsource: Path) -> None:
 
 
 def card() -> None:
-    """Imagen 9-slice de las tarjetas: blanca, borde fino y esquinas redondeadas."""
+    """Imágenes 9-slice con borde fino y esquinas redondeadas.
+
+    ``tarjeta`` es blanca (tarjetas y baldosas) y ``campo`` tiene el fondo de
+    las tablas (textos largos dentro de una tarjeta).
+    """
+    for name, fill in (("tarjeta", (255, 255, 255, 255)), ("campo", FIELD)):
+        _card(name, fill)
+
+
+def _card(name: str, fill: tuple[int, int, int, int]) -> None:
+    """Imagen 9-slice ``name`` a 1x y 2x con relleno ``fill``."""
     for scale, suffix in ((1, ""), (2, "@2x")):
         radius = CARD_RADIUS * scale
         size = radius * 2 + 2 * scale + 8 * scale
@@ -159,13 +171,13 @@ def card() -> None:
         draw.rounded_rectangle(
             (0, 0, size * 4 - 1, size * 4 - 1),
             radius=radius * 4,
-            fill=(255, 255, 255, 255),
+            fill=fill,
             outline=(223, 229, 238, 255),
             width=4 * scale,
         )
         small = image.resize((size, size), Image.Resampling.LANCZOS)
         _expand(small, radius + scale, CARD_SIZE * scale).save(
-            OUT / f"tarjeta{suffix}.png", optimize=True
+            OUT / f"{name}{suffix}.png", optimize=True
         )
 
 

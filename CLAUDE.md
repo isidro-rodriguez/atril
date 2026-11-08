@@ -122,7 +122,7 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   `gui/model.py` and `gui/activity.py` so it is tested without a display; window tests skip when
   there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`.
 - Every box has rounded corners: `style.card` (on the page) and `style.tile` / `Tile.Atril.TFrame`
-  (inside a card). No `ttk.Notebook`: tabs are `widgets.TabBar` (navigation style) on a card.
+  (inside a card; `field=True` for text boxes, with the tables' `#fafafa`). No `ttk.Notebook`: tabs are `widgets.TabBar` (navigation style) on a card.
 - GUI layout: fixed 1024x700 window (logical px, scaled with Windows and reduced if the screen is
   smaller), not resizable; no header; sidebar with logo and name; footer with service status,
   current operation and version. Every message or question is a `gui.dialogs.Modal` (centered,

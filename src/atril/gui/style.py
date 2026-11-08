@@ -36,6 +36,12 @@ NAVY = "#14254a"
 """Títulos (alias de :data:`TEXT`)."""
 MUTED = "#5b6b85"
 """Texto secundario."""
+FIELD = "#fafafa"
+"""Fondo de las tablas de sv-ttk y de los recuadros de texto."""
+TEXT_SELECTION = "#e7e7e7"
+"""Fondo del texto seleccionado (el de las filas elegidas de las tablas)."""
+TEXT_SELECTED = "#191919"
+"""Color del texto seleccionado."""
 
 LEVEL_COLORS = {
     Level.OK: "#1a8f3c",
@@ -116,18 +122,22 @@ def apply(root: tk.Tk) -> None:
     root.configure(background=PAGE)
     _fonts(root)
     style = ttk.Style(root)
-    image = tk.PhotoImage(
-        master=root,
-        data=_resource(f"tarjeta{'@2x' if scale(root) >= 1.75 else ''}.png"),
-    )
-    border = CARD_BORDER * (2 if scale(root) >= 1.75 else 1)
-    _images[("tarjeta", border)] = image  # que no se libere
-    style.element_create("Atril.Card.bg", "image", image, border=border, sticky="nsew")
+    for name, element in (("tarjeta", "Atril.Card.bg"), ("campo", "Atril.Field.bg")):
+        image = tk.PhotoImage(
+            master=root,
+            data=_resource(f"{name}{'@2x' if scale(root) >= 1.75 else ''}.png"),
+        )
+        border = CARD_BORDER * (2 if scale(root) >= 1.75 else 1)
+        _images[(name, border)] = image  # que no se libere
+        style.element_create(element, "image", image, border=border, sticky="nsew")
     style.layout("Card.Atril.TFrame", [("Atril.Card.bg", {"sticky": "nsew"})])
     style.configure("Card.Atril.TFrame", background=PAGE)
     # La misma tarjeta dentro de otra (esquinas sobre blanco): baldosas y recuadros.
     style.layout("Tile.Atril.TFrame", [("Atril.Card.bg", {"sticky": "nsew"})])
     style.configure("Tile.Atril.TFrame", background=CARD)
+    # Recuadro con el fondo de las tablas para textos largos (detalle de Actividad).
+    style.layout("Field.Atril.TFrame", [("Atril.Field.bg", {"sticky": "nsew"})])
+    style.configure("Field.Atril.TFrame", background=CARD)
     for widget in ("TButton", "Accent.TButton", "TCheckbutton", "TEntry", "TCombobox"):
         style.configure(widget, font=BODY)
     style.configure("Treeview", font=BODY, rowheight=round(28 * scale(root)))
@@ -195,7 +205,9 @@ CELL_PAD = "   "
 sus cabeceras (``ttk`` no admite margen por celda)."""
 
 
-def autoscroll(widget: ttk.Treeview | tk.Canvas, scrollbar: ttk.Scrollbar) -> None:
+def autoscroll(
+    widget: ttk.Treeview | tk.Canvas | tk.Text, scrollbar: ttk.Scrollbar
+) -> None:
     """Barra de desplazamiento vertical que solo se ve si hace falta."""
 
     def update(first: str | float, last: str | float) -> None:
@@ -310,12 +322,17 @@ def label(
     return widget
 
 
-def tile(parent: tk.Misc, padding: tuple[int, int] = (16, 12)) -> ttk.Frame:
-    """Recuadro redondeado con borde fino, para colocar dentro de una tarjeta."""
+def tile(
+    parent: tk.Misc, padding: tuple[int, int] = (16, 12), field: bool = False
+) -> ttk.Frame:
+    """Recuadro redondeado con borde fino, para colocar dentro de una tarjeta.
+
+    Con ``field`` tiene el fondo de las tablas (:data:`FIELD`) en vez de blanco.
+    """
     factor = scale(parent)
     return ttk.Frame(
         parent,
-        style="Tile.Atril.TFrame",
+        style="Field.Atril.TFrame" if field else "Tile.Atril.TFrame",
         padding=(round(padding[0] * factor), round(padding[1] * factor)),
     )
 
