@@ -158,6 +158,51 @@ Pruebas: `ops` con los mismos dobles que hoy (sin tiempo real ni servicios); en 
 lógica de las vistas y el trabajador sin pantalla; las pruebas que abren ventanas se saltan si no
 hay pantalla.
 
+## Revisión de la 0.21.0 y rediseño de la GUI (decidido el 2026-11-08)
+
+### Correcciones (revisión externa, verificada contra el código)
+
+| Problema | Corrección |
+|---|---|
+| Cerrar la ventana mataba la operación en curso (hilo *daemon*) | Al cerrar con una operación en marcha: se cancela en un punto seguro si es cancelable o se espera a que termine; la ventana no se destruye antes |
+| Una copia incompleta quedaba como `atril-*.zip` normal: contaba en la retención y podía restaurarse | Manifiesto con inventario (nombre y tamaño) y `completa`; `verify()` lo contrasta con el archivo; una copia incompleta se renombra `…-incompleta` y queda fuera de la retención y de la restauración. Sin hash por fichero (duplicaría la lectura) |
+| Manifiesto sin validar (un JSON lista daba traza) | Validación estricta de claves y tipos → `BackupError`; los manifiestos sin inventario (≤ 0.21) se aceptan como antiguos |
+| DeepTutor podía arrancar entre la confirmación y la restauración | Se vuelve a comprobar dentro de `restore()`, con el bloqueo |
+| Con el *rollback* incompleto se borraba la carpeta de extracción | Si el estado queda incierto no se borra nada y se indican las rutas |
+| Enlaces simbólicos a ficheros de fuera | Se saltan enlaces y uniones, con aviso |
+| Dos copias en el mismo segundo se pisaban | Sufijo `-2`, `-3`... |
+| Las copias en otros destinos no se verificaban | Se verifica cada una; si falla, no hay retención |
+| Bloqueo: dos procesos podían sustituir a la vez uno abandonado | Bloqueo del sistema (`msvcrt`/`fcntl`) sobre `.atril.lock`: el sistema lo libera si el proceso muere |
+| Bandeja del sistema | Descartada (ya decidido: arrastra Pillow y no aporta) |
+
+### Rediseño de la GUI
+
+Referencia visual: «Panel educativo Atril en español» (dirección estética, no diseño literal).
+
+| Tema | Decisión |
+|---|---|
+| Navegación lateral | Inicio, Temarios, Biblioteca, Servicios, Copias, Diagnóstico, Ajustes; logotipo arriba; sin versión (va en la barra inferior) |
+| Biblioteca | Todas las fuentes de todos los temarios, con búsqueda y filtros; añadir PDF o URL. No hay apartado «Fuentes» aparte (era redundante) |
+| Temarios | Crear, renombrar, eliminar, KB e indexado. **Eliminar** mueve la carpeta a `temarios/.papelera/<id>-<fecha>` y deja las KB en DeepTutor; una casilla aparte borra también las KB (irreversible) |
+| Servicios | DeepTutor y Ollama (arrancar, parar, estado), herramientas en lenguaje llano, instalar y actualizar DeepTutor |
+| Diagnóstico | Lo técnico: rutas, versiones, `doctor`, parches, logs, historial completo, volver a un commit |
+| Ajustes | Edición guiada de pocas claves de `atril.toml` (copias, ritmo de indexado) con `tomlkit` y validación; sin segunda fuente de configuración |
+| Actividad | Panel derecho plegable; un evento por operación (título, resumen, nivel, hora, detalle) guardado en `data/atril/actividad.jsonl`; «Ver todo» en Diagnóstico |
+| Inicio | Estado general, servicios, última copia, accesos rápidos y «Modificados recientemente» (atril no registra el uso de un temario: no se inventa) |
+| Logotipo | SVG propio como fuente maestra; PNG a 1× y 2× generados de él (Tk 8.6 no pinta SVG) |
+| Tipografía | Inter (OFL) incluida en el paquete y registrada solo para atril en Windows (`AddFontResourceExW` privado); Segoe UI si falla |
+| Iconos | Lucide (ISC) rasterizados a PNG en dos tamaños |
+| Tarjetas | Esquinas redondeadas con una imagen 9-*slice* como elemento de `ttk` |
+| Pantallas | Comprobación a 1366×768 y 1920×1080, escalados 100/125/150 % |
+| Descartado | «Generación» de temarios (no existe en atril), bandeja, sesión multiusuario |
+
+| Fase | Contenido | Versión |
+|---|---|---|
+| A | Correcciones de la revisión | 0.22.0 |
+| B | Base visual: recursos, componentes, navegación, cabecera, actividad estructurada | 0.23.0 |
+| C | Apartados nuevos sin perder funciones | 0.24.0 |
+| D | Validación de resoluciones y escalado; después, el instalador (en espera) | 1.0.0 |
+
 ## Lecciones de la instalación previa
 
 - Backup: se retiran restic, rclone y los git bundles. Las KB ocupan varios GB y rclone exigía una configuración compleja; ahora son ficheros `atril-<fecha>.zip` (deflate 9) o `.tar.xz` (xz 9) en carpetas (disco externo o Google Drive para escritorio), verificados y con `conservar` copias por destino. Se retiran también `scripts/backup.py` y `scripts/migrar_estacion.py` (la migración ya está hecha).
