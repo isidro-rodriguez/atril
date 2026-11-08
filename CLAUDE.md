@@ -121,6 +121,8 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   Glyphs must exist in Inter's latin subset (no ✓, ✗ or arrows). View logic without Tk lives in
   `gui/model.py` and `gui/activity.py` so it is tested without a display; window tests skip when
   there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`.
+- Every box has rounded corners: `style.card` (on the page), `style.tile` / `Tile.Atril.TFrame`
+  (inside a card) and `Atril.TNotebook` (tab content, inset by `style.TAB_INSET`).
 - GUI layout: fixed 1024x700 window (logical px, scaled with Windows and reduced if the screen is
   smaller), not resizable; no header; sidebar with logo and name; footer with service status,
   current operation and version. Every message or question is a `gui.dialogs.Modal` (centered,

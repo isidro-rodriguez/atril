@@ -5,6 +5,13 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.26.1] - 2026-11-08
+
+### Changed
+
+- Bordes redondeados también en las tarjetas de herramientas de Inicio, el detalle de
+  Actividad y el contenido de las pestañas de Ajustes, como el resto de tarjetas.
+
 ## [0.26.0] - 2026-11-08
 
 ### Added

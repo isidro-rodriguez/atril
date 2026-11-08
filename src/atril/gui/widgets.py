@@ -110,7 +110,7 @@ class Footer(tk.Frame):
         )
 
 
-class ToolTile(tk.Frame):
+class ToolTile(ttk.Frame):
     """Tarjeta de una herramienta: logotipo, nombre, estado y una acción.
 
     Todo va centrado en vertical. Pulsar el logotipo abre la web de la
@@ -127,13 +127,11 @@ class ToolTile(tk.Frame):
         on_logo: Callable[[ToolCard], None],
     ) -> None:
         """Construye la tarjeta vacía, que se rellena con :meth:`show`."""
+        factor = style.scale(parent)
         super().__init__(
             parent,
-            background=style.CARD,
-            highlightthickness=1,
-            highlightbackground=style.BORDER,
-            padx=16,
-            pady=12,
+            style="Tile.Atril.TFrame",
+            padding=(round(16 * factor), round(12 * factor)),
         )
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)

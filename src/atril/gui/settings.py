@@ -350,11 +350,11 @@ class SettingsView(tk.Frame):
         self._docling = tk.BooleanVar(self, value=True)
         self._commit = tk.StringVar(self)
 
-        self._tabs = ttk.Notebook(self)
+        self._tabs = ttk.Notebook(self, style="Atril.TNotebook")
         self._tabs.grid(row=0, column=0, sticky="nsew")
         for name, sections in TABS.items():
             tab = tk.Frame(self._tabs, background=style.CARD, padx=PAD, pady=PAD)
-            self._tabs.add(tab, text=name)
+            self._tabs.add(tab, text=name, padding=style.TAB_INSET)
             body = self._scrolled(tab) if name == "Avanzado" else tab
             row = 0
             if name == "Indexado":
@@ -547,7 +547,7 @@ class SettingsView(tk.Frame):
         """Pestaña Herramientas: mantenimiento de DeepTutor y de la configuración."""
         tab = tk.Frame(self._tabs, background=style.CARD, padx=PAD, pady=PAD)
         tab.columnconfigure(1, weight=1)
-        self._tabs.add(tab, text="Herramientas")
+        self._tabs.add(tab, text="Herramientas", padding=style.TAB_INSET)
         rows: tuple[tuple[str, str, Callable[[], None]], ...] = (
             (
                 "Instalar o reparar",

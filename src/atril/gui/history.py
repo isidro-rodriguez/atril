@@ -53,12 +53,16 @@ class HistoryView(tk.Frame):
         style.autoscroll(self._list, scroll)
         self._list.bind("<<TreeviewSelect>>", self._show_event)
 
+        box = style.tile(card, padding=(4, 4))
+        box.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
+        box.columnconfigure(0, weight=1)
+        box.rowconfigure(0, weight=1)
         self._detail = tk.Text(
-            card,
+            box,
             height=6,
             wrap="word",
             font=style.BODY,
-            background=style.PAGE,
+            background=style.CARD,
             foreground=style.TEXT,
             relief="flat",
             padx=10,
@@ -67,7 +71,7 @@ class HistoryView(tk.Frame):
         )
         for level, color in style.LEVEL_COLORS.items():
             self._detail.tag_configure(level.value, foreground=color)
-        self._detail.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
+        self._detail.grid(row=0, column=0, sticky="nsew")
 
     def refresh(self) -> bool:
         """Repinta la lista desde la actividad en memoria (no lee nada)."""
