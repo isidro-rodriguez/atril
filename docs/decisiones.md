@@ -23,7 +23,7 @@ El código de atril vive en su repo (`D:\Desarrollo\Repositorios\atril`), nunca 
 - Guías no vinculantes en KB separada de la norma vinculante.
 - Indexado documento a documento, con registro propio (`fuentes\indexado.json`) y reanudación; quitar o cambiar documentos exige reindexar (DT no purga vectores y guarda una versión nueva con el mismo nombre como `nombre (2).pdf`; el reindexado se fuerza enviando `embedding_model` = selección activa). `kb indexar` solo añade fuentes nuevas; `kb reindexar` quita versiones anteriores y retiradas por la API, añade las nuevas y reindexa.
 - ~~Backup con restic~~ (sustituido en 0.15.0 por copias zip/tar.xz, ver abajo): disco externo (conectado solo durante la copia) + Google Drive vía rclone, carpeta por defecto `Atril/`. Retención 7 diarias / 4 semanales / 12 mensuales. Git bundle de los repos dentro del snapshot. Parar DT antes de copiar (SQLite). Restaurar en la misma ruta (rutas absolutas en `kb_config.json`).
-- Interfaz: CLI Typer primero; TUI Textual solo si aporta comodidad real.
+- Interfaz: CLI Typer para uso avanzado y servidores; GUI tkinter para quien no usa la consola (ver «Interfaz gráfica»). Sin TUI.
 - README esquemático; detalle en `CLAUDE.md` y `docs/`.
 - Entrega del código: commits directos a `main` del repo en GitHub.
 
@@ -50,6 +50,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | KB | `atril kb estado [t] [kb]` · `atril kb indexar <t> [kb]` · `atril kb reindexar <kb>` · `atril kb evaluar <kb>` |
 | Backup | `atril backup` · `atril backup comprobar` · `atril backup restaurar` |
 | Configuración | `atril validar` (fase 0) |
+| Previstos (GUI) | `atril temario crear` · `atril fuentes añadir` · `atril-gui` |
 
 ## Fases
 
@@ -59,7 +60,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 3. ✅ Backup y restauración (`atril backup`, `backup comprobar`, `backup restaurar`). La restauración va a `<estación>.restaurar-<fecha>` y después se intercambia; lo actual queda en `<estación>.previo-<fecha>`.
 4. ✅ Migración de la estructura actual con `scripts\migrar_estacion.py` (plan por defecto, `--aplicar` para ejecutar; no borra nada, todo lo sobrante va a `_legado\`): `deeptutor_app` → `app` (venv apartado y recreado con `atril instalar`), `materia_normativa` → `temarios\normativa\espacio` (el historial de chats viaja con la carpeta; el catálogo de espacios de DT se actualiza), fuentes con nombre estable y registros (`registro.json`, `indexado.json`) generados por hash contra `raw\` de cada KB, de modo que no hay que reindexar. Aplicada el 2026-11-03: `kb evaluar norm-edificacion-cte` repite recall@5 1,000 y MRR 0,986.
 5. ✅ Publicación en PyPI (`publish.yml`). Los accesos directos se retiran: `atril` ya es una CLI en el `PATH`.
-6. TUI (opcional).
+6. ~~TUI (opcional)~~ → GUI tkinter, plan en «Interfaz gráfica».
 
 ## Estado actual de la instalación (a 2026-11-03)
 
@@ -102,6 +103,51 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | 2.2 Ensayo de restauración | ❌ Restaurar ya valida antes de intercambiar, deshace y conserva `.previo-*`; extraer GB para comprobar lo mismo no compensa |
 | 2.3 Diario de operaciones | ❌ Las operaciones son repetibles o atómicas; solo se avisa de restauraciones a medias |
 | 3.1 Historial, 3.3 Inventario, 4.2 Política | ❌ Auditoría de equipo; para un usuario y una estación no aporta |
+
+## Interfaz gráfica (decidida el 2026-11-08, pendiente de implementar)
+
+Motivo: un alumno sin experiencia con la consola quiere usar atril y crear sus propios temarios.
+La CLI se mantiene para usuarios avanzados e instalaciones en servidor. De la propuesta de GPT
+(`Interfaz_gráfica_…md`) se descarta lo que supone un motor que atril no tiene: editor de bloques,
+unidades y temas, generación asistida, «biblioteca», servicio de notificaciones y «último temario».
+El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta la estación.
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Tecnología | tkinter + ttk con el tema `sv-ttk` (aspecto Windows 11) | Qt, web embebida, Textual |
+| Paquete | Uno solo, `atril`: `atril` (CLI) y `atril-gui` (`[project.gui-scripts]`, sin consola) | Paquete aparte |
+| Núcleo | Nuevo `atril/ops/`: casos de uso sin Rich ni Typer que devuelven resultados o `Finding`, aceptan `progress(done, total, texto)` y un `threading.Event` de cancelación. `commands/` solo traduce argumentos, pinta y fija el código de salida; `gui/` igual con widgets. Los módulos actuales del núcleo no cambian | Capas `domain/`/`infrastructure/`; GUI que llame a la CLI por subprocess |
+| Errores | `AtrilError` (y subclases existentes) con mensaje en español; la CLI hace `fail()`, la GUI muestra un diálogo con detalle técnico | `typer.Exit` dentro de la lógica |
+| Confirmaciones | Las pide la interfaz antes de llamar a `ops`; nunca dentro de `ops` | |
+| Concurrencia | Un hilo de trabajo + `queue.Queue` leída con `after()` (Tk no admite llamadas desde otros hilos). Cancelación solo en puntos seguros (entre fuentes al indexar; antes de renombrar el `.part` de una copia). Bloqueo de estación `data/atril/atril.lock` para operaciones largas, compartido por CLI y GUI | |
+| Subprocesos | Desde `pythonw` todo `git`/`uv`/`npm`/`deeptutor` se lanza con `CREATE_NO_WINDOW` en Windows; la variable `ATRIL_ESTACION` se escribe en el registro (`winreg`) en lugar de `setx` | |
+| Secciones | Inicio (estado real, abrir DeepTutor, parar) · Temarios (temarios, KB, fuentes, descargar, comprobar, indexar) · Copias (crear, comprobar, restaurar con confirmación) · Administración (instalar, actualizar o volver a un commit, parches, validar, doctor, abrir `atril.toml`) · asistente de primera ejecución | Biblioteca, Diagnóstico y Servicios como secciones aparte |
+| Temarios del alumno | «Crear temario»: id slug a partir del nombre, `prompt.md` de plantilla, una KB `<id>` con `fuentes = ["*"]` y `vinculante = false`. «Añadir fuente»: PDF local (se copia a `fuentes/<carpeta>/`, fuente manual) o URL. Mismos casos de uso en la CLI: `atril temario crear` y `atril fuentes añadir` | Formato de temario paralelo |
+| Escritura de `temario.toml` | `tomlkit`: conserva comentarios y orden (`tomllib` solo lee); se valida con `load_syllabus` antes de guardar y se escribe vía `.nuevo` + renombrado | Regenerar el fichero (borra comentarios) |
+| Ollama | `[ollama]` pasa a ser opcional: sin ella no se indexa (`kb indexar`/`reindexar`/`evaluar` lo dicen claramente) y `arrancar` no lo levanta. El LLM puede ser de la nube, con su clave en los ajustes de DeepTutor (nunca en `atril.toml`) | |
+| Ajustes | La GUI muestra `atril.toml`, lo abre en el editor del sistema y valida al volver | Formulario completo de ajustes |
+| Bandeja | No: DeepTutor ya corre separado de la ventana; al cerrar se pregunta si pararlo | `pystray` (arrastra Pillow) |
+| Icono | `icon.png` del proyecto reducido a 256/64/32 px en `gui/recursos/` y `.ico` para el instalador | Original de 1,4 MB |
+| Distribución Windows | Instalador Inno Setup **por usuario** (sin administrador), publicado en las releases de GitHub: lleva `uv.exe`, ejecuta `uv tool install atril`, crea accesos directos con icono. Desinstalar quita programa y accesos, nunca la estación, las copias ni `ATRIL_ESTACION` | PyInstaller: no incluye git, Node.js, Ollama ni DeepTutor |
+| Dependencias externas | Al instalar DeepTutor desde la GUI: git y Node.js obligatorios, Ollama opcional. Si faltan, se ofrece `winget` (puede pedir permiso de administrador) o el enlace oficial | Meterlas en el instalador |
+| Actualizar atril | Desde la GUI: se cierra, `uv tool upgrade atril` y se reabre (Windows bloquea el `.exe` en uso). El instalador solo se rehace si cambia él mismo | |
+| Firma | Sin firma al principio (SmartScreen: «Más información → Ejecutar de todas formas») | Certificado de pago, por ahora |
+| Linux/macOS | `uv tool install atril` + `atril-gui`; sin instalador. Nada específico de Windows fuera de adaptadores | |
+
+### Plan
+
+| Fase | Contenido | Versión |
+|---|---|---|
+| 1 | `ops/` para servicio (arrancar, parar, estado) y copias; `AtrilError`; bloqueo de estación; `CREATE_NO_WINDOW`. La CLI pasa a usar `ops` sin cambios visibles | 0.17.0 |
+| 2 | Temarios del alumno en la CLI: `[ollama]` opcional, `temario crear`, `fuentes añadir` (`tomlkit`), `ops` de temarios, fuentes y KB | 0.18.0 |
+| 3 | GUI mínima: primera ejecución, Inicio, abrir y parar DeepTutor, `atril-gui`. Se prueba con el alumno | 0.19.0 |
+| 4 | GUI de Temarios (crear, añadir fuentes, descargar, comprobar, indexar con progreso y cancelación) | 0.20.0 |
+| 5 | GUI de Copias y Administración (instalar DeepTutor con comprobación de dependencias, actualizar, parches, validar, doctor) | 0.21.0 |
+| 6 | Instalador Inno Setup en las releases (job `windows-latest`), guía del alumno | 1.0.0 |
+
+Pruebas: `ops` con los mismos dobles que hoy (sin tiempo real ni servicios); en la GUI se prueba la
+lógica de las vistas y el trabajador sin pantalla; las pruebas que abren ventanas se saltan si no
+hay pantalla.
 
 ## Lecciones de la instalación previa
 
