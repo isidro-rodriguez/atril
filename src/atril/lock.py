@@ -1,26 +1,27 @@
 """Bloqueo de la estación para operaciones largas.
 
 La CLI y la GUI comparten la estación: un backup no debe empezar mientras otro
-proceso indexa o actualiza DeepTutor. El bloqueo es el fichero
-``<estación>/.atril.lock`` con el PID, la hora de inicio de ese proceso y la
-operación. Si el proceso ya no existe (o el PID se ha reutilizado), el bloqueo
-está abandonado y se sustituye.
+proceso indexa o actualiza DeepTutor. El bloqueo es un bloqueo del sistema
+operativo (``msvcrt`` en Windows, ``fcntl`` en el resto) sobre
+``<estación>/.atril.lock``: el sistema lo libera si el proceso muere, así que no
+hay bloqueos abandonados que limpiar ni carreras al sustituirlos. El fichero
+guarda quién lo tiene (PID, operación, hora) para el mensaje de ocupado y no se
+borra nunca: borrarlo permitiría a otro proceso bloquear un fichero distinto.
 """
 
 import contextlib
 import json
 import os
+import sys
 import time
 from collections.abc import Generator
 from pathlib import Path
 
-import psutil
-
 from atril.config.station import Station
 from atril.errors import AtrilError
 
-FRESH_SECONDS = 10.0
-"""Un bloqueo ilegible más reciente se considera a medio escribir (ocupado)."""
+LOCK_OFFSET = 1 << 30
+"""Byte que se bloquea en Windows: lejos del texto, que sigue siendo legible."""
 
 _held: set[Path] = set()
 """Bloqueos de este proceso: una operación puede llamar a otra sin bloquearse."""
@@ -39,77 +40,78 @@ def station_lock(station: Station, operation: str) -> Generator[None]:
         operation: Nombre de la operación, para el mensaje de ocupado.
 
     Raises:
-        BusyError: Si otro proceso vivo tiene la estación.
+        BusyError: Si otro proceso tiene la estación.
     """
     path = station.lock_file
     if path in _held:
         yield
         return
-    _acquire(path, operation)
-    _held.add(path)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
     try:
-        yield
-    finally:
-        _held.discard(path)
-        with contextlib.suppress(OSError):
-            path.unlink()
-
-
-def _acquire(path: Path, operation: str) -> None:
-    """Crea el fichero de bloqueo; sustituye uno abandonado."""
-    for _ in range(2):
+        if not try_lock(fd):
+            raise BusyError(_busy_message(path))
+        _write_holder(fd, operation)
+        _held.add(path)
         try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            _check_holder(path)
-            with contextlib.suppress(FileNotFoundError):
-                path.unlink()
-            continue
-        with os.fdopen(fd, "w", encoding="utf-8") as file:
-            json.dump(_holder(operation), file, ensure_ascii=False)
-        return
-    raise BusyError(f"no se puede reservar la estación ({path}); vuelve a intentarlo.")
+            yield
+        finally:
+            _held.discard(path)
+            with contextlib.suppress(OSError):
+                os.ftruncate(fd, 0)
+            unlock(fd)
+    finally:
+        os.close(fd)
 
 
-def _holder(operation: str) -> dict[str, object]:
-    """Datos de este proceso para el fichero de bloqueo."""
-    return {
+def try_lock(fd: int) -> bool:
+    """Intenta el bloqueo exclusivo sin esperar; ``False`` si lo tiene otro."""
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            os.lseek(fd, LOCK_OFFSET, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+def unlock(fd: int) -> None:
+    """Libera el bloqueo de ``fd``."""
+    with contextlib.suppress(OSError):
+        if sys.platform == "win32":
+            import msvcrt
+
+            os.lseek(fd, LOCK_OFFSET, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def _write_holder(fd: int, operation: str) -> None:
+    """Apunta quién tiene el bloqueo (solo informativo)."""
+    holder = {
         "pid": os.getpid(),
-        "inicio": psutil.Process().create_time(),
         "operacion": operation,
         "desde": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+    with contextlib.suppress(OSError):
+        os.ftruncate(fd, 0)
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.write(fd, json.dumps(holder, ensure_ascii=False).encode("utf-8"))
 
 
-def _check_holder(path: Path) -> None:
-    """Lanza :class:`BusyError` si el dueño del bloqueo sigue vivo."""
+def _busy_message(path: Path) -> str:
+    """Mensaje de ocupado con la operación que tiene la estación, si se sabe."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        pid, started = int(data["pid"]), float(data["inicio"])
-    except FileNotFoundError:
-        return
+        detail = f": {data['operacion']} (PID {data['pid']}, desde {data['desde']})"
     except (OSError, ValueError, KeyError, TypeError):
-        if _age(path) < FRESH_SECONDS:
-            raise BusyError("la estación está ocupada por otra operación.") from None
-        return
-    if _alive(pid, started):
-        raise BusyError(
-            f"la estación está ocupada: {data.get('operacion', '?')} "
-            f"(PID {pid}, desde {data.get('desde', '?')}). Espera a que termine."
-        )
-
-
-def _age(path: Path) -> float:
-    """Segundos desde la última modificación (infinito si no se puede leer)."""
-    try:
-        return time.time() - path.stat().st_mtime
-    except OSError:
-        return float("inf")
-
-
-def _alive(pid: int, started: float) -> bool:
-    """El proceso existe y es el mismo (no un PID reutilizado)."""
-    try:
-        return abs(psutil.Process(pid).create_time() - started) < 1.0
-    except (psutil.Error, OSError):
-        return False
+        detail = ""
+    return f"la estación está ocupada{detail}. Espera a que termine."

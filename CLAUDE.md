@@ -113,8 +113,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   scrollbars stay `ttk`. View logic without Tk lives in `gui/model.py` so it is tested without a
   display; window tests skip when there is none.
 - Long operations (backup, restore, install, update, `kb indexar`/`reindexar`) hold the station
-  lock (`lock.station_lock`, taken inside `ops`); it is reentrant within a process and an
-  abandoned lock (dead PID or reused PID) is replaced.
+  lock (`lock.station_lock`, taken inside `ops`): an OS lock (`msvcrt`/`fcntl`) on `.atril.lock`,
+  released by the OS if the process dies, reentrant within a process. Never delete the lock file.
+- Closing the GUI never kills an operation: it asks the job to cancel at a safe point (or waits
+  for it) and destroys the window only when the worker is done.
 - Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,
   `pythonw`) Windows would open an empty console window per child.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;
@@ -162,16 +164,22 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Backups are compressed archives (`zip` deflate 9 or `tar.xz` xz 9), written with the stdlib to
   the folders in `[backup] destinos` (no restic, rclone or git bundles). Each one holds
   `atril.toml`, `data/` (without `data/atril/logs/`) and `temarios/` — never `app/` — plus
-  `atril-backup.json` with the station root. DeepTutor is stopped first (SQLite) and restarted
-  after. The archive is written as `.part`, renamed, verified (zip CRC / full xz stream) and then
-  copied to the other destinations. Secret values in `data/user/settings/model_catalog.json` are
+  `atril-backup.json` (validated strictly by `backup.parse_manifest`: station root, date, version,
+  blanked keys, `completa` and the file inventory with sizes; manifests without inventory are
+  legacy and accepted). DeepTutor is stopped first (SQLite) and restarted after. Symlinks and
+  junctions are skipped. The archive is written as `.part`, renamed without overwriting
+  (`-2`...), verified (zip CRC / full xz stream and the inventory) and then copied to and verified
+  in the other destinations. An archive with unreadable files is named `…-incompleta`: excluded
+  from `archives()`, retention and restore. Secret values in `data/user/settings/model_catalog.json` are
   blanked in the archive (`backup.redact_secrets`; the original is untouched) and restore warns to
   re-enter them. Only `atril-*` files are pruned to `conservar`, and nothing is
   pruned if a file could not be read or a copy failed (exit code 1). A destination whose parent
   folder is missing is a disconnected disk and is skipped with a warning. Restore extracts to
   `<root>.restaurar-<ts>` (rejecting absolute or `..` paths), then swaps in; the current content
-  moves to `<root>.previo-<ts>` and is never deleted. A failed swap is rolled back; an archive from
-  another root requires `--nueva-ruta`.
+  moves to `<root>.previo-<ts>` and is never deleted. DeepTutor must be stopped, checked again
+  inside `restore()` right before the swap. A failed swap is rolled back; if the rollback is
+  incomplete (`SwapError.uncertain`) nothing is deleted, not even the staging folder. An archive
+  from another root requires `--nueva-ruta`.
 
 ## Project rules (load-bearing)
 

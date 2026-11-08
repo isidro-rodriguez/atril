@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from atril import backup
-from atril.backup import Archive, BackupError
+from atril.backup import Archive, BackupError, SwapError
 from atril.checks import Finding, Level, error, info, ok, warning
 from atril.config import ConfigError, load_station
 from atril.config.station import Station
@@ -117,9 +117,21 @@ def create(
             if was_running and restart:
                 service.start(dt, reporter, timeout=RESTART_TIMEOUT)
 
-        findings = [verify_finding(result.archive)]
-        findings += [copy_to(result.archive, folder) for folder in folders[1:]]
-        findings += [warning(f"No se pudo leer {item}") for item in result.unread]
+        findings = [warning(f"No se pudo leer {item}") for item in result.unread]
+        findings += [
+            warning(f"No se copia el enlace {item} (podría salir de la estación).")
+            for item in result.skipped
+        ]
+        if result.incomplete:
+            findings.append(
+                error(
+                    f"{result.archive.name}: incompleta; se guarda aparte, no cuenta "
+                    "para la retención ni se ofrece para restaurar."
+                )
+            )
+        else:
+            findings.append(verify_finding(result.archive))
+            findings += [copy_to(result.archive, folder) for folder in folders[1:]]
         if result.redacted:
             findings.append(
                 info(
@@ -163,6 +175,13 @@ def check(station: Station, reporter: Reporter) -> list[FolderReport]:
             with reporter.busy(f"Verificando {found[-1].path.name}..."):
                 findings = [verify_finding(found[-1].path)]
             findings.append(backup.latest_finding(found[-1]))
+        if broken := backup.incomplete_archives(folder):
+            findings.append(
+                warning(
+                    f"{folder}: {len(broken)} copias incompletas (no se restauran); "
+                    "bórralas cuando quieras."
+                )
+            )
         reports.append(FolderReport(folder, found, findings))
     return reports
 
@@ -176,12 +195,12 @@ def plan_restore(
         AtrilError: Si DeepTutor está en marcha, no hay copia o las carpetas de
             trabajo ya existen.
     """
-    dt = DeepTutor(station)
-    if dt.installed and (dt.backend_up() or dt.frontend_up()):
-        raise AtrilError("DeepTutor está en marcha; páralo antes de restaurar.")
+    _require_stopped(station)
     chosen = archive or _latest(station, reporter)
     if not chosen.is_file():
         raise AtrilError(f"no existe la copia {chosen}.")
+    if backup.INCOMPLETE in chosen.name:
+        raise AtrilError(f"{chosen.name} es una copia incompleta; elige otra.")
     stamp = time.strftime("%Y%m%d-%H%M%S")
     staging = station.root.with_name(f"{station.root.name}.restaurar-{stamp}")
     keep = station.root.with_name(f"{station.root.name}.previo-{stamp}")
@@ -209,10 +228,12 @@ def restore(
         AtrilError: Si la copia no es válida, es de otra ruta o falla el intercambio.
     """
     with station_lock(station, "restauración"):
+        _require_stopped(station)
+        keep_staging = False
         try:
             with reporter.busy(f"Extrayendo {plan.archive.name}..."):
                 manifest = backup.extract(plan.archive, plan.staging)
-            source = str(manifest.get("estacion", ""))
+            source = manifest.station
             if not same_root(source, station.root) and not other_root:
                 raise OtherRootError(
                     f"la copia se hizo desde {source or '?'}, no desde "
@@ -225,12 +246,27 @@ def restore(
                 raise AtrilError(
                     f"la copia no contiene una estación válida: {exc}"
                 ) from exc
-            replaced = backup.swap_in(station, plan.staging, plan.keep)
+            _require_stopped(station)  # justo antes de tocar la estación
+            try:
+                replaced = backup.swap_in(station, plan.staging, plan.keep)
+            except SwapError as exc:
+                keep_staging = exc.uncertain  # estado incierto: no se borra nada
+                raise
         finally:
-            if plan.staging.exists():
+            if plan.staging.exists() and not keep_staging:
                 shutil.rmtree(plan.staging, ignore_errors=True)
-    blanked = manifest.get("claves_vaciadas")
-    return Restored(replaced, plan.keep, int(blanked) if blanked else 0)
+    return Restored(replaced, plan.keep, manifest.blanked_keys)
+
+
+def _require_stopped(station: Station) -> None:
+    """Exige DeepTutor parado (sus bases SQLite no pueden estar abiertas).
+
+    Raises:
+        AtrilError: Si responde el backend o el frontend.
+    """
+    dt = DeepTutor(station)
+    if dt.installed and (dt.backend_up() or dt.frontend_up()):
+        raise AtrilError("DeepTutor está en marcha; páralo antes de restaurar.")
 
 
 def verify_finding(archive: Path) -> Finding:
@@ -253,7 +289,11 @@ def copy_to(archive: Path, folder: Path) -> Finding:
     except OSError as exc:
         partial.unlink(missing_ok=True)
         return error(f"{folder}: no se pudo copiar ({exc}).")
-    return ok(f"{target} copiada.")
+    try:
+        backup.verify(target)
+    except BackupError as exc:
+        return error(f"{folder}: la copia no se ha verificado ({exc}).")
+    return ok(f"{target} copiada y verificada.")
 
 
 def same_root(source: str, root: Path) -> bool:

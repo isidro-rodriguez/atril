@@ -81,7 +81,27 @@ SCRIPT = textwrap.dedent(
     app.show_view("Administración")
     settle(app)
     assert app.views["Administración"]._tools.winfo_children()
-    app.destroy()
+
+    # Cerrar con una operación en marcha: se cancela y se espera; no se corta.
+    import threading
+    from tkinter import messagebox
+    from atril.errors import CancelledError
+
+    messagebox.askyesno = lambda *args, **kwargs: True
+    started = threading.Event()
+
+    def slow(reporter):
+        started.set()
+        app.worker.cancel.wait(5)
+        raise CancelledError("cancelado en un punto seguro")
+
+    app.run("Operación lenta", slow, lambda _: None)
+    started.wait(5)
+    app.close()
+    assert not app.closed  # sigue abierta mientras el trabajo no termina
+    app.worker._thread.join(5)
+    app._poll()
+    assert app.closed
     print("VENTANA-OK", flush=True)
     os._exit(0)
     """

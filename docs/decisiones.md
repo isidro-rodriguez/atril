@@ -198,7 +198,7 @@ Referencia visual: «Panel educativo Atril en español» (dirección estética, 
 
 | Fase | Contenido | Versión |
 |---|---|---|
-| A | Correcciones de la revisión | 0.22.0 |
+| A ✅ | Correcciones de la revisión | 0.22.0 |
 | B | Base visual: recursos, componentes, navegación, cabecera, actividad estructurada | 0.23.0 |
 | C | Apartados nuevos sin perder funciones | 0.24.0 |
 | D | Validación de resoluciones y escalado; después, el instalador (en espera) | 1.0.0 |

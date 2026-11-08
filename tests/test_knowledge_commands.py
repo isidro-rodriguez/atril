@@ -21,6 +21,7 @@ from atril.knowledge import (
     content_digest,
     ledger_path,
 )
+from atril.lock import station_lock
 from atril.main import app
 from atril.ollama import OllamaStatus
 from atril.ops import knowledge as knowledge_ops
@@ -366,7 +367,8 @@ def test_index_cancel_stops_in_tick_and_keeps_source_pending(
 
     ledger = Ledger(ledger_path(syllabus))
     assert not ledger.kb("norm-edificacion-cte").sources  # nada se da por indexado
-    assert not load_station(station).lock_file.exists()
+    with station_lock(load_station(station), "comprobar"):
+        pass  # liberado
 
 
 def test_download_cancel_between_sources(station: Path) -> None:

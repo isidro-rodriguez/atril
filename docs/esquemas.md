@@ -14,8 +14,9 @@ y `temarios\`.
 
 Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`),
 `temarios\<id>\`. Mientras dura una operación larga (backup, restauración, instalación,
-actualización, indexado) existe `.atril.lock` en la raíz: otra no puede empezar hasta que termine.
-Si el proceso que lo creó ya no existe, se sustituye.
+actualización, indexado) atril bloquea `.atril.lock` en la raíz con un bloqueo del sistema: otra
+no puede empezar hasta que termine, y si el proceso muere el sistema lo libera. El fichero se
+queda (solo indica quién lo tuvo por última vez).
 
 | Tabla | Clave | Tipo | Defecto | Notas |
 |---|---|---|---|---|
@@ -48,9 +49,12 @@ embedding). `atril kb indexar` vuelve a aplicar `[indexado]` antes de empezar. S
 | | `formato` | `zip` · `tar.xz` | `"zip"` | `zip` (deflate 9) o `tar.xz` (xz 9: más compacto, bastante más lento) |
 | | `conservar` | entero ≥ 1 | `7` | Copias que se guardan en cada destino; las más antiguas se borran |
 
-Cada copia es `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`) con `atril.toml`, `data\` (sin
-`data\atril\logs\`) y `temarios\`, más `atril-backup.json` con la ruta de la estación. Se escribe
-como `.part`, se verifica y después se copia al resto de destinos.
+Cada copia es `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`; `-2`, `-3`... si coincide el segundo)
+con `atril.toml`, `data\` (sin `data\atril\logs\`) y `temarios\`, más `atril-backup.json`: ruta
+de la estación, fecha, versión de atril, claves vaciadas, `completa` y el inventario de ficheros
+con su tamaño. Se escribe como `.part`, se verifica contra el inventario y se copia y verifica en
+el resto de destinos. Los enlaces simbólicos y uniones no se copian. Si algún fichero no se pudo
+leer, la copia queda como `atril-…-incompleta.zip`: no se restaura ni cuenta para `conservar`.
 
 ## `temario.toml` (temario)
 

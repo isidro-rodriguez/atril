@@ -51,6 +51,8 @@ class App(tk.Tk):
         self._actions: list[ttk.Button] = []
         self._cancels: list[ttk.Button] = []
         self._idle = True
+        self._closing = False
+        self.closed = False
         self._images = _load_icons(self)
         self.title("Atril")
         self.iconphoto(True, *self._images.values())
@@ -76,6 +78,8 @@ class App(tk.Tk):
 
         Con ``quiet`` (lecturas al cambiar de apartado) no avisa si está ocupado.
         """
+        if self._closing:
+            return False
         if not self.worker.submit(task, on_done, self._show_error):
             if not quiet:
                 self.log(Level.WARNING, "Espera a que termine la operación en curso.")
@@ -120,16 +124,31 @@ class App(tk.Tk):
         self._views[name][1].refresh()
 
     def close(self) -> None:
-        """Cierra la ventana; si DeepTutor está en marcha, pregunta si pararlo."""
-        if self.worker.running and not messagebox.askyesno(
-            "Atril",
-            "Hay una operación en curso. Si sales ahora quedará a medias. ¿Salir?",
-            icon="warning",
-            parent=self,
-        ):
+        """Cierra la ventana sin dejar operaciones a medias.
+
+        Con una operación en marcha se le pide que pare en un punto seguro (o se
+        espera a que termine si no admite cancelación) y la ventana se cierra
+        después: nunca se corta el trabajo. Si DeepTutor sigue en marcha, se
+        pregunta si pararlo.
+        """
+        if self._closing:
+            return
+        if self.worker.running:
+            if messagebox.askyesno(
+                "Atril",
+                "Hay una operación en curso. Atril la parará en cuanto sea seguro "
+                "(o esperará a que termine si no se puede parar) y se cerrará "
+                "después. ¿Cerrar?",
+                icon="warning",
+                parent=self,
+            ):
+                self._closing = True
+                self.worker.cancel.set()
+                self.log(Level.INFO, "Cerrando: esperando a que la operación pare...")
+                self._status.configure(text="Cerrando al terminar la operación...")
             return
         dt = DeepTutor(self.station)
-        if not self.worker.running and dt.installed and dt.backend_up():
+        if dt.installed and dt.backend_up():
             answer = messagebox.askyesnocancel(
                 "Atril",
                 "DeepTutor sigue en marcha. ¿Pararlo antes de salir?\n\n"
@@ -277,6 +296,9 @@ class App(tk.Tk):
     def _poll(self) -> None:
         """Reparte los avisos del trabajo y vuelve a programarse."""
         self.worker.poll()
+        if self._closing and not self.worker.running:
+            self._quit(None)
+            return
         if not self.worker.running and not self._idle:
             self._set_idle(True)
             self.on_busy(None)
@@ -323,7 +345,7 @@ class App(tk.Tk):
         """Muestra un error en la actividad y, salvo cancelaciones, en un diálogo."""
         message = str(exc) if isinstance(exc, AtrilError) else repr(exc)
         message = message[:1].upper() + message[1:]
-        if isinstance(exc, CancelledError):
+        if isinstance(exc, CancelledError) or self._closing:
             self.log(Level.WARNING, message)
             return
         self.log(Level.ERROR, message)
@@ -346,6 +368,7 @@ class App(tk.Tk):
 
     def _quit(self, _: object) -> None:
         """Cierra la aplicación."""
+        self.closed = True
         self.destroy()
 
 

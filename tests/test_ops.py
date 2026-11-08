@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import subprocess
@@ -5,12 +6,11 @@ import sys
 import threading
 from pathlib import Path
 
-import psutil
 import pytest
 from support import write
 from typer.testing import CliRunner
 
-from atril import backup, processes
+from atril import backup, lock, processes
 from atril.config import load_station
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor, Orphans
@@ -42,10 +42,18 @@ def idle(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: False)
 
 
-def _hold(station: Station, pid: int, started: float) -> None:
-    """Simula el bloqueo de otro proceso."""
-    data = {"pid": pid, "inicio": started, "operacion": "indexado", "desde": "hoy"}
-    station.lock_file.write_text(json.dumps(data), encoding="utf-8")
+@contextlib.contextmanager
+def _held_elsewhere(station: Station):
+    """Bloqueo tomado por otro «proceso» (otro descriptor), con su ficha."""
+    fd = os.open(station.lock_file, os.O_RDWR | os.O_CREAT)
+    try:
+        assert lock.try_lock(fd)
+        holder = {"pid": 4242, "operacion": "indexado", "desde": "hoy"}
+        os.write(fd, json.dumps(holder).encode())
+        yield
+    finally:
+        lock.unlock(fd)
+        os.close(fd)
 
 
 # --- bloqueo -------------------------------------------------------------------
@@ -53,35 +61,51 @@ def _hold(station: Station, pid: int, started: float) -> None:
 
 def test_lock_is_released_and_reentrant(station: Station) -> None:
     with station_lock(station, "copia"):
-        assert station.lock_file.is_file()
-        with station_lock(station, "arranque"):  # la misma operación anida otra
-            pass
-        assert station.lock_file.is_file()
-    assert not station.lock_file.exists()
-
-
-def test_lock_held_by_live_process_is_busy(station: Station) -> None:
-    me = psutil.Process()
-    _hold(station, me.pid, me.create_time())
-
-    with pytest.raises(BusyError, match="indexado"), station_lock(station, "copia"):
-        pass
-    assert station.lock_file.is_file()  # no se toca el bloqueo ajeno
-
-
-def test_abandoned_lock_is_replaced(station: Station) -> None:
-    _hold(station, os.getpid(), 1.0)  # mismo PID, otro inicio: PID reutilizado
-
-    with station_lock(station, "copia"):
         holder = json.loads(station.lock_file.read_text(encoding="utf-8"))
         assert holder["operacion"] == "copia"
+        with station_lock(station, "arranque"):  # la misma operación anida otra
+            pass
+    fd = os.open(station.lock_file, os.O_RDWR)
+    try:
+        assert lock.try_lock(fd)  # liberado al salir
+    finally:
+        lock.unlock(fd)
+        os.close(fd)
+
+
+def test_lock_held_elsewhere_is_busy(station: Station) -> None:
+    with (
+        _held_elsewhere(station),
+        pytest.raises(BusyError, match=r"indexado \(PID 4242"),
+        station_lock(station, "copia"),
+    ):
+        pass
+
+
+def test_leftover_lock_file_does_not_block(station: Station) -> None:
+    station.lock_file.write_text('{"pid": 1, "operacion": "vieja"}', "utf-8")
+
+    with station_lock(station, "copia"):  # nadie lo tiene: el fichero no basta
+        assert "copia" in station.lock_file.read_text(encoding="utf-8")
+
+
+def test_lock_released_when_process_dies(station: Station) -> None:
+    script = (
+        "import os, sys; from atril import lock; "
+        "fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT); "
+        "assert lock.try_lock(fd); os._exit(0)"
+    )
+    subprocess.run([sys.executable, "-c", script, str(station.lock_file)], check=True)
+
+    with station_lock(station, "copia"):
+        pass
 
 
 def test_backup_command_refuses_busy_station(station: Station, idle: None) -> None:
-    me = psutil.Process()
-    _hold(station, me.pid, me.create_time())
-
-    result = runner.invoke(app, ["backup"], env={"ATRIL_ESTACION": str(station.root)})
+    with _held_elsewhere(station):
+        result = runner.invoke(
+            app, ["backup"], env={"ATRIL_ESTACION": str(station.root)}
+        )
 
     assert result.exit_code == 1
     assert "ocupada" in result.output
@@ -100,7 +124,7 @@ def test_create_returns_result_without_console(station: Station, idle: None) -> 
     assert created.files >= 2
     assert "Comprimiendo" in recorder.steps
     assert any("verificada" in f.message for f in recorder.findings)
-    assert not station.lock_file.exists()
+    _assert_free(station)
 
 
 def test_cancelled_backup_leaves_nothing(station: Station, idle: None) -> None:
@@ -111,7 +135,7 @@ def test_cancelled_backup_leaves_nothing(station: Station, idle: None) -> None:
         operations.create(station, Recorder(), cancel=cancel)
 
     assert not list(station.backup.destinations[0].iterdir())
-    assert not station.lock_file.exists()
+    _assert_free(station)
 
 
 def test_restore_plan_refuses_running_deeptutor(
@@ -162,3 +186,13 @@ def test_no_window_only_without_console(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(sys, "stdout", None)
     flag = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
     assert processes.no_window() == flag
+
+
+def _assert_free(station: Station) -> None:
+    """Nadie tiene el bloqueo de la estación."""
+    fd = os.open(station.lock_file, os.O_RDWR | os.O_CREAT)
+    try:
+        assert lock.try_lock(fd)
+    finally:
+        lock.unlock(fd)
+        os.close(fd)

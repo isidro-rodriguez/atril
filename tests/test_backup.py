@@ -1,5 +1,6 @@
 import json
 import shutil
+import sys
 import tarfile
 import time
 import zipfile
@@ -14,8 +15,10 @@ from atril.backup import BackupError
 from atril.config import load_station
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
+from atril.errors import AtrilError
 from atril.main import app
-from atril.ops import service
+from atril.ops import Recorder, service
+from atril.ops import backup as ops_backup
 
 runner = CliRunner()
 
@@ -74,10 +77,12 @@ def test_create_verify_and_extract(
     assert sum(seen) == result.read_bytes
     assert not list(_folder(station).glob("*.part"))
     manifest = backup.verify(result.archive)
-    assert manifest["estacion"] == str(station.root)
+    assert manifest.station == str(station.root)
+    assert manifest.complete is True
+    assert manifest.files == result.inventory
 
     target = tmp_path / "extraido"
-    assert backup.extract(result.archive, target)["estacion"] == str(station.root)
+    assert backup.extract(result.archive, target).station == str(station.root)
     assert (target / "data" / "user" / "settings.json").read_text() == (
         '{"tema": "claro"}'
     )
@@ -212,8 +217,8 @@ def test_unreadable_file_makes_backup_incomplete(
     write(_folder(station) / backup.archive_name("zip", "20200101-000000"), "vieja")
     real_files = backup.station_files
 
-    def with_missing(station: Station):
-        yield from real_files(station)
+    def with_missing(station: Station, skipped=None):
+        yield from real_files(station, skipped)
         yield station.root / "data" / "bloqueado.db", "data/bloqueado.db"
 
     monkeypatch.setattr(backup, "station_files", with_missing)
@@ -223,7 +228,11 @@ def test_unreadable_file_makes_backup_incomplete(
     assert result.exit_code == 1
     assert "INCOMPLETO" in result.output
     assert "bloqueado.db" in result.output
-    assert len(backup.archives(_folder(station))) == 2  # no se borra la antigua
+    assert len(backup.archives(_folder(station))) == 1  # no se borra la antigua
+    (incomplete,) = backup.incomplete_archives(_folder(station))
+    assert "-incompleta" in incomplete.name  # no cuenta ni se restaura
+    with pytest.raises(BackupError, match="incompleta"):
+        backup.verify(incomplete)
 
 
 def test_backup_stops_and_restarts_deeptutor(
@@ -273,7 +282,9 @@ def test_restore_from_other_path_needs_flag(
 ) -> None:
     archive = tmp_path / backup.archive_name("zip", "20261101-010000")
     with zipfile.ZipFile(archive, "w") as zipped:
-        zipped.writestr(backup.MANIFEST, json.dumps({"estacion": "D:/otra"}))
+        zipped.writestr(
+            backup.MANIFEST, json.dumps({**LEGACY_MANIFEST, "estacion": "D:/otra"})
+        )
         zipped.writestr("data/user/settings.json", '{"tema": "de otra"}')
         zipped.write(station.root / "atril.toml", "atril.toml")
 
@@ -292,7 +303,10 @@ def test_restore_rejects_archive_without_station(
 ) -> None:
     archive = tmp_path / backup.archive_name("zip", "20261101-010000")
     with zipfile.ZipFile(archive, "w") as zipped:
-        zipped.writestr(backup.MANIFEST, json.dumps({"estacion": str(station.root)}))
+        zipped.writestr(
+            backup.MANIFEST,
+            json.dumps({**LEGACY_MANIFEST, "estacion": str(station.root)}),
+        )
         zipped.writestr("data/user/settings.json", "{}")
     before = (station.root / "atril.toml").read_text(encoding="utf-8")
 
@@ -333,11 +347,140 @@ def test_backup_blanks_api_keys_and_restore_warns(station: Station, idle: None) 
 def test_verify_requires_station_structure(tmp_path: Path) -> None:
     archive = tmp_path / backup.archive_name("zip", "20261101-010000")
     with zipfile.ZipFile(archive, "w") as zipped:
-        zipped.writestr(backup.MANIFEST, "{}")
+        zipped.writestr(backup.MANIFEST, json.dumps(LEGACY_MANIFEST))
         zipped.writestr("atril.toml", "")
 
     with pytest.raises(BackupError, match="data/, temarios/"):
         backup.verify(archive)
+
+
+LEGACY_MANIFEST = {
+    "estacion": "D:/DeepTutor",
+    "fecha": "2026-11-01T01:00:00",
+    "atril": "0.21.0",
+    "claves_vaciadas": 0,
+}
+"""Manifiesto de una copia anterior al inventario (sigue siendo válida)."""
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"no es json",
+        b"[]",
+        b'"texto"',
+        b"{}",
+        json.dumps({**LEGACY_MANIFEST, "claves_vaciadas": "2"}).encode(),
+        json.dumps({**LEGACY_MANIFEST, "claves_vaciadas": True}).encode(),
+        json.dumps({**LEGACY_MANIFEST, "fecha": "ayer"}).encode(),
+        json.dumps({**LEGACY_MANIFEST, "estacion": 3}).encode(),
+        json.dumps({**LEGACY_MANIFEST, "completa": True}).encode(),
+        json.dumps({**LEGACY_MANIFEST, "completa": 1, "ficheros": {}}).encode(),
+        json.dumps({**LEGACY_MANIFEST, "completa": True, "ficheros": []}).encode(),
+        json.dumps(
+            {**LEGACY_MANIFEST, "completa": True, "ficheros": {"a": -1}}
+        ).encode(),
+        json.dumps({**LEGACY_MANIFEST, "otra": 1}).encode(),
+    ],
+)
+def test_manifest_is_validated_strictly(raw: bytes) -> None:
+    with pytest.raises(BackupError, match="manifiesto no válido"):
+        backup.parse_manifest(raw, "copia.zip")
+
+
+def test_legacy_manifest_is_accepted() -> None:
+    manifest = backup.parse_manifest(json.dumps(LEGACY_MANIFEST).encode(), "c.zip")
+    assert (manifest.complete, manifest.files) == (None, None)
+
+
+def test_verify_checks_inventory(station: Station, tmp_path: Path) -> None:
+    archive = backup.create(station, _folder(station)).archive
+    tampered = tmp_path / archive.name
+    with zipfile.ZipFile(archive) as source, zipfile.ZipFile(tampered, "w") as out:
+        for info in source.infolist():
+            if info.filename != "atril.toml":
+                out.writestr(info, source.read(info))
+        out.writestr("atril.toml", source.read("atril.toml") + b"# cambiado\n")
+        out.writestr("data/intruso.txt", "x")
+
+    with pytest.raises(BackupError, match="inventario"):
+        backup.verify(tampered)
+
+
+def test_same_second_does_not_overwrite(
+    station: Station, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(backup.time, "strftime", lambda fmt: "20261108-090000")
+    first = backup.create(station, _folder(station)).archive
+    second = backup.create(station, _folder(station)).archive
+
+    assert first.name == "atril-20261108-090000.zip"
+    assert second.name == "atril-20261108-090000-2.zip"
+    assert [a.stamp for a in backup.archives(_folder(station))] == [
+        "20261108-090000",
+        "20261108-090000-2",
+    ]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="crear enlaces pide permisos")
+def test_symlinks_are_skipped(station: Station, tmp_path: Path) -> None:
+    outside = write(tmp_path / "fuera" / "secreto.txt", "no debe copiarse")
+    (station.root / "data" / "enlace.txt").symlink_to(outside)
+    (station.root / "temarios" / "carpeta").symlink_to(outside.parent)
+
+    result = backup.create(station, _folder(station))
+
+    assert sorted(result.skipped) == ["data/enlace.txt", "temarios/carpeta"]
+    assert "data/enlace.txt" not in result.inventory
+    assert not result.incomplete
+
+
+def test_secondary_copy_is_verified(
+    station: Station, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = backup.create(station, _folder(station)).archive
+    real_verify = backup.verify
+
+    def broken_on_second(path: Path):
+        if path.parent != archive.parent:
+            raise BackupError("dañada")
+        return real_verify(path)
+
+    monkeypatch.setattr(backup, "verify", broken_on_second)
+
+    finding = ops_backup.copy_to(archive, tmp_path / "otro")
+
+    assert finding.level.name == "ERROR"
+    assert "no se ha verificado" in finding.message
+
+
+def test_restore_rechecks_deeptutor_after_confirmation(
+    station: Station, idle: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backup.create(station, _folder(station))
+    plan = ops_backup.plan_restore(station, Recorder())
+    write(station.deeptutor_cli, "")
+    monkeypatch.setattr(DeepTutor, "backend_up", lambda self: True)  # arranca ahora
+
+    with pytest.raises(AtrilError, match="en marcha"):
+        ops_backup.restore(station, plan, Recorder())
+    assert not plan.keep.exists()
+
+
+def test_uncertain_swap_keeps_extracted_copy(
+    station: Station, idle: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backup.create(station, _folder(station))
+    plan = ops_backup.plan_restore(station, Recorder())
+
+    def fail(*args, **kwargs):
+        raise backup.SwapError("no se ha podido deshacer", uncertain=True)
+
+    monkeypatch.setattr(backup, "swap_in", fail)
+
+    with pytest.raises(backup.SwapError):
+        ops_backup.restore(station, plan, Recorder())
+    assert plan.staging.is_dir()  # se conserva para recuperar a mano
 
 
 def test_latest_finding_age() -> None:

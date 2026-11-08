@@ -5,6 +5,33 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.22.0] - 2026-11-08
+
+Correcciones de la revisión externa de la 0.21.0, antes del rediseño de la GUI.
+
+### Fixed
+
+- Cerrar la ventana con una operación en marcha ya no la corta: se le pide que pare en un punto
+  seguro (o se espera a que termine) y la ventana se cierra después.
+- Una copia con ficheros sin leer quedaba como copia normal: contaba para `conservar` y podía
+  restaurarse. Ahora se guarda como `atril-…-incompleta`, fuera de la retención y de la
+  restauración, y `backup comprobar` avisa de ellas.
+- La verificación contrasta la copia con el inventario del manifiesto (nombres y tamaños), no solo
+  el CRC del zip o el flujo del xz.
+- Un manifiesto con estructura o tipos incorrectos daba una traza de Python; ahora se valida
+  estrictamente y es un error claro. Las copias anteriores (sin inventario) siguen valiendo.
+- La restauración vuelve a comprobar que DeepTutor está parado justo antes del intercambio.
+- Si el intercambio falla y no se puede deshacer del todo, ya no se borra la carpeta extraída.
+- Los enlaces simbólicos y uniones ya no se copian (podían meter ficheros de fuera de la estación).
+- Dos copias en el mismo segundo ya no se pisan (`-2`, `-3`...).
+- Las copias en los demás destinos también se verifican; si una falla no se borran antiguas.
+- El bloqueo de la estación usa el bloqueo del sistema (`msvcrt`/`fcntl`): dos procesos ya no
+  pueden quedarse a la vez con un bloqueo abandonado.
+
+### Changed
+
+- El manifiesto de las copias añade `completa` y el inventario de ficheros.
+
 ## [0.21.0] - 2026-11-08
 
 Fase 5: todo lo necesario para instalar y mantener la estación sin consola.
