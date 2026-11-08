@@ -1,4 +1,4 @@
-Logotipos de las herramientas que usa atril (DeepTutor, Ollama, Git, uv y Node.js).
+Logotipos de las herramientas que usa atril (DeepTutor, Ollama, Python, uv, Node.js, npm y Git).
 
 Son marcas de sus respectivos titulares y no forman parte de la licencia MIT de atril.
 Se incluyen solo para identificar cada herramienta en la ventana de atril, sin
@@ -7,6 +7,8 @@ ni relación con sus titulares.
 
 - Git: logotipo de Jason Long, CC BY 3.0 (https://git-scm.com/downloads/logos).
 - Node.js: marca de la OpenJS Foundation.
+- npm: marca de npm, Inc. (GitHub).
+- Python: marca de la Python Software Foundation.
 - uv: marca de Astral Software Inc.
 - Ollama: marca de Ollama Inc.
 - DeepTutor: logotipo del proyecto HKUDS/DeepTutor.

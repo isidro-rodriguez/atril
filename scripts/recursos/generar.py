@@ -39,8 +39,6 @@ ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     "activity": (22, (("nav", NAV), ("sel", SELECTED))),
     "settings": (22, (("nav", NAV), ("sel", SELECTED))),
     "bot": (BRAND, (("marca", NAV),)),
-    "terminal": (BRAND, (("marca", NAV),)),
-    "package": (BRAND, (("marca", NAV),)),
     "circle-check": (18, (("ok", "#1a8f3c"),)),
     "info": (18, (("info", "#0f5ec9"),)),
     "triangle-alert": (18, (("aviso", "#d97706"),)),

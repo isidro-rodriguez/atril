@@ -240,14 +240,14 @@ def icon(root: tk.Misc, name: str, base: int = 22) -> tk.PhotoImage:
     return _images[key]
 
 
-GENERIC_LOGOS = {"python": "terminal-marca", "npm": "package-marca"}
-"""Icono genérico de las herramientas sin logotipo en ``marcas/``."""
+GENERIC_LOGO = "bot-marca"
+"""Icono de las herramientas sin logotipo en ``marcas/`` (el asistente)."""
 
 
 def brand(root: tk.Misc, name: str, base: int = 36) -> tk.PhotoImage:
     """Logotipo de una herramienta (``marcas/``) al tamaño más cercano a ``base``.
 
-    Sin logotipo propio se usa un icono genérico (:data:`GENERIC_LOGOS`).
+    Sin logotipo propio se usa un icono genérico (:data:`GENERIC_LOGO`).
     """
     wanted = base * scale(root)
     sizes = [
@@ -256,7 +256,7 @@ def brand(root: tk.Misc, name: str, base: int = 36) -> tk.PhotoImage:
         if entry.name.startswith(f"{name}-") and entry.name.endswith(".png")
     ]
     if not sizes:
-        return icon(root, GENERIC_LOGOS.get(name, "bot-marca"), base)
+        return icon(root, GENERIC_LOGO, base)
     size = min(sizes, key=lambda candidate: abs(candidate - wanted))
     key = (f"marca-{name}", size)
     if key not in _images:
