@@ -75,7 +75,9 @@ def test_install_stops_on_step_error(
 
 
 def test_update_same_version(station: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(Installer, "update_checkout", lambda self: ("a1 x", "a1 x"))
+    monkeypatch.setattr(
+        Installer, "update_checkout", lambda self, commit=None: ("a1 x", "a1 x")
+    )
     monkeypatch.setattr(
         Installer, "python_env", lambda self, docling: pytest.fail("no debe reinstalar")
     )
@@ -84,7 +86,7 @@ def test_update_same_version(station: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
     assert result.exit_code == 0, result.output
     assert "paginas-citas: deshecho." in result.output
-    assert "Ya en la última versión" in result.output
+    assert "Sin cambios" in result.output
     assert "paginas-citas: aplicado." in result.output
     assert "runtime_settings" in result.output and "doctor" in result.output
     assert PATCH.new in (load_station(station).app_dir / PATCH.file).read_text()
@@ -93,7 +95,9 @@ def test_update_same_version(station: Path, monkeypatch: pytest.MonkeyPatch) -> 
 def test_update_recreates_venv_with_other_python(
     station: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(Installer, "update_checkout", lambda self: ("a1 x", "a1 x"))
+    monkeypatch.setattr(
+        Installer, "update_checkout", lambda self, commit=None: ("a1 x", "a1 x")
+    )
     monkeypatch.setattr(Installer, "venv_matches", lambda self: False)
 
     result = _invoke(station, "actualizar")
@@ -105,7 +109,9 @@ def test_update_recreates_venv_with_other_python(
 def test_update_fails_on_doctor_error(
     station: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(Installer, "update_checkout", lambda self: ("a1 x", "a1 x"))
+    monkeypatch.setattr(
+        Installer, "update_checkout", lambda self, commit=None: ("a1 x", "a1 x")
+    )
     monkeypatch.setattr(Installer, "doctor", lambda self: [error("LLM: sin clave")])
 
     result = _invoke(station, "actualizar")
@@ -123,7 +129,9 @@ def test_update_new_version_restarts(
     monkeypatch.setattr(
         commands, "launch", lambda dt, timeout: calls.append("arrancar")
     )
-    monkeypatch.setattr(Installer, "update_checkout", lambda self: ("a1 x", "b2 y"))
+    monkeypatch.setattr(
+        Installer, "update_checkout", lambda self, commit=None: ("a1 x", "b2 y")
+    )
     hashes = iter(["lock-1", "lock-2"])
     monkeypatch.setattr(Installer, "frontend_lock_hash", lambda self: next(hashes))
     forced: list[bool] = []
@@ -146,7 +154,7 @@ def test_update_fails_when_patch_no_longer_fits(
 ) -> None:
     app_file = load_station(station).app_dir / PATCH.file
 
-    def new_code(self: Installer) -> tuple[str, str]:
+    def new_code(self: Installer, commit: str | None = None) -> tuple[str, str]:
         app_file.write_text("codigo reescrito\n")
         return ("a1 x", "b2 y")
 
@@ -157,3 +165,23 @@ def test_update_fails_when_patch_no_longer_fits(
 
     assert result.exit_code == 1
     assert "ha cambiado" in result.output
+
+
+def test_update_to_commit_shows_how_to_go_back(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str | None] = []
+    old = "a" * 40
+
+    def checkout(self: Installer, commit: str | None = None) -> tuple[str, str]:
+        calls.append(commit)
+        return (f"{old} viejo", f"{'b' * 40} nuevo")
+
+    monkeypatch.setattr(Installer, "update_checkout", checkout)
+    monkeypatch.setattr(Installer, "frontend_lock_hash", lambda self: "igual")
+
+    result = _invoke(station, "actualizar", "--commit", "c" * 40)
+
+    assert result.exit_code == 0, result.output
+    assert calls == ["c" * 40]
+    assert f"atril actualizar --commit {old}" in result.output

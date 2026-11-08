@@ -102,7 +102,8 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   rewrites); `kb indexar` reapplies it before indexing.
 - `app/` is a shallow clone: update with `fetch --depth 1` + `reset --hard FETCH_HEAD`, only on a
   clean tree, after reverting patches and after checking that `origin` and the current branch match
-  `atril.toml` (abort otherwise). `actualizar` reapplies `config apply`, parser/chunks and `doctor`;
+  `atril.toml` (abort otherwise). `actualizar --commit <full sha>` goes to that commit instead
+  (rollback; GitHub serves reachable SHAs to shallow fetches). `actualizar` reapplies `config apply`, parser/chunks and `doctor`;
   a venv with another Python version is recreated (`uv venv --clear`).
 - State files (`registro.json`, `indexado.json`) are `{"version": 1, "<section>": {...}}` with
   exact fields and types (`_toml.load_state` / `check_record`); anything else raises
@@ -130,7 +131,9 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   `atril.toml`, `data/` (without `data/atril/logs/`) and `temarios/` — never `app/` — plus
   `atril-backup.json` with the station root. DeepTutor is stopped first (SQLite) and restarted
   after. The archive is written as `.part`, renamed, verified (zip CRC / full xz stream) and then
-  copied to the other destinations; only `atril-*` files are pruned to `conservar`, and nothing is
+  copied to the other destinations. Secret values in `data/user/settings/model_catalog.json` are
+  blanked in the archive (`backup.redact_secrets`; the original is untouched) and restore warns to
+  re-enter them. Only `atril-*` files are pruned to `conservar`, and nothing is
   pruned if a file could not be read or a copy failed (exit code 1). A destination whose parent
   folder is missing is a disconnected disk and is skipped with a warning. Restore extracts to
   `<root>.restaurar-<ts>` (rejecting absolute or `..` paths), then swaps in; the current content

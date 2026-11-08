@@ -91,6 +91,18 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | 2.ª revisión: `doctor` con elementos raros, `instalar` sobre otro checkout | `StepError` y se para |
 | 2.ª revisión: git bundles (P1.1, P2.2) | No aplica: backups en zip/tar.xz desde 0.15.0 |
 
+## Funcionalidades sugeridas por GPT (0.16.0)
+
+| Sugerencia | Decisión |
+|---|---|
+| 5.1 Secretos en copias | ✅ Las claves de API de `model_catalog.json` se vacían en la copia (sin restic ya no hay cifrado); restaurar avisa de reescribirlas |
+| 4.1 Versiones y rollback | ✅ `atril actualizar --commit <sha>`; tras actualizar se muestra el comando para volver. atril ya se fija con `uv tool install atril==X` |
+| 3.2 / 6.1 doctor y estado | ✅ `atril estado` añade espacio libre (estación y destinos), última copia y restauraciones a medias (lo esencial de 2.3) |
+| 2.1 Verificar copias | ✅ `backup comprobar` exige `atril.toml`, `data/` y `temarios/` y avisa si la última tiene más de 7 días |
+| 2.2 Ensayo de restauración | ❌ Restaurar ya valida antes de intercambiar, deshace y conserva `.previo-*`; extraer GB para comprobar lo mismo no compensa |
+| 2.3 Diario de operaciones | ❌ Las operaciones son repetibles o atómicas; solo se avisa de restauraciones a medias |
+| 3.1 Historial, 3.3 Inventario, 4.2 Política | ❌ Auditoría de equipo; para un usuario y una estación no aporta |
+
 ## Lecciones de la instalación previa
 
 - Backup: se retiran restic, rclone y los git bundles. Las KB ocupan varios GB y rclone exigía una configuración compleja; ahora son ficheros `atril-<fecha>.zip` (deflate 9) o `.tar.xz` (xz 9) en carpetas (disco externo o Google Drive para escritorio), verificados y con `conservar` copias por destino. Se retiran también `scripts/backup.py` y `scripts/migrar_estacion.py` (la migración ya está hecha).

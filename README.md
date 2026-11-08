@@ -27,10 +27,10 @@ atril validar                    # valida atril.toml y el temario.toml de cada t
 
 ```bash
 atril instalar                   # instala DeepTutor en app\ o completa la instalación
-atril actualizar                 # trae la última versión de la rama y reaplica ajustes y parches
+atril actualizar [--commit <sha>]  # última versión de la rama (o vuelta a un commit) y reaplica ajustes
 atril arrancar                   # arranca DeepTutor (y Ollama si hace falta)
 atril parar                      # detiene DeepTutor y cierra sus procesos huérfanos
-atril estado                     # estado de DeepTutor, sus parches y Ollama
+atril estado                     # DeepTutor, parches, Ollama, espacio libre y última copia
 atril parches [--comprobar]      # aplica los parches de atril.toml sobre app\
 ```
 
@@ -56,13 +56,14 @@ atril kb evaluar <kb> [-k 5]     # mide la recuperación y la compara con el inf
 
 ```bash
 atril backup                     # comprime la estación (sin app\) en cada destino y borra las antiguas
-atril backup comprobar           # lista las copias de cada destino y verifica la más reciente
+atril backup comprobar           # verifica la copia más reciente de cada destino y su antigüedad
 atril backup restaurar [copia]   # restaura (por defecto, la más reciente); lo actual queda en <estación>.previo-*
 ```
 
 Las copias son ficheros `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`) en las carpetas de
 `[backup] destinos`: un disco externo o la carpeta de Google Drive para escritorio. No hace falta
-instalar nada más.
+instalar nada más. Las claves de API de DeepTutor se copian vacías: tras restaurar hay que
+volver a escribirlas.
 
 Configuración: [`docs/esquemas.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](https://github.com/isidro-rodriguez/atril/blob/main/docs/ejemplos/).
 

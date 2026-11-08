@@ -17,8 +17,10 @@ import zipfile
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 from atril import __version__
+from atril.checks import Finding, info, ok, warning
 from atril.config.station import Station
 
 MANIFEST = "atril-backup.json"
@@ -35,6 +37,18 @@ EXCLUDED_DIRS = ("data/atril/logs", "data/atril/bundles")
 
 EXCLUDED_SUFFIXES = (".part", ".nuevo")
 """Descargas a medias."""
+
+SECRET_FILES = ("data/user/settings/model_catalog.json",)
+"""Ficheros de DeepTutor con claves de API en claro: se copian con las claves vacías."""
+
+SECRET_HINTS = ("api_key", "apikey", "token", "secret", "password")
+"""Campos que DeepTutor trata como secretos (los mismos que oculta en su web)."""
+
+STALE_DAYS = 7
+"""Días a partir de los que la última copia se considera antigua."""
+
+LOW_SPACE = 10 * 1024**3
+"""Espacio libre por debajo del que se avisa (las KB ocupan varios GB)."""
 
 Progress = Callable[[int], None]
 """Recibe los bytes leídos desde la última llamada."""
@@ -67,6 +81,8 @@ class Result:
     read_bytes: int = 0
     unread: list[str] = field(default_factory=list)
     """Ficheros que no se pudieron leer: la copia queda incompleta."""
+    redacted: int = 0
+    """Claves de API vaciadas en la copia."""
 
     @property
     def incomplete(self) -> bool:
@@ -116,22 +132,17 @@ def create(station: Station, folder: Path, progress: Progress | None = None) -> 
     target = folder / archive_name(archive_format)
     partial = target.with_name(target.name + ".part")
     result = Result(target)
-    manifest = json.dumps(
-        {
-            "estacion": str(station.root),
-            "fecha": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "atril": __version__,
-        },
-        ensure_ascii=False,
-        indent=2,
-    ).encode("utf-8")
     try:
         folder.mkdir(parents=True, exist_ok=True)
         with _open(partial, archive_format) as archive:
-            _put_bytes(archive, MANIFEST, manifest)
             for path, name in station_files(station):
                 try:
-                    _put_file(archive, path, name)
+                    if name in SECRET_FILES:
+                        data, count = redact_secrets(path.read_bytes())
+                        _put_bytes(archive, name, data)
+                        result.redacted += count
+                    else:
+                        _put_file(archive, path, name)
                     size = path.stat().st_size
                 except OSError as exc:
                     result.unread.append(f"{name}: {exc}")
@@ -140,12 +151,66 @@ def create(station: Station, folder: Path, progress: Progress | None = None) -> 
                 result.read_bytes += size
                 if progress:
                     progress(size)
+            _put_bytes(archive, MANIFEST, _manifest(station, result))
         partial.replace(target)
     except OSError as exc:
         with contextlib.suppress(OSError):
             partial.unlink()
         raise BackupError(f"no se puede escribir la copia en {folder}: {exc}") from exc
     return result
+
+
+def _manifest(station: Station, result: Result) -> bytes:
+    """Manifiesto de la copia: origen, fecha, versión y claves vaciadas."""
+    data = {
+        "estacion": str(station.root),
+        "fecha": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "atril": __version__,
+        "claves_vaciadas": result.redacted,
+    }
+    return json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def redact_secrets(raw: bytes) -> tuple[bytes, int]:
+    """Vacía las claves de un JSON de DeepTutor; devuelve el JSON y cuántas eran.
+
+    Solo se vacían textos no vacíos (``max_tokens`` es un número y se respeta).
+    Si no es JSON válido se deja tal cual: DeepTutor lo rechazaría igualmente.
+
+    Examples:
+        >>> data, count = redact_secrets(b'{"llm": {"api_key": "sk", "max_tokens": 9}}')
+        >>> count, json.loads(data)
+        (1, {'llm': {'api_key': '', 'max_tokens': 9}})
+    """
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return raw, 0
+    count = 0
+
+    def clean(value: Any, secret: bool) -> Any:
+        nonlocal count
+        if isinstance(value, dict):
+            return {
+                key: clean(item, secret or _is_secret(key))
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [clean(item, secret) for item in value]
+        if secret and isinstance(value, str) and value:
+            count += 1
+            return ""
+        return value
+
+    cleaned = clean(data, False)
+    text = json.dumps(cleaned, ensure_ascii=False, indent=2)
+    return text.encode("utf-8"), count
+
+
+def _is_secret(key: str) -> bool:
+    """Campo con credenciales (o cabeceras, que suelen llevarlas)."""
+    lowered = key.lower()
+    return lowered == "extra_headers" or any(hint in lowered for hint in SECRET_HINTS)
 
 
 def _open(path: Path, archive_format: str) -> zipfile.ZipFile | tarfile.TarFile:
@@ -193,10 +258,13 @@ def verify(path: Path) -> dict[str, str]:
                 if broken is not None:
                     raise BackupError(f"{path.name}: {broken} está dañado.")
                 manifest = archive.read(MANIFEST)
+                names = archive.namelist()
         else:
             manifest = b""
+            names = []
             with tarfile.open(path, "r:xz") as archive:
                 for member in archive:
+                    names.append(member.name)
                     reader = archive.extractfile(member)
                     if reader is None:
                         continue
@@ -205,11 +273,79 @@ def verify(path: Path) -> dict[str, str]:
                     # Leer hasta el final comprueba el flujo xz sin cargarlo entero.
                     while reader.read(1 << 20):
                         pass
+        _check_contents(path, names)
         return json.loads(manifest)
     except BackupError:
         raise
     except (OSError, KeyError, ValueError, zipfile.BadZipFile, tarfile.TarError) as exc:
         raise BackupError(f"{path.name}: copia dañada o incompleta ({exc}).") from exc
+
+
+def _check_contents(path: Path, names: list[str]) -> None:
+    """Exige ``atril.toml``, ``data/`` y ``temarios/`` en la copia."""
+    missing = [
+        item
+        for item, present in (
+            ("atril.toml", "atril.toml" in names),
+            ("data/", any(name.startswith("data/") for name in names)),
+            ("temarios/", any(name.startswith("temarios/") for name in names)),
+        )
+        if not present
+    ]
+    if missing:
+        raise BackupError(f"{path.name}: le falta {', '.join(missing)}.")
+
+
+def age_days(archive: Archive, now: float | None = None) -> float:
+    """Días desde que se hizo la copia (según su nombre)."""
+    made = time.mktime(time.strptime(archive.stamp, "%Y%m%d-%H%M%S"))
+    return ((now or time.time()) - made) / 86400
+
+
+def station_findings(station: Station) -> list[Finding]:
+    """Espacio libre, última copia y restauraciones a medias (para ``atril estado``)."""
+    findings = [_free_space(station.root, "Estación")]
+    latest: Archive | None = None
+    for folder in station.backup.destinations:
+        if not is_reachable(folder):
+            findings.append(info(f"{folder}: no conectado."))
+            continue
+        findings.append(
+            _free_space(folder if folder.is_dir() else folder.parent, str(folder))
+        )
+        found = archives(folder)
+        if found and (latest is None or found[-1].stamp > latest.stamp):
+            latest = found[-1]
+    findings.append(latest_finding(latest))
+    root = station.root
+    findings += [
+        warning(f"{leftover}: restauración interrumpida; revísala y bórrala.")
+        for leftover in sorted(root.parent.glob(f"{root.name}.restaurar-*"))
+    ]
+    findings += [
+        info(f"{kept}: estado anterior a una restauración; bórralo si sobra.")
+        for kept in sorted(root.parent.glob(f"{root.name}.previo-*"))
+    ]
+    return findings
+
+
+def latest_finding(latest: Archive | None) -> Finding:
+    """Antigüedad de la última copia: aviso si no hay o si tiene más de una semana."""
+    if latest is None:
+        return warning("No hay ninguna copia de seguridad: ejecuta atril backup.")
+    days = age_days(latest)
+    text = f"Última copia: {latest.path.name} (hace {days:.0f} días)."
+    return warning(text) if days > STALE_DAYS else ok(text)
+
+
+def _free_space(folder: Path, label: str) -> Finding:
+    """Espacio libre en el disco de ``folder``; aviso si queda poco."""
+    try:
+        free = shutil.disk_usage(folder).free
+    except OSError as exc:
+        return warning(f"{label}: no se puede consultar el espacio libre ({exc}).")
+    text = f"{label}: {free / 1024**3:.1f} GiB libres."
+    return warning(text) if free < LOW_SPACE else ok(text)
 
 
 def archives(folder: Path) -> list[Archive]:

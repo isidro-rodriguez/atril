@@ -60,8 +60,19 @@ def update_command(
             "--sin-arrancar", help="No vuelve a arrancar DeepTutor al terminar."
         ),
     ] = False,
+    commit: Annotated[
+        str | None,
+        typer.Option(
+            "--commit",
+            help="Va a este commit (hash completo): vuelta atrás de DeepTutor.",
+        ),
+    ] = None,
 ) -> None:
     """Actualiza DeepTutor a la última versión de su rama y reaplica los parches.
+
+    Con [bold]--commit[/] va a ese commit en lugar de a la punta de la rama, p. ej.
+    para volver a la versión anterior si la nueva da problemas: el comando muestra
+    el hash de la que había.
 
     Para DeepTutor si está en marcha, comprueba que [bold]app/[/] sigue el repo y la
     rama de atril.toml, deshace los parches, trae la rama, reinstala dependencias
@@ -80,11 +91,17 @@ def update_command(
 
     show(_revert_patches(station), "Deshacer parches")
     lock_before = installer.frontend_lock_hash()
-    with console.status("Trayendo la última versión..."):
-        before, after = _step_value(installer.update_checkout)
+    with console.status("Trayendo el código..."):
+        before, after = _step_value(lambda: installer.update_checkout(commit))
     changed = before != after
-    message = f"{before} → {after}" if changed else f"Ya en la última versión: {before}"
-    show([ok(message) if changed else info(message)], "Código")
+    message = f"{before} → {after}" if changed else f"Sin cambios: {before}"
+    code = [ok(message) if changed else info(message)]
+    if changed:
+        previous = before.split(" ", 1)[0]
+        code.append(
+            info(f"Para volver a la anterior: atril actualizar --commit {previous}")
+        )
+    show(code, "Código")
     show([install.version_finding(station.app_dir)])
     if changed or not installer.venv_matches():
         _step("Python", lambda: installer.python_env(docling=not no_docling))

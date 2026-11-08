@@ -5,6 +5,26 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.16.0] - 2026-11-08
+
+Selección de las funcionalidades sugeridas por GPT (las de git y rclone ya no aplican).
+
+### Added
+
+- `atril actualizar --commit <sha>` lleva DeepTutor a ese commit: vuelta atrás cuando la rama
+  `dev` rompe algo. Tras cada actualización se muestra el comando para volver a la anterior.
+- `atril estado` muestra el espacio libre de la estación y de los destinos de backup, la
+  antigüedad de la última copia y las carpetas `.restaurar-*` (restauración interrumpida) o
+  `.previo-*` que hayan quedado.
+
+### Changed
+
+- Las copias de seguridad llevan vacías las claves de API de DeepTutor (`model_catalog.json`):
+  sin restic ya no van cifradas y no deben acabar en Google Drive. Restaurar avisa de que hay
+  que volver a escribirlas; el fichero original no se toca.
+- `atril backup comprobar` exige que la copia contenga `atril.toml`, `data/` y `temarios/` y
+  avisa si la última tiene más de una semana.
+
 ## [0.15.1] - 2026-11-08
 
 Segunda revisión externa (las partes de git bundles ya no aplican).

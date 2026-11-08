@@ -346,3 +346,19 @@ def test_doctor_rejects_malformed_check(station_dir: Path, recorder: Recorder) -
 
     with pytest.raises(StepError, match="formato"):
         _installer(station_dir).doctor()
+
+
+def test_update_checkout_to_commit(
+    station_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _origin(recorder)
+    monkeypatch.setattr(Installer, "head", lambda self: "x")
+    sha = "0123456789abcdef0123456789abcdef01234567"
+
+    _installer(station_dir).update_checkout(sha)
+
+    assert ["fetch", "--depth", "1", "origin", sha] in [
+        c[3:] for c in recorder.commands
+    ]
+    with pytest.raises(StepError, match="40 caracteres"):
+        _installer(station_dir).update_checkout("0123abc")

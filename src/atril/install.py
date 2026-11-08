@@ -89,6 +89,9 @@ Se ejecuta con el Python de ``app/`` porque usa la API interna de DeepTutor.
 """
 
 
+FULL_SHA = re.compile(r"[0-9a-f]{40}")
+"""Hash completo de un commit de git."""
+
 TESTED_DEEPTUTOR = ("1.7",)
 """Versiones (mayor.menor) de DeepTutor con las que se ha probado atril."""
 
@@ -305,17 +308,21 @@ class Installer:
         return ok(f"Clonado {dt.repo} (rama {dt.branch}).")
 
     def head(self) -> str:
-        """Commit actual de ``app/`` (hash corto y asunto)."""
+        """Commit actual de ``app/`` (hash completo y asunto)."""
         return capture(
-            [tool("git"), "-C", str(self.app), "log", "-1", "--format=%h %s"]
+            [tool("git"), "-C", str(self.app), "log", "-1", "--format=%H %s"]
         )
 
-    def update_checkout(self) -> tuple[str, str]:
-        """Trae la última versión de la rama y deja ``app/`` en ella.
+    def update_checkout(self, commit: str | None = None) -> tuple[str, str]:
+        """Trae la última versión de la rama (o ``commit``) y deja ``app/`` en ella.
 
         El checkout es superficial, así que no se hace merge: se descarga la punta
-        de la rama y se mueve ``HEAD`` a ella. Antes se exige un árbol limpio (los
-        parches deben estar deshechos).
+        de la rama, o el commit pedido, y se mueve ``HEAD`` a él. Antes se exige un
+        árbol limpio (los parches deben estar deshechos).
+
+        Args:
+            commit: Hash completo (40 caracteres) al que ir, p. ej. para volver a
+                una versión que funcionaba; ``None`` es la punta de la rama.
 
         Returns:
             Commit anterior y nuevo (hash corto y asunto).
@@ -329,10 +336,15 @@ class Installer:
         if dirty:
             files = ", ".join(line[3:] for line in dirty.splitlines()[:5])
             raise StepError(f"app/ tiene cambios locales ({files}); revísalos antes.")
+        if commit is not None and not FULL_SHA.fullmatch(commit):
+            raise StepError(
+                f"{commit!r} no es un hash completo de 40 caracteres (git no puede "
+                "traer un hash abreviado de un clon superficial)."
+            )
         before = self.head().strip()
-        branch = self.station.deeptutor.branch
+        target = commit or self.station.deeptutor.branch
         self._run(
-            [git, "-C", str(self.app), "fetch", "--depth", "1", "origin", branch],
+            [git, "-C", str(self.app), "fetch", "--depth", "1", "origin", target],
             "git fetch",
         )
         self._run(

@@ -8,7 +8,7 @@ import typer
 from rich.markup import escape
 from rich.panel import Panel
 
-from atril import ollama
+from atril import backup, ollama
 from atril.checks import Finding, error, info, ok, warning
 from atril.commands._common import console, fail, get_station, show, success
 from atril.config.station import Station
@@ -115,7 +115,7 @@ def shutdown(dt: DeepTutor) -> None:
 
 
 def status(ctx: typer.Context) -> None:
-    """Muestra el estado de DeepTutor, sus parches y Ollama."""
+    """Muestra DeepTutor, parches, Ollama, espacio libre y la última copia."""
     station = get_station(ctx)
     dt = DeepTutor(station)
 
@@ -128,6 +128,7 @@ def status(ctx: typer.Context) -> None:
     if station.deeptutor.patches:
         clean = show(_patch_findings(station), "Parches") and clean
     clean = show(ollama_findings, "Ollama") and clean
+    clean = show(backup.station_findings(station), "Estación y copias") and clean
     if not clean:
         raise typer.Exit(1)
 

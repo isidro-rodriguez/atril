@@ -1,6 +1,7 @@
 import json
 import shutil
 import tarfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -303,3 +304,60 @@ def test_restore_rejects_archive_without_station(
     assert (station.root / "atril.toml").read_text(encoding="utf-8") == before
     assert not list(station.root.parent.glob(f"{station.root.name}.restaurar-*"))
     assert not list(station.root.parent.glob(f"{station.root.name}.previo-*"))
+
+
+# --- claves, estructura y estado ------------------------------------------------
+
+
+def test_backup_blanks_api_keys_and_restore_warns(station: Station, idle: None) -> None:
+    catalog = station.data_dir / "user" / "settings" / "model_catalog.json"
+    write(
+        catalog,
+        json.dumps({"llm": {"api_key": "sk-1", "max_tokens": 4096, "model": "m"}}),
+    )
+
+    result = _invoke(station)
+
+    assert result.exit_code == 0, result.output
+    assert "1 claves de API vaciadas" in result.output
+    (archive,) = backup.archives(_folder(station))
+    with zipfile.ZipFile(archive.path) as zipped:
+        saved = json.loads(zipped.read("data/user/settings/model_catalog.json"))
+    assert saved == {"llm": {"api_key": "", "max_tokens": 4096, "model": "m"}}
+    assert "sk-1" in catalog.read_text()  # el original no se toca
+
+    restored = _invoke(station, "restaurar", "--si")
+    assert restored.exit_code == 0, restored.output
+    assert "claves de API" in restored.output
+
+
+def test_verify_requires_station_structure(tmp_path: Path) -> None:
+    archive = tmp_path / backup.archive_name("zip", "20261101-010000")
+    with zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr(backup.MANIFEST, "{}")
+        zipped.writestr("atril.toml", "")
+
+    with pytest.raises(BackupError, match="data/, temarios/"):
+        backup.verify(archive)
+
+
+def test_latest_finding_age() -> None:
+    old = backup.Archive(Path("atril-20200101-000000.zip"), 1)
+    assert backup.latest_finding(None).level.name == "WARNING"
+    assert "días" in backup.latest_finding(old).message
+    assert backup.latest_finding(old).level.name == "WARNING"
+    fresh_stamp = time.strftime("%Y%m%d-%H%M%S")
+    fresh = backup.Archive(Path(f"atril-{fresh_stamp}.zip"), 1)
+    assert backup.latest_finding(fresh).level.name == "OK"
+
+
+def test_station_findings_report_leftovers(station: Station) -> None:
+    station.root.with_name(f"{station.root.name}.restaurar-20261101-010000").mkdir()
+    station.root.with_name(f"{station.root.name}.previo-20261101-010000").mkdir()
+
+    messages = [f.message for f in backup.station_findings(station)]
+
+    assert any("GiB libres" in m for m in messages)
+    assert any("restauración interrumpida" in m for m in messages)
+    assert any("estado anterior" in m for m in messages)
+    assert any("no conectado" in m for m in messages)

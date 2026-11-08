@@ -61,6 +61,10 @@ def run_backup(
     findings = [_verify(result.archive)]
     findings += [_copy(result.archive, folder) for folder in folders[1:]]
     findings += [warning(f"No se pudo leer {item}") for item in result.unread]
+    if result.redacted:
+        findings.append(
+            info(f"{result.redacted} claves de API vaciadas en la copia (no viajan).")
+        )
     if not show(findings, "Copias") or result.incomplete:
         fail("backup INCOMPLETO: no se borran copias antiguas. Revisa los avisos.")
     keep = station.backup.keep
@@ -75,7 +79,11 @@ def run_backup(
 
 @backup_app.command("comprobar")
 def check_backups(ctx: typer.Context) -> None:
-    """Lista las copias de cada destino y verifica la más reciente."""
+    """Lista las copias de cada destino y verifica la más reciente.
+
+    La verificación lee la copia entera y exige [bold]atril.toml[/], [bold]data/[/]
+    y [bold]temarios/[/]; avisa si la última copia tiene más de una semana.
+    """
     station = get_station(ctx)
     clean = True
     for folder in _reachable(station):
@@ -86,7 +94,7 @@ def check_backups(ctx: typer.Context) -> None:
             continue
         with console.status(f"Verificando {escape(found[-1].path.name)}..."):
             finding = _verify(found[-1].path)
-        clean = show([finding]) and clean
+        clean = show([finding, backup.latest_finding(found[-1])]) and clean
     if not clean:
         raise typer.Exit(1)
 
@@ -155,7 +163,18 @@ def restore(
     finally:
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
-    show([ok(f"Restaurado: {', '.join(replaced)}."), info(f"Lo anterior: {keep}.")])
+    findings = [
+        ok(f"Restaurado: {', '.join(replaced)}."),
+        info(f"Lo anterior: {keep}."),
+    ]
+    if manifest.get("claves_vaciadas"):
+        findings.append(
+            warning(
+                f"La copia no lleva las {manifest['claves_vaciadas']} claves de API: "
+                "vuelve a escribirlas en la configuración de DeepTutor."
+            )
+        )
+    show(findings)
     success("Restauración terminada. Comprueba con: atril estado")
 
 
