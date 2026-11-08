@@ -127,7 +127,11 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   no title bar, veil over the window on Windows); `messagebox` only before the window exists
   (first run). Never name widget attributes like tkinter internals (`_name`, `_root`, `_w`).
 - GUI texts never mention CLI commands or options (`tests/test_textos.py` scans every module
-  except `commands/`): shared `ops` messages say what to do, the CLI adds its own hint.
+  except `commands/`): shared `ops` messages say what to do, the CLI adds its own hint. GUI
+  texts never use ";" and setting descriptions fit in one line.
+- Inicio's assistant card reads the active chat model from DeepTutor's `model_catalog.json`
+  (`deeptutor.active_assistant`) and only reports whether a key exists: never read the key
+  into anything else, never show or log it.
 - GUI performance (it is a launcher; it must feel instant): switching sections never waits.
   `App.show_view` reloads a view only the first time, after an operation, or past
   `STATUS_TTL` for Inicio; hidden views are `grid_remove`d. Quiet reads (`run(quiet=True)`) do

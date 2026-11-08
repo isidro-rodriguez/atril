@@ -192,6 +192,19 @@ CELL_PAD = "   "
 sus cabeceras (``ttk`` no admite margen por celda)."""
 
 
+def autoscroll(widget: ttk.Treeview | tk.Canvas, scrollbar: ttk.Scrollbar) -> None:
+    """Barra de desplazamiento vertical que solo se ve si hace falta."""
+
+    def update(first: str | float, last: str | float) -> None:
+        if float(first) <= 0 and float(last) >= 1:
+            scrollbar.grid_remove()
+        else:
+            scrollbar.grid()
+        scrollbar.set(first, last)
+
+    widget.configure(yscrollcommand=update)
+
+
 def cells(*values: object) -> tuple[str, ...]:
     """Valores de una fila de tabla con la sangría de :data:`CELL_PAD`.
 
@@ -227,14 +240,23 @@ def icon(root: tk.Misc, name: str, base: int = 22) -> tk.PhotoImage:
     return _images[key]
 
 
+GENERIC_LOGOS = {"python": "terminal-marca", "npm": "package-marca"}
+"""Icono genérico de las herramientas sin logotipo en ``marcas/``."""
+
+
 def brand(root: tk.Misc, name: str, base: int = 36) -> tk.PhotoImage:
-    """Logotipo de una herramienta (``marcas/``) al tamaño más cercano a ``base``."""
+    """Logotipo de una herramienta (``marcas/``) al tamaño más cercano a ``base``.
+
+    Sin logotipo propio se usa un icono genérico (:data:`GENERIC_LOGOS`).
+    """
     wanted = base * scale(root)
     sizes = [
         int(entry.name.removesuffix(".png").rpartition("-")[2])
         for entry in (_RESOURCES / "marcas").iterdir()
         if entry.name.startswith(f"{name}-") and entry.name.endswith(".png")
     ]
+    if not sizes:
+        return icon(root, GENERIC_LOGOS.get(name, "bot-marca"), base)
     size = min(sizes, key=lambda candidate: abs(candidate - wanted))
     key = (f"marca-{name}", size)
     if key not in _images:

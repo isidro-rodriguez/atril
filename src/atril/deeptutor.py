@@ -26,6 +26,53 @@ class Orphans:
     """De otro programa: no se tocan."""
 
 
+MODEL_CATALOG = "data/user/settings/model_catalog.json"
+"""Catálogo de modelos de DeepTutor (con las claves de API), bajo la estación."""
+
+
+@dataclass(frozen=True, slots=True)
+class Assistant:
+    """Modelo de chat activo en DeepTutor (sin la clave: solo si la tiene)."""
+
+    provider: str
+    """``claude_code``, ``ollama``, ``openai``, ``gemini``..."""
+    model: str
+    has_key: bool
+
+
+def active_assistant(station: Station) -> Assistant | None:
+    """Modelo de chat activo según el catálogo de DeepTutor.
+
+    Se lee el perfil y el modelo activos de ``services.llm``; la clave puede
+    estar en el perfil o en su conexión. Nunca se devuelve la clave.
+
+    Returns:
+        El asistente, o ``None`` si no hay catálogo o no se entiende.
+    """
+    try:
+        catalog = json.loads((station.root / MODEL_CATALOG).read_text(encoding="utf-8"))
+        llm = catalog["services"]["llm"]
+        profile = next(
+            p for p in llm["profiles"] if p.get("id") == llm.get("active_profile_id")
+        )
+        model = next(
+            (
+                m
+                for m in profile.get("models", [])
+                if m.get("id") == llm.get("active_model_id")
+            ),
+            (profile.get("models") or [{}])[0],
+        )
+        connections = {c.get("id"): c for c in catalog.get("connections", [])}
+        reference = profile.get("provider_ref") or {}
+        connection = connections.get(reference.get("connection_id"), {})
+        has_key = bool(profile.get("api_key") or connection.get("api_key"))
+        provider = str(profile.get("binding") or reference.get("binding") or "")
+        return Assistant(provider, str(model.get("model") or ""), has_key)
+    except (OSError, ValueError, KeyError, TypeError, StopIteration, IndexError):
+        return None
+
+
 class DeepTutor:
     """Instalación de DeepTutor de una estación."""
 

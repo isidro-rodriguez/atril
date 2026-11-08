@@ -42,16 +42,17 @@ OLLAMA_DEFAULTS = {
 
 @dataclass(frozen=True, slots=True)
 class Field:
-    """Una clave de ``atril.toml`` en el formulario."""
+    """Una clave de ``atril.toml`` en el formulario, con su descripción."""
 
     table: str
     key: str
     label: str
     kind: str
-    """``text``, ``int``, ``bool``, ``choice``, ``combo`` (con texto libre),
-    ``lines``, ``patches`` o ``folders``."""
+    """``text``, ``int``, ``bool``, ``choice``, ``lines``, ``patches`` o
+    ``folders``."""
     current: Callable[[Station], Value]
-    help: str = ""
+    help: str
+    """Una sola línea, sin punto y coma."""
     choices: tuple[str, ...] = ()
 
 
@@ -68,178 +69,252 @@ def _ollama(station: Station, attribute: str, key: str) -> Value:
     return getattr(station.ollama, attribute)
 
 
-TABS: dict[str, tuple[Field, ...]] = {
+Section = tuple[str | None, tuple[Field, ...]]
+"""Título (o ``None``) y claves de una parte de una pestaña."""
+
+TABS: dict[str, tuple[Section, ...]] = {
     "DeepTutor": (
-        Field(
-            "deeptutor.llm",
-            "proveedor",
-            "Asistente",
-            "combo",
-            lambda s: _llm(s, "provider"),
-            "Vacío: se configura dentro de DeepTutor. claude_code usa tu sesión de "
-            "Claude Code, sin claves.",
-            ("", "claude_code"),
-        ),
-        Field(
-            "deeptutor.llm",
-            "modelo",
-            "Modelo",
-            "text",
-            lambda s: _llm(s, "model"),
-            "Por ejemplo, claude-code/opus.",
-        ),
-        Field(
-            "deeptutor",
-            "busqueda",
-            "Búsqueda web",
-            "combo",
-            lambda s: s.deeptutor.search or "",
-            "Proveedor de búsqueda de DeepTutor; vacío para no cambiarlo.",
-            ("", "duckduckgo"),
+        (
+            None,
+            (
+                Field(
+                    "deeptutor.llm",
+                    "proveedor",
+                    "Asistente",
+                    "text",
+                    lambda s: _llm(s, "provider"),
+                    "Proveedor del chat. Vacío: se elige dentro de DeepTutor.",
+                ),
+                Field(
+                    "deeptutor.llm",
+                    "modelo",
+                    "Modelo",
+                    "text",
+                    lambda s: _llm(s, "model"),
+                    "Modelo del proveedor, tal como lo nombra DeepTutor.",
+                ),
+                Field(
+                    "deeptutor",
+                    "busqueda",
+                    "Búsqueda web",
+                    "text",
+                    lambda s: s.deeptutor.search or "",
+                    "Buscador web de DeepTutor. Vacío: el suyo por defecto.",
+                ),
+            ),
         ),
     ),
     "Indexado": (
-        Field(
-            "ollama",
-            "url",
-            "Dirección de Ollama",
-            "text",
-            lambda s: _ollama(s, "url", "url"),
-        ),
-        Field(
-            "indexado",
-            "hilos",
-            "Hilos",
-            "int",
-            lambda s: s.indexing.threads,
-            "Hilos de cálculo al indexar (0 = sin límite). Menos hilos dejan el "
-            "ordenador más libre.",
-        ),
-        Field(
-            "indexado",
-            "lote_embedding",
-            "Tamaño de lote",
-            "int",
-            lambda s: s.indexing.batch_size,
-            "Fragmentos que se envían juntos a Ollama. Bájalo si falla por memoria.",
-        ),
-        Field(
-            "indexado",
-            "pausa_embedding",
-            "Pausa (ms)",
-            "int",
-            lambda s: s.indexing.pause_ms,
-            "Pausa entre lotes. Súbela si el ordenador se calienta al indexar.",
-        ),
-        Field(
-            "indexado",
-            "descargar_modelos",
-            "Modelos del lector",
-            "bool",
-            lambda s: s.indexing.download_models,
-            "Permite que el lector de PDF descargue sus modelos la primera vez.",
+        (
+            None,
+            (
+                Field(
+                    "ollama",
+                    "url",
+                    "Dirección de Ollama",
+                    "text",
+                    lambda s: _ollama(s, "url", "url"),
+                    "Servidor de Ollama. Normalmente no hay que cambiarla.",
+                ),
+                Field(
+                    "indexado",
+                    "hilos",
+                    "Hilos",
+                    "int",
+                    lambda s: s.indexing.threads,
+                    "Hilos de cálculo al indexar. 0 usa todos los del equipo.",
+                ),
+                Field(
+                    "indexado",
+                    "lote_embedding",
+                    "Tamaño de lote",
+                    "int",
+                    lambda s: s.indexing.batch_size,
+                    "Fragmentos por envío a Ollama. Bájalo si falla por memoria.",
+                ),
+                Field(
+                    "indexado",
+                    "pausa_embedding",
+                    "Pausa (ms)",
+                    "int",
+                    lambda s: s.indexing.pause_ms,
+                    "Pausa entre envíos. Súbela si el equipo se calienta.",
+                ),
+                Field(
+                    "indexado",
+                    "descargar_modelos",
+                    "Modelos del lector",
+                    "bool",
+                    lambda s: s.indexing.download_models,
+                    "Deja que el lector de PDF descargue sus modelos la primera vez.",
+                ),
+            ),
         ),
     ),
     "Backups": (
-        Field(
-            "backup",
-            "destinos",
-            "Destinos",
-            "folders",
-            lambda s: [str(p) for p in s.backup.destinations],
-            "Carpetas fuera de la estación, mejor en otro disco o sincronizadas. "
-            "Un disco desconectado se salta.",
-        ),
-        Field(
-            "backup",
-            "formato",
-            "Formato",
-            "choice",
-            lambda s: s.backup.archive_format,
-            "zip es más rápido; tar.xz ocupa menos.",
-            ARCHIVE_FORMATS,
-        ),
-        Field(
-            "backup",
-            "conservar",
-            "Conservar",
-            "int",
-            lambda s: s.backup.keep,
-            "Backups que se guardan en cada destino; los más antiguos se borran.",
+        (
+            None,
+            (
+                Field(
+                    "backup",
+                    "destinos",
+                    "Destinos",
+                    "folders",
+                    lambda s: [str(p) for p in s.backup.destinations],
+                    "Carpetas fuera de la estación. Un disco desconectado se salta.",
+                ),
+                Field(
+                    "backup",
+                    "formato",
+                    "Formato",
+                    "choice",
+                    lambda s: s.backup.archive_format,
+                    "zip es más rápido. tar.xz ocupa menos.",
+                    ARCHIVE_FORMATS,
+                ),
+                Field(
+                    "backup",
+                    "conservar",
+                    "Conservar",
+                    "int",
+                    lambda s: s.backup.keep,
+                    "Backups por destino. Los más antiguos se borran.",
+                ),
+            ),
         ),
     ),
     "Avanzado": (
-        Field("deeptutor", "repo", "Repositorio", "text", lambda s: s.deeptutor.repo),
-        Field("deeptutor", "rama", "Rama", "text", lambda s: s.deeptutor.branch),
-        Field("deeptutor", "python", "Python", "text", lambda s: s.deeptutor.python),
-        Field(
-            "deeptutor.puertos",
-            "backend",
-            "Puerto del backend",
-            "int",
-            lambda s: s.deeptutor.backend_port,
+        (
+            "Código de DeepTutor",
+            (
+                Field(
+                    "deeptutor",
+                    "repo",
+                    "Repositorio",
+                    "text",
+                    lambda s: s.deeptutor.repo,
+                    "Repositorio de GitHub del que se instala DeepTutor.",
+                ),
+                Field(
+                    "deeptutor",
+                    "rama",
+                    "Rama",
+                    "text",
+                    lambda s: s.deeptutor.branch,
+                    "Rama del repositorio que se sigue al actualizar.",
+                ),
+                Field(
+                    "deeptutor",
+                    "python",
+                    "Python",
+                    "text",
+                    lambda s: s.deeptutor.python,
+                    "Versión de Python del entorno de DeepTutor.",
+                ),
+                Field(
+                    "deeptutor",
+                    "paquetes",
+                    "Paquetes extra",
+                    "lines",
+                    lambda s: list(s.deeptutor.packages),
+                    "Paquetes añadidos al entorno de DeepTutor, uno por línea.",
+                ),
+                Field(
+                    "deeptutor",
+                    "parches",
+                    "Parches",
+                    "patches",
+                    lambda s: list(s.deeptutor.patches),
+                    "Arreglos de atril sobre el código de DeepTutor.",
+                ),
+            ),
         ),
-        Field(
-            "deeptutor.puertos",
-            "frontend",
-            "Puerto del frontend",
-            "int",
-            lambda s: s.deeptutor.frontend_port,
+        (
+            "Puertos",
+            (
+                Field(
+                    "deeptutor.puertos",
+                    "backend",
+                    "Backend",
+                    "int",
+                    lambda s: s.deeptutor.backend_port,
+                    "Puerto de la API de DeepTutor.",
+                ),
+                Field(
+                    "deeptutor.puertos",
+                    "frontend",
+                    "Frontend",
+                    "int",
+                    lambda s: s.deeptutor.frontend_port,
+                    "Puerto de la web de DeepTutor que se abre en el navegador.",
+                ),
+            ),
         ),
-        Field(
-            "deeptutor",
-            "parches",
-            "Parches",
-            "patches",
-            lambda s: list(s.deeptutor.patches),
-        ),
-        Field(
-            "deeptutor",
-            "paquetes",
-            "Paquetes extra",
-            "lines",
-            lambda s: list(s.deeptutor.packages),
-            "Uno por línea.",
-        ),
-        Field(
-            "ollama",
-            "embedding",
+        (
             "Modelo de embedding",
-            "text",
-            lambda s: _ollama(s, "embedding", "embedding"),
+            (
+                Field(
+                    "ollama",
+                    "embedding",
+                    "Modelo",
+                    "text",
+                    lambda s: _ollama(s, "embedding", "embedding"),
+                    "Modelo de Ollama que convierte el texto en vectores.",
+                ),
+                Field(
+                    "ollama",
+                    "dimension",
+                    "Dimensión",
+                    "int",
+                    lambda s: _ollama(s, "dimension", "dimension"),
+                    "Tamaño de los vectores. Debe coincidir con el modelo.",
+                ),
+                Field(
+                    "ollama",
+                    "contexto",
+                    "Contexto",
+                    "int",
+                    lambda s: _ollama(s, "context", "contexto"),
+                    "Ventana de contexto. Igual que OLLAMA_CONTEXT_LENGTH.",
+                ),
+            ),
         ),
-        Field(
-            "ollama",
-            "dimension",
-            "Dimensión",
-            "int",
-            lambda s: _ollama(s, "dimension", "dimension"),
-        ),
-        Field(
-            "ollama",
-            "contexto",
-            "Contexto",
-            "int",
-            lambda s: _ollama(s, "context", "contexto"),
-        ),
-        Field(
-            "indexado",
-            "parser",
-            "Lector de PDF",
-            "choice",
-            lambda s: s.indexing.parser,
-            choices=tuple(sorted(PARSERS)),
-        ),
-        Field("indexado", "chunk", "Fragmento", "int", lambda s: s.indexing.chunk_size),
-        Field(
-            "indexado", "solape", "Solape", "int", lambda s: s.indexing.chunk_overlap
+        (
+            "Lectura y troceado",
+            (
+                Field(
+                    "indexado",
+                    "parser",
+                    "Lector de PDF",
+                    "choice",
+                    lambda s: s.indexing.parser,
+                    "Programa que lee los PDF. docling entiende tablas y columnas.",
+                    tuple(sorted(PARSERS)),
+                ),
+                Field(
+                    "indexado",
+                    "chunk",
+                    "Fragmento",
+                    "int",
+                    lambda s: s.indexing.chunk_size,
+                    "Tamaño de cada fragmento indexado, en tokens.",
+                ),
+                Field(
+                    "indexado",
+                    "solape",
+                    "Solape",
+                    "int",
+                    lambda s: s.indexing.chunk_overlap,
+                    "Texto compartido entre fragmentos seguidos, en tokens.",
+                ),
+            ),
         ),
     ),
 }
-"""Pestañas del formulario y sus claves (todas las de ``atril.toml``)."""
+"""Pestañas del formulario, sus partes y sus claves (todas las de ``atril.toml``)."""
 
-ADVANCED_SPLIT = 7
-"""En Avanzado, las primeras claves van a la izquierda y el resto a la derecha."""
+FIELDS = tuple(f for sections in TABS.values() for _, fs in sections for f in fs)
+"""Todas las claves del formulario."""
 
 EFFECT_HINTS = {
     Effect.APPLY: "Aplicar la configuración a DeepTutor (botón «Aplicar ahora»).",
@@ -248,6 +323,12 @@ EFFECT_HINTS = {
     Effect.REINDEX: "Reindexar los temarios: los vectores actuales ya no sirven.",
 }
 """Qué decir al alumno después de guardar, por efecto."""
+
+PAD = 20
+"""Margen interior de las pestañas, igual en horizontal y en vertical."""
+
+GAP = 7
+"""Espacio vertical entre claves (0,5 em)."""
 
 
 class SettingsView(tk.Frame):
@@ -261,29 +342,27 @@ class SettingsView(tk.Frame):
         self.rowconfigure(0, weight=1)
         self._vars: dict[tuple[str, str], tk.Variable] = {}
         self._texts: dict[tuple[str, str], tk.Text] = {}
+        self._controls: dict[tuple[str, str], tk.Widget] = {}
         self._patches: dict[str, tk.BooleanVar] = {}
         self._folders: tk.Listbox | None = None
         self._use_ollama = tk.BooleanVar(self)
+        self._use_ollama.trace_add("write", lambda *_: self._ollama_changed())
         self._docling = tk.BooleanVar(self, value=True)
         self._commit = tk.StringVar(self)
 
         self._tabs = ttk.Notebook(self)
         self._tabs.grid(row=0, column=0, sticky="nsew")
-        for name, fields in TABS.items():
-            tab = tk.Frame(self._tabs, background=style.CARD, padx=20, pady=16)
-            tab.columnconfigure(1, weight=1)
+        for name, sections in TABS.items():
+            tab = tk.Frame(self._tabs, background=style.CARD, padx=PAD, pady=PAD)
             self._tabs.add(tab, text=name)
-            if name == "Avanzado":
-                self._build_advanced(tab, fields)
-            else:
-                self._build_fields(tab, fields, start=1 if name == "Indexado" else 0)
+            body = self._scrolled(tab) if name == "Avanzado" else tab
+            row = 0
             if name == "Indexado":
-                ttk.Checkbutton(
-                    tab,
-                    text="Usar Ollama para indexar fuentes (sin Ollama, DeepTutor "
-                    "funciona pero no se indexa nada)",
-                    variable=self._use_ollama,
-                ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
+                row = self._ollama_switch(body)
+            if name == "Avanzado":
+                row = self._advanced_warning(body)
+            for title, fields in sections:
+                row = self._build_section(body, row, title, fields)
         self._build_tools()
 
         bar = tk.Frame(self, background=style.PAGE)
@@ -300,42 +379,95 @@ class SettingsView(tk.Frame):
 
     # --- construcción -----------------------------------------------------------
 
-    def _build_fields(
-        self, tab: tk.Frame, fields: tuple[Field, ...], start: int
-    ) -> None:
-        """Una fila por clave: nombre, control y explicación debajo."""
-        row = start
+    def _build_section(
+        self, parent: tk.Frame, row: int, title: str | None, fields: tuple[Field, ...]
+    ) -> int:
+        """Título opcional y una clave por fila: nombre, control y descripción."""
+        parent.columnconfigure(1, weight=1)
+        if title:
+            style.label(parent, title, font=style.SUBTITLE).grid(
+                row=row,
+                column=0,
+                columnspan=2,
+                sticky="w",
+                pady=(GAP * 2 if row else 0, GAP),
+            )
+            row += 1
         for field in fields:
-            style.label(tab, field.label, font=style.STRONG).grid(
+            style.label(parent, field.label, font=style.STRONG).grid(
                 row=row, column=0, sticky="nw", padx=(0, 16), pady=(4, 0)
             )
-            self._control(tab, field).grid(row=row, column=1, sticky="w", pady=(2, 0))
-            row += 1
-            if field.help:
-                style.label(
-                    tab, field.help, color=style.MUTED, font=style.SMALL, wraplength=520
-                ).grid(row=row, column=1, sticky="w", pady=(2, 8))
-                row += 1
+            control = self._control(parent, field)
+            control.grid(row=row, column=1, sticky="w")
+            self._controls[(field.table, field.key)] = control
+            style.label(parent, field.help, color=style.MUTED, font=style.SMALL).grid(
+                row=row + 1, column=1, sticky="w", pady=(2, GAP)
+            )
+            row += 2
+        return row
 
-    def _build_advanced(self, tab: tk.Frame, fields: tuple[Field, ...]) -> None:
-        """Dos columnas de claves delicadas, con un aviso arriba."""
+    def _ollama_switch(self, parent: tk.Frame) -> int:
+        """Casilla para usar Ollama y su explicación; devuelve la fila siguiente."""
+        ttk.Checkbutton(
+            parent, text="Usar Ollama para indexar fuentes", variable=self._use_ollama
+        ).grid(row=0, column=0, columnspan=2, sticky="w")
         style.label(
-            tab,
+            parent,
+            "Sin Ollama, DeepTutor funciona pero no se indexa nada.",
+            color=style.MUTED,
+            font=style.SMALL,
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, GAP * 2))
+        return 2
+
+    def _advanced_warning(self, parent: tk.Frame) -> int:
+        """Aviso de Avanzado; devuelve la fila siguiente."""
+        style.label(
+            parent,
             "  Cambiar esto obliga a reinstalar DeepTutor o a reindexar los temarios.",
             color=style.LEVEL_COLORS[Level.WARNING],
             image=style.icon(self, style.LEVEL_ICONS[Level.WARNING], 18),
-        ).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 12))
-        tab.columnconfigure(1, weight=1)
-        tab.columnconfigure(3, weight=1)
-        for index, field in enumerate(fields):
-            column = 0 if index < ADVANCED_SPLIT else 2
-            row = 1 + (index if index < ADVANCED_SPLIT else index - ADVANCED_SPLIT)
-            style.label(tab, field.label, font=style.STRONG).grid(
-                row=row, column=column, sticky="nw", padx=(0, 12), pady=4
-            )
-            self._control(tab, field).grid(
-                row=row, column=column + 1, sticky="w", pady=4, padx=(0, 20)
-            )
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, GAP * 2))
+        return 1
+
+    def _scrolled(self, tab: tk.Frame) -> tk.Frame:
+        """Marco desplazable en vertical (la barra solo aparece si hace falta)."""
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+        canvas = tk.Canvas(tab, background=style.CARD, highlightthickness=0)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        bar = ttk.Scrollbar(tab, command=canvas.yview)
+        bar.grid(row=0, column=1, sticky="ns", padx=(6, 0))
+        style.autoscroll(canvas, bar)
+        body = tk.Frame(canvas, background=style.CARD)
+        window = canvas.create_window(0, 0, window=body, anchor="nw")
+        body.bind(
+            "<Configure>", lambda _: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.bind(
+            "<Configure>", lambda e: canvas.itemconfigure(window, width=e.width)
+        )
+
+        def wheel(event: tk.Event) -> None:
+            canvas.yview_scroll(-1 if event.delta > 0 or event.num == 4 else 1, "units")
+
+        def capture(on: bool) -> None:
+            for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                if on:
+                    canvas.bind_all(sequence, wheel)
+                else:
+                    canvas.unbind_all(sequence)
+
+        canvas.bind("<Enter>", lambda _: capture(True))
+        canvas.bind("<Leave>", lambda _: capture(False))
+        return body
+
+    def _ollama_changed(self) -> None:
+        """Sin Ollama, sus claves y las del indexado quedan desactivadas."""
+        enabled = self._use_ollama.get()
+        indexing = {(f.table, f.key) for _, fs in TABS["Indexado"] for f in fs}
+        for key, control in self._controls.items():
+            if key in indexing or key[0] == "ollama":
+                _set_enabled(control, enabled)
 
     def _control(self, parent: tk.Frame, field: Field) -> tk.Widget:
         """Control de una clave según su tipo."""
@@ -358,16 +490,11 @@ class SettingsView(tk.Frame):
                     state="readonly",
                     width=16,
                 )
-            case "combo":
-                var = tk.StringVar(self)
-                widget = ttk.Combobox(
-                    parent, textvariable=var, values=field.choices, width=30
-                )
             case "lines":
                 text = tk.Text(
                     parent,
                     height=3,
-                    width=34,
+                    width=46,
                     font=style.SMALL,
                     relief="flat",
                     highlightthickness=1,
@@ -388,8 +515,7 @@ class SettingsView(tk.Frame):
                 return self._folder_list(parent)
             case _:
                 var = tk.StringVar(self)
-                width = 40 if field.table != "deeptutor" else 34
-                widget = ttk.Entry(parent, textvariable=var, width=width)
+                widget = ttk.Entry(parent, textvariable=var, width=46)
         self._vars[key] = var
         return widget
 
@@ -419,7 +545,7 @@ class SettingsView(tk.Frame):
 
     def _build_tools(self) -> None:
         """Pestaña Herramientas: mantenimiento de DeepTutor y de la configuración."""
-        tab = tk.Frame(self._tabs, background=style.CARD, padx=20, pady=16)
+        tab = tk.Frame(self._tabs, background=style.CARD, padx=PAD, pady=PAD)
         tab.columnconfigure(1, weight=1)
         self._tabs.add(tab, text="Herramientas")
         rows: tuple[tuple[str, str, Callable[[], None]], ...] = (
@@ -464,7 +590,7 @@ class SettingsView(tk.Frame):
         start = len(rows)
         ttk.Checkbutton(
             tab,
-            text="Instalar Docling (lee mejor los PDF; descarga grande)",
+            text="Instalar Docling (lee mejor los PDF, descarga grande)",
             variable=self._docling,
         ).grid(row=start, column=0, columnspan=2, sticky="w", pady=(8, 0))
         commit = tk.Frame(tab, background=style.CARD)
@@ -493,23 +619,22 @@ class SettingsView(tk.Frame):
         """Carga los valores actuales de la estación (descarta lo no guardado)."""
         station = self.app.station
         self._use_ollama.set(station.ollama is not None)
-        for fields in TABS.values():
-            for field in fields:
-                value = field.current(station)
-                key = (field.table, field.key)
-                if field.kind == "lines":
-                    text = self._texts[key]
-                    text.delete("1.0", "end")
-                    text.insert("1.0", "\n".join(_strings(value)))
-                elif field.kind == "patches":
-                    for name, flag in self._patches.items():
-                        flag.set(name in _strings(value))
-                elif field.kind == "folders" and self._folders is not None:
-                    self._folders.delete(0, "end")
-                    for folder in _strings(value):
-                        self._folders.insert("end", folder)
-                else:
-                    self._vars[key].set(value)
+        for field in FIELDS:
+            value = field.current(station)
+            key = (field.table, field.key)
+            if field.kind == "lines":
+                text = self._texts[key]
+                text.delete("1.0", "end")
+                text.insert("1.0", "\n".join(_strings(value)))
+            elif field.kind == "patches":
+                for name, flag in self._patches.items():
+                    flag.set(name in _strings(value))
+            elif field.kind == "folders" and self._folders is not None:
+                self._folders.delete(0, "end")
+                for folder in _strings(value):
+                    self._folders.insert("end", folder)
+            else:
+                self._vars[key].set(value)
         self._note.configure(text="")
         return True
 
@@ -548,17 +673,16 @@ class SettingsView(tk.Frame):
         station = self.app.station
         found: dict[str, dict[str, Value | None] | None] = {}
         use_ollama = self._use_ollama.get()
-        for fields in TABS.values():
-            for field in fields:
-                if field.table == "ollama" and not use_ollama:
-                    continue
-                value = self._value(field)
-                adding_ollama = field.table == "ollama" and station.ollama is None
-                if value == field.current(station) and not adding_ollama:
-                    continue
-                table = found.setdefault(field.table, {})
-                assert table is not None
-                table[field.key] = None if value == "" else value
+        for field in FIELDS:
+            if field.table == "ollama" and not use_ollama:
+                continue
+            value = self._value(field)
+            adding_ollama = field.table == "ollama" and station.ollama is None
+            if value == field.current(station) and not adding_ollama:
+                continue
+            table = found.setdefault(field.table, {})
+            assert table is not None
+            table[field.key] = None if value == "" else value
         if not use_ollama and station.ollama is not None:
             found["ollama"] = None
         llm = found.get("deeptutor.llm")
@@ -758,6 +882,16 @@ class SettingsView(tk.Frame):
     def open_config(self) -> None:
         """Abre ``atril.toml`` con el editor del sistema."""
         open_path(self.app.station.config_file)
+
+
+def _set_enabled(widget: tk.Misc, enabled: bool) -> None:
+    """Activa o desactiva un control (y los que contenga)."""
+    if isinstance(widget, ttk.Widget):
+        widget.state(["!disabled"] if enabled else ["disabled"])
+    elif isinstance(widget, tk.Text | tk.Listbox):
+        widget.configure(state="normal" if enabled else "disabled")
+    for child in widget.winfo_children():
+        _set_enabled(child, enabled)
 
 
 def _strings(value: Value) -> list[str]:

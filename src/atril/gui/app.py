@@ -384,6 +384,9 @@ class App(tk.Tk):
         view = self.views["Actividad"]
         if isinstance(view, HistoryView) and view.winfo_ismapped():
             view.refresh()
+        home = self.views["Inicio"]
+        if isinstance(home, HomeView):
+            home.shown()
 
     def _show_error(self, exc: Exception) -> None:
         """Muestra un error (las cancelaciones, solo en la actividad)."""
@@ -466,7 +469,7 @@ def _first_run(parent: tk.Tk) -> Station | None:
     messagebox.showinfo(
         "Atril: primera ejecución",
         "Elige la carpeta de tu estación de estudio. Si ya tienes una, selecciona la "
-        f"carpeta que contiene {STATION_FILE}; si no, elige o crea una carpeta vacía "
+        f"carpeta que contiene {STATION_FILE}. Si no, elige o crea una carpeta vacía "
         "y atril la preparará.",
         parent=parent,
     )

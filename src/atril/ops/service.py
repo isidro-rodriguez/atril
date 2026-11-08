@@ -157,7 +157,7 @@ def service_findings(dt: DeepTutor) -> list[Finding]:
     if orphans.own and not (backend and frontend):
         findings.append(
             warning(
-                f"Procesos huérfanos: {pids(orphans.own)}; se cierran al parar "
+                f"Procesos huérfanos: {pids(orphans.own)}. Se cierran al parar "
                 "DeepTutor."
             )
         )
@@ -171,7 +171,7 @@ def patch_finding(name: str, state: PatchState) -> Finding:
             return ok(f"{name}: aplicado.")
         case PatchState.PENDING:
             return warning(
-                f"{name}: pendiente; aplica los parches con DeepTutor parado."
+                f"{name}: pendiente. Aplica los parches con DeepTutor parado."
             )
         case PatchState.CHANGED:
             return error(

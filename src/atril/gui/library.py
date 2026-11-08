@@ -108,8 +108,8 @@ class LibraryView(tk.Frame):
         style.tag_levels(self._table)
         self._table.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table, command=self._table.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self._table.configure(yscrollcommand=scroll.set)
+        scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
+        style.autoscroll(self._table, scroll)
         self._count = style.label(card, "", color=style.MUTED, font=style.SMALL)
         self._count.grid(row=4, column=0, sticky="w", pady=(8, 0))
 
@@ -199,7 +199,7 @@ class LibraryView(tk.Frame):
             for path in paths:
                 source = syllabus_ops.add_source(syllabus, path, kb_id=kb_id)
                 reporter.show([ok(f"Añadida {source.id}.")])
-            reporter.show([ok(f"{len(paths)} PDF añadidos; indexa el temario.")])
+            reporter.show([ok(f"{len(paths)} PDF añadidos. Indexa el temario.")])
 
         self.app.run(
             "Añadiendo PDF...", add, lambda _: self.refresh(), title="Añadir PDF"

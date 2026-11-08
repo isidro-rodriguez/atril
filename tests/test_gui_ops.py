@@ -144,3 +144,38 @@ def test_only_the_ollama_started_by_atril_is_stopped(
     service.stop_ollama(station, Recorder())
     assert killed == [4242]
     assert service.ollama_owner(station) is None
+
+
+def test_active_assistant_reads_deeptutor_catalog_without_the_key(
+    station_dir: Path,
+) -> None:
+    import json
+
+    from atril.deeptutor import MODEL_CATALOG, Assistant, active_assistant
+
+    station = load_station(station_dir)
+    assert active_assistant(station) is None  # sin catálogo
+    catalog = {
+        "connections": [{"id": "c1", "api_key": "secreta"}],
+        "services": {
+            "llm": {
+                "active_profile_id": "p2",
+                "active_model_id": "m2",
+                "profiles": [
+                    {"id": "p1", "binding": "claude_code", "api_key": "", "models": []},
+                    {
+                        "id": "p2",
+                        "binding": "gemini",
+                        "api_key": "",
+                        "provider_ref": {"connection_id": "c1"},
+                        "models": [{"id": "m2", "model": "gemini-2.5-pro"}],
+                    },
+                ],
+            }
+        },
+    }
+    path = station.root / MODEL_CATALOG
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(catalog), encoding="utf-8")
+
+    assert active_assistant(station) == Assistant("gemini", "gemini-2.5-pro", True)

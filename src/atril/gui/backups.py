@@ -78,9 +78,9 @@ class BackupsView(tk.Frame):
         for column, (title, width, anchor) in zip(
             columns,
             (
-                ("Fecha", 200, "w"),
-                ("Tamaño", 110, "center"),
-                ("Destino", 320, "w"),
+                ("Fecha", 170, "w"),
+                ("Tamaño", 100, "w"),
+                ("Destino", 280, "w"),
                 ("Verificación", 150, "w"),
             ),
             strict=True,
@@ -95,8 +95,8 @@ class BackupsView(tk.Frame):
         style.tag_levels(self._table)
         self._table.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table, command=self._table.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self._table.configure(yscrollcommand=scroll.set)
+        scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
+        style.autoscroll(self._table, scroll)
         self._note = style.label(
             card,
             "",
@@ -146,7 +146,7 @@ class BackupsView(tk.Frame):
                 item = self._table.insert("", "end", values=values, tags=(level.value,))
                 self._paths[item] = archive.path
         self._note.configure(
-            text="Selecciona un backup para restaurarlo; sin selección se usa el "
+            text="Selecciona un backup para restaurarlo. Sin selección se usa el "
             "más reciente. Las claves de API no se guardan: tras restaurar hay que "
             "volver a escribirlas en DeepTutor.",
             foreground=style.MUTED,
@@ -264,7 +264,7 @@ def _sentence(text: str) -> str:
 def _restored_findings(result: Restored) -> list:
     """Resultado de una restauración para la actividad."""
     findings = [
-        info(f"Lo anterior está en {result.keep}; bórralo cuando compruebes todo."),
+        info(f"Lo anterior está en {result.keep}. Bórralo cuando compruebes todo."),
         ok(f"Restaurado: {', '.join(result.replaced)}."),
     ]
     if result.blanked_keys:

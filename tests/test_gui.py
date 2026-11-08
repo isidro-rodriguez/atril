@@ -2,7 +2,7 @@ import dataclasses
 import threading
 
 from atril.checks import Level, ok, warning
-from atril.config.station import LlmConfig
+from atril.deeptutor import Assistant
 from atril.errors import AtrilError
 from atril.gui.model import Action, Facts, overall, service_states, tool_cards
 from atril.gui.worker import Worker
@@ -95,8 +95,15 @@ def _facts(**changes: object) -> Facts:
         ollama_running=True,
         ollama_ours=False,
         ollama_models=("qwen3:8b",),
-        tools={"git": True, "uv": True, "node": True, "claude": True},
-        llm=LlmConfig("claude_code", "claude-code/opus"),
+        tools={
+            "git": True,
+            "uv": True,
+            "node": True,
+            "npm": True,
+            "python": True,
+            "claude": True,
+        },
+        assistant=Assistant("claude_code", "claude-code/opus", False),
         ollama_required=True,
     )
     return dataclasses.replace(base, **changes)
@@ -108,15 +115,17 @@ def test_tool_cards_offer_one_action_each() -> None:
     assert [c.key for c in tool_cards(_facts())] == [
         "deeptutor",
         "ollama",
-        "git",
+        "python",
         "uv",
         "node",
+        "npm",
+        "git",
         "asistente",
     ]
     assert cards["deeptutor"].action is Action.START
     assert cards["ollama"].action is Action.NONE  # abierto aparte: no se para
     assert cards["git"].action is Action.NONE and cards["git"].level is Level.OK
-    assert cards["asistente"].name == "Claude Code"
+    assert cards["asistente"].state == "Claude Code disponible"
 
     stopped = {
         c.key: c
@@ -140,7 +149,7 @@ def test_tool_cards_offer_one_action_each() -> None:
             _facts(
                 deeptutor_installed=False,
                 ollama_installed=False,
-                llm=LlmConfig("ollama", "ollama/llama3:8b"),
+                assistant=Assistant("ollama", "llama3:8b", False),
             )
         )
     }

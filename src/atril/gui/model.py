@@ -11,7 +11,8 @@ from enum import StrEnum
 
 from atril.checks import Finding, Level
 from atril.config import Syllabus, load_syllabi
-from atril.config.station import LlmConfig, Station
+from atril.config.station import Station
+from atril.deeptutor import Assistant
 from atril.knowledge import PlanState
 from atril.ops import knowledge as knowledge_ops
 from atril.ops.knowledge import KbStatus
@@ -47,11 +48,13 @@ class ToolCard:
     """Una herramienta en Inicio: nombre, logotipo, estado y su acción."""
 
     key: str
-    """``deeptutor``, ``ollama``, ``git``, ``uv``, ``node`` o ``asistente``."""
+    """``deeptutor``, ``ollama``, ``python``, ``uv``, ``node``, ``npm``, ``git`` o
+    ``asistente``."""
     name: str
     logo: str | None
     """Logotipo de ``recursos/marcas`` (``None``: icono genérico)."""
     state: str
+    """Una sola línea."""
     level: Level
     action: Action = Action.NONE
 
@@ -69,8 +72,9 @@ class Facts:
     """El Ollama en marcha lo abrió atril (solo ese se puede parar)."""
     ollama_models: tuple[str, ...]
     tools: dict[str, bool]
-    """``git``, ``uv``, ``node`` y ``claude``: si están en el PATH."""
-    llm: LlmConfig | None
+    """``python``, ``uv``, ``node``, ``npm``, ``git`` y ``claude``: si están."""
+    assistant: Assistant | None
+    """Modelo de chat activo (catálogo de DeepTutor o ``[deeptutor.llm]``)."""
     ollama_required: bool
     """``atril.toml`` declara ``[ollama]`` (indexado)."""
     pending: list[Finding] = field(default_factory=list)
@@ -82,134 +86,139 @@ class Facts:
         return self.backend_up and self.frontend_up
 
 
-TOOL_NAMES = {"git": "Git", "uv": "uv", "node": "Node.js"}
-"""Nombre visible de las herramientas de instalación."""
+TOOLS = {
+    "python": ("Python", "python"),
+    "uv": ("uv", "uv"),
+    "node": ("Node.js", "nodejs"),
+    "npm": ("npm", "npm"),
+    "git": ("Git", "git"),
+}
+"""Herramientas de instalación: nombre visible y logotipo."""
+
+ORDER = ("deeptutor", "ollama", "python", "uv", "node", "npm", "git", "asistente")
+"""Orden de las tarjetas en Inicio, de dos en dos."""
+
+WEBSITES = {
+    "deeptutor": "https://github.com/HKUDS/DeepTutor",
+    "ollama": "https://ollama.com",
+    "python": "https://www.python.org",
+    "uv": "https://docs.astral.sh/uv/",
+    "node": "https://nodejs.org",
+    "npm": "https://www.npmjs.com",
+    "git": "https://git-scm.com",
+}
+"""Web de cada herramienta (al pulsar su logotipo)."""
 
 
 def tool_cards(facts: Facts) -> list[ToolCard]:
-    """Las seis herramientas de Inicio con su estado y su acción.
+    """Las ocho herramientas de Inicio, en :data:`ORDER`, con su estado y acción.
 
     Examples:
         >>> facts = Facts(True, True, True, True, False, False, (), {}, None, True)
         >>> [(c.key, c.state, c.action.value) for c in tool_cards(facts)][:2]
         [('deeptutor', 'En marcha', 'Parar'), ('ollama', 'Parado', 'Arrancar')]
     """
-    return [
-        _deeptutor_card(facts),
-        _ollama_card(facts),
-        *(
-            ToolCard(
-                key, name, key if key != "node" else "nodejs", "Instalado", Level.OK
+    cards = {
+        "deeptutor": _deeptutor_card(facts),
+        "ollama": _ollama_card(facts),
+        "asistente": assistant_card(facts),
+    }
+    for key, (name, logo) in TOOLS.items():
+        if facts.tools.get(key):
+            cards[key] = ToolCard(key, name, logo, "Instalado", Level.OK)
+        else:
+            cards[key] = ToolCard(
+                key, name, logo, "No instalado", Level.ERROR, Action.INSTALL
             )
-            if facts.tools.get(key)
-            else ToolCard(
-                key,
-                name,
-                key if key != "node" else "nodejs",
-                "No instalado",
-                Level.ERROR,
-                Action.INSTALL,
-            )
-            for key, name in TOOL_NAMES.items()
-        ),
-        assistant_card(facts),
-    ]
+    return [cards[key] for key in ORDER]
 
 
 def _deeptutor_card(facts: Facts) -> ToolCard:
     """DeepTutor: instalar, arrancar o parar."""
+
+    def card(state: str, level: Level, action: Action) -> ToolCard:
+        return ToolCard("deeptutor", "DeepTutor", "deeptutor", state, level, action)
+
     if not facts.deeptutor_installed:
-        return ToolCard(
-            "deeptutor",
-            "DeepTutor",
-            "deeptutor",
-            "No instalado",
-            Level.ERROR,
-            Action.INSTALL,
-        )
+        return card("No instalado", Level.ERROR, Action.INSTALL)
     if facts.deeptutor_running:
-        return ToolCard(
-            "deeptutor", "DeepTutor", "deeptutor", "En marcha", Level.OK, Action.STOP
-        )
+        return card("En marcha", Level.OK, Action.STOP)
     if facts.backend_up or facts.frontend_up:
-        return ToolCard(
-            "deeptutor",
-            "DeepTutor",
-            "deeptutor",
-            "Arranque incompleto",
-            Level.WARNING,
-            Action.STOP,
-        )
-    return ToolCard(
-        "deeptutor", "DeepTutor", "deeptutor", "Parado", Level.INFO, Action.START
-    )
+        return card("Arranque incompleto", Level.WARNING, Action.STOP)
+    return card("Parado", Level.INFO, Action.START)
 
 
 def _ollama_card(facts: Facts) -> ToolCard:
     """Ollama: instalar, arrancar, parar (solo el que abrió atril) o nada."""
-    optional = "" if facts.ollama_required else " (opcional)"
+
+    def card(state: str, level: Level, action: Action = Action.NONE) -> ToolCard:
+        return ToolCard("ollama", "Ollama", "ollama", state, level, action)
+
     if not facts.ollama_installed:
-        return ToolCard(
-            "ollama",
-            "Ollama",
-            "ollama",
-            f"No instalado{optional}",
-            Level.WARNING if facts.ollama_required else Level.INFO,
-            Action.INSTALL,
-        )
+        if facts.ollama_required:
+            return card("No instalado", Level.WARNING, Action.INSTALL)
+        return card("No instalado (opcional)", Level.INFO, Action.INSTALL)
     if not facts.ollama_running:
-        return ToolCard(
-            "ollama", "Ollama", "ollama", "Parado", Level.INFO, Action.START
-        )
-    if facts.ollama_ours:
-        return ToolCard(
-            "ollama", "Ollama", "ollama", "En marcha", Level.OK, Action.STOP
-        )
-    return ToolCard(
-        "ollama", "Ollama", "ollama", "En marcha (abierto aparte)", Level.OK
+        return card("Parado", Level.INFO, Action.START)
+    return card(
+        "En marcha", Level.OK, Action.STOP if facts.ollama_ours else Action.NONE
     )
 
 
+PROVIDERS = {
+    "claude_code": "Claude Code",
+    "anthropic": "Claude",
+    "openai": "GPT",
+    "azure_openai": "GPT (Azure)",
+    "gemini": "Gemini",
+    "google": "Gemini",
+    "deepseek": "DeepSeek",
+    "ollama": "Ollama",
+    "openrouter": "OpenRouter",
+}
+"""Nombre visible de los proveedores de chat más comunes."""
+
+
 def assistant_card(facts: Facts) -> ToolCard:
-    """Asistente de DeepTutor según ``[deeptutor.llm]``.
+    """Asistente de DeepTutor y si está accesible.
 
     ``claude_code`` necesita el programa ``claude``; un modelo de Ollama, estar
-    descargado. Sin ``[deeptutor.llm]`` se configura dentro de DeepTutor.
+    descargado; un proveedor en la nube, su clave en DeepTutor.
 
     Examples:
-        >>> from atril.config.station import LlmConfig
+        >>> facts = Facts(True, False, False, True, True, True, (), {}, None, False)
+        >>> assistant_card(facts).state
+        'Sin configurar en DeepTutor'
         >>> facts = Facts(
-        ...     True, False, False, True, True, True, ("qwen3:8b",), {}, None, False
+        ...     True, False, False, True, True, True, (), {},
+        ...     Assistant("gemini", "gemini-2.5-pro", False), False,
         ... )
         >>> assistant_card(facts).state
-        'Configurado en DeepTutor'
+        'Gemini sin clave'
     """
-    llm = facts.llm
-    if llm is None:
-        return ToolCard(
-            "asistente", "Asistente", None, "Configurado en DeepTutor", Level.OK
-        )
-    if llm.provider == "claude_code":
+    assistant = facts.assistant
+
+    def card(state: str, level: Level, action: Action = Action.NONE) -> ToolCard:
+        logo = "ollama" if assistant and assistant.provider == "ollama" else None
+        return ToolCard("asistente", "Asistente", logo, state, level, action)
+
+    if assistant is None or not assistant.provider:
+        return card("Sin configurar en DeepTutor", Level.WARNING)
+    label = PROVIDERS.get(assistant.provider, assistant.provider)
+    if assistant.provider == "claude_code":
         if facts.tools.get("claude"):
-            return ToolCard("asistente", "Claude Code", None, "Instalado", Level.OK)
-        return ToolCard(
-            "asistente",
-            "Claude Code",
-            None,
-            "No instalado",
-            Level.ERROR,
-            Action.INSTALL,
-        )
-    if llm.provider == "ollama":
-        name = llm.model.removeprefix("ollama/")
+            return card("Claude Code disponible", Level.OK)
+        return card("Claude Code no instalado", Level.ERROR, Action.INSTALL)
+    if assistant.provider == "ollama":
+        name = assistant.model.removeprefix("ollama/")
         if any(_same_model(name, model) for model in facts.ollama_models):
-            return ToolCard("asistente", name, "ollama", "Descargado", Level.OK)
+            return card(f"{name} disponible", Level.OK)
         if not facts.ollama_running:
-            return ToolCard("asistente", name, "ollama", "Ollama parado", Level.INFO)
-        return ToolCard(
-            "asistente", name, "ollama", "Sin descargar", Level.WARNING, Action.PULL
-        )
-    return ToolCard("asistente", llm.model, None, llm.provider, Level.OK)
+            return card(f"{name} (Ollama parado)", Level.INFO)
+        return card(f"{name} sin descargar", Level.WARNING, Action.PULL)
+    if assistant.has_key:
+        return card(f"{label} con clave", Level.OK)
+    return card(f"{label} sin clave", Level.ERROR)
 
 
 def _same_model(wanted: str, installed: str) -> bool:
@@ -240,7 +249,7 @@ def overall(facts: Facts) -> tuple[Level, str, str]:
             OVERALL[Level.ERROR][0],
             "DeepTutor no está instalado: instálalo abajo.",
         )
-    missing = [TOOL_NAMES[key] for key in TOOL_NAMES if not facts.tools.get(key)]
+    missing = [name for key, (name, _) in TOOLS.items() if not facts.tools.get(key)]
     if missing:
         return (
             Level.ERROR,
@@ -259,10 +268,7 @@ def service_states(facts: Facts) -> dict[str, tuple[Level, str]]:
     cards = {card.key: card for card in tool_cards(facts)[:2]}
     return {
         "DeepTutor": (cards["deeptutor"].level, cards["deeptutor"].state),
-        "Ollama": (
-            cards["ollama"].level,
-            cards["ollama"].state.removesuffix(" (abierto aparte)"),
-        ),
+        "Ollama": (cards["ollama"].level, cards["ollama"].state),
     }
 
 

@@ -5,6 +5,33 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.25.0] - 2026-11-08
+
+Retoques de la ventana tras la primera prueba del segundo rediseño.
+
+### Added
+
+- Inicio muestra Python y npm. Python se instala con uv (la versión de `atril.toml`) y npm con
+  Node.js.
+- La tarjeta Asistente comprueba el modelo de chat activo en DeepTutor, sea cual sea el
+  proveedor: Claude Code instalado, el modelo de Ollama descargado o, en la nube (Claude, GPT,
+  Gemini...), que tenga su clave. Nunca se lee ni se muestra la clave.
+- Pulsar el logotipo de una herramienta abre su web.
+- Ajustes: cada clave con su descripción de una línea. Avanzado en una columna desplazable y
+  por partes (código de DeepTutor, puertos, modelo de embedding, lectura y troceado).
+
+### Changed
+
+- Inicio recupera «Última actividad» y «Último backup», y las herramientas van de dos en dos,
+  más grandes, todas del mismo tamaño y ocupando el apartado entero.
+- Logotipo y nombre de la navegación más grandes, y el apartado activo con el mismo margen a
+  ambos lados.
+- Sin Ollama, el resto de Indexado (y su modelo en Avanzado) queda desactivado.
+- El asistente se escribe a mano en Ajustes, sin sugerir un proveedor.
+- Las tablas solo muestran la barra de desplazamiento si hace falta y la separan de la última
+  columna.
+- Los textos de la ventana no usan punto y coma (una prueba lo vigila).
+
 ## [0.24.0] - 2026-11-08
 
 Segundo rediseño de la ventana: más simple, fija y sin rastro de la consola.

@@ -28,7 +28,7 @@ SCALES = (1.0, 1.5, 2.0)
 """Escalas de los PNG: 100 %, 150 % y 200 % de pantalla."""
 
 NAV, SELECTED = "#3d4f6e", "#0f5ec9"
-BRAND = 36
+BRAND = 48
 """Lado de los logotipos de las herramientas a 100 %."""
 ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     # nombre Lucide: (tamaño base, ((variante, color), ...))
@@ -39,6 +39,8 @@ ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     "activity": (22, (("nav", NAV), ("sel", SELECTED))),
     "settings": (22, (("nav", NAV), ("sel", SELECTED))),
     "bot": (BRAND, (("marca", NAV),)),
+    "terminal": (BRAND, (("marca", NAV),)),
+    "package": (BRAND, (("marca", NAV),)),
     "circle-check": (18, (("ok", "#1a8f3c"),)),
     "info": (18, (("info", "#0f5ec9"),)),
     "triangle-alert": (18, (("aviso", "#d97706"),)),

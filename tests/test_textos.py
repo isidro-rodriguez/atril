@@ -24,15 +24,13 @@ CLI = re.compile(
 
 
 def _strings(path: Path) -> list[tuple[int, str]]:
-    """Textos literales del módulo, sin docstrings."""
+    """Textos literales del módulo, sin docstrings (de módulo, clase, función o
+    atributo)."""
     tree = ast.parse(path.read_text(encoding="utf-8"))
     docstrings = {
-        id(node.body[0].value)
+        id(node.value)
         for node in ast.walk(tree)
-        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef)
-        and node.body
-        and isinstance(node.body[0], ast.Expr)
-        and isinstance(node.body[0].value, ast.Constant)
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
     }
     return [
         (node.lineno, node.value)
@@ -54,5 +52,15 @@ def test_messages_shared_with_the_window_do_not_mention_cli_commands() -> None:
         for path in modules
         for line, text in _strings(path)
         if CLI.search(text) and not text.startswith("--")  # argumento de un programa
+    ]
+    assert found == []
+
+
+def test_window_texts_do_not_use_semicolons() -> None:
+    found = [
+        f"{path.name}:{line}: {text!r}"
+        for path in (SRC / "gui").glob("*.py")
+        for line, text in _strings(path)
+        if ";" in text
     ]
     assert found == []

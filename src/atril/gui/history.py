@@ -46,8 +46,8 @@ class HistoryView(tk.Frame):
         style.tag_levels(self._list)
         self._list.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table, command=self._list.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self._list.configure(yscrollcommand=scroll.set)
+        scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
+        style.autoscroll(self._list, scroll)
         self._list.bind("<<TreeviewSelect>>", self._show_event)
 
         self._detail = tk.Text(

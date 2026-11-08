@@ -232,6 +232,7 @@ Sustituye lo anterior donde choque.
 | Textos | Sin comandos ni opciones de la consola; una prueba lo comprueba en todos los módulos salvo `commands/` |
 | Ajustes | Todas las claves de `atril.toml` en pestañas: DeepTutor (asistente, búsqueda), Indexado (Ollama, ritmo), Backups, Avanzado (lo que obliga a reinstalar o reindexar) y Herramientas (instalar o reparar, actualizar, aplicar ajustes, diagnóstico, validar, copiar informe, volver a un commit, registros). Al guardar se dice qué hace falta (`ops.settings.effects`) y se ofrece aplicarlo |
 | Lecturas | Las lecturas de fondo no bloquean botones ni dejan rastro en Actividad; sus errores se muestran en el propio apartado (p. ej., un destino de backups desconectado) |
+| Retoques (0.25.0) | Inicio recupera última actividad y último backup. Herramientas de dos en dos y en este orden: DeepTutor y Ollama, Python y uv, Node.js y npm, Git y Asistente; el logotipo abre la web de cada una (Python y npm, con icono genérico hasta tener su logotipo). El Asistente comprueba el modelo activo en DeepTutor (Claude Code instalado, modelo de Ollama descargado o clave presente en la nube) sin leer la clave. Ajustes con una descripción de una línea por clave, 0,5 em entre claves y Avanzado en una columna desplazable por partes. Sin punto y coma en los textos |
 
 ## Lecciones de la instalación previa
 
