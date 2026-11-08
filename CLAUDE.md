@@ -33,6 +33,7 @@
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
 │   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus)
+│   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app, worker, model, style, recursos/
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
@@ -57,9 +58,10 @@
 - Every `__init__.py` must include a short docstring describing the module or package.
 - The project uses `uv` as dependency manager and build backend.
 - Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` with `rich` (CLI output),
-  `psutil` (ports, command lines and process trees, portable and testable on Linux CI) and
-  `tomlkit` (edits `temario.toml` keeping comments; `tomllib` only reads). Anything else needs
-  a justification (stdlib first). Raise the `acodo` lower bound only when a newer API is needed.
+  `psutil` (ports, command lines and process trees, portable and testable on Linux CI),
+  `tomlkit` (edits `temario.toml` keeping comments; `tomllib` only reads) and `sv-ttk` (Windows 11
+  look for the tkinter GUI). Anything else needs a justification (stdlib first). Raise the `acodo`
+  lower bound only when a newer API is needed.
 - `README.md` must stay minimal: what it is, installation, usage, quality commands and links.
   Put any extra explanation in this file instead.
 
@@ -97,7 +99,13 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   `Finding`s, report progress to an `ops.Reporter` (`show`, `busy`, `progress`) and raise
   `atril.errors.AtrilError` (every module error derives from it). Confirmations are asked by the
   interface before calling them. `commands/` only parses options, prints (`ConsoleReporter`,
-  `fail_error`) and sets the exit code; the future GUI does the same with widgets.
+  `fail_error`) and sets the exit code; the GUI does the same with widgets.
+- **GUI** (`atril.gui`): never blocks Tk's thread; every operation goes through `gui.worker.Worker`
+  (one job at a time, events through a queue drained with `after`). Texts and backgrounds use
+  `tk` widgets via `style.label`/`style.card` (sv-ttk's `tk_setPalette` overrides `ttk.Label`
+  colors); `style.apply` processes `<<ThemeChanged>>` before building widgets. Buttons, bars and
+  scrollbars stay `ttk`. View logic without Tk lives in `gui/model.py` so it is tested without a
+  display; window tests skip when there is none.
 - Long operations (backup, restore, install, update, `kb indexar`/`reindexar`) hold the station
   lock (`lock.station_lock`, `commands._common.reserve`); it is reentrant within a process and an
   abandoned lock (dead PID or reused PID) is replaced.

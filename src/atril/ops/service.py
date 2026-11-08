@@ -73,6 +73,18 @@ def start(dt: DeepTutor, reporter: Reporter, timeout: int) -> None:
         raise _with_log(dt, f"DeepTutor no responde tras {timeout} s.")
 
 
+def open_url(station: Station, reporter: Reporter, timeout: int = 600) -> str:
+    """Arranca DeepTutor si no responde y devuelve la URL para el navegador.
+
+    Raises:
+        AtrilError: Si no está instalado o no arranca.
+    """
+    dt = installed(station)
+    if not dt.ready():
+        start(dt, reporter, timeout)
+    return dt.frontend_url
+
+
 def stop(dt: DeepTutor, reporter: Reporter) -> None:
     """Detiene DeepTutor y sus huérfanos.
 

@@ -51,7 +51,7 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
 | Backup | `atril backup` · `atril backup comprobar` · `atril backup restaurar` |
 | Configuración | `atril validar` (fase 0) |
 | Temarios del alumno (0.18.0) | `atril temario crear` · `atril fuentes añadir` |
-| Previsto (GUI) | `atril-gui` |
+| GUI (0.19.0) | `atril-gui` |
 
 ## Fases
 
@@ -135,13 +135,21 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 | Firma | Sin firma al principio (SmartScreen: «Más información → Ejecutar de todas formas») | Certificado de pago, por ahora |
 | Linux/macOS | `uv tool install atril` + `atril-gui`; sin instalador. Nada específico de Windows fuera de adaptadores | |
 
+### Notas de implementación
+
+- `sv-ttk` llama a `tk_setPalette` al procesar `<<ThemeChanged>>`: si se procesa después de crear
+  los widgets, pisa sus fondos y los colores de `ttk.Label`. Se procesa antes de construir la
+  ventana y los textos van en widgets `tk` con colores explícitos (`style.label`, `style.card`).
+- La ventana se valida con capturas en Xvfb; las fuentes reales (Segoe UI Variable) solo están en
+  Windows, así que tamaños y glifos (✓, ⌂) se revisan allí.
+
 ### Plan
 
 | Fase | Contenido | Versión |
 |---|---|---|
 | 1 ✅ | `ops/` para servicio (arrancar, parar, estado) y copias; `AtrilError`; bloqueo de estación; `CREATE_NO_WINDOW`. La CLI pasa a usar `ops` sin cambios visibles | 0.17.0 |
 | 2 ✅ | Temarios del alumno en la CLI: `[ollama]` opcional, `temario crear`, `fuentes añadir` (`tomlkit`, `ops.syllabus`). Los `ops` de descarga e indexado pasan a la fase 4, cuando la GUI los use | 0.18.0 |
-| 3 | GUI mínima: primera ejecución, Inicio, abrir y parar DeepTutor, `atril-gui`. Se prueba con el alumno | 0.19.0 |
+| 3 ✅ | GUI mínima: primera ejecución, Inicio, abrir y parar DeepTutor, `atril-gui`. Se prueba con el alumno | 0.19.0 |
 | 4 | `ops` de descarga, comprobación e indexado; GUI de Temarios (crear, añadir fuentes, descargar, comprobar, indexar con progreso y cancelación) | 0.20.0 |
 | 5 | GUI de Copias y Administración (instalar DeepTutor con comprobación de dependencias, actualizar, parches, validar, doctor) | 0.21.0 |
 | 6 | Instalador Inno Setup en las releases (job `windows-latest`), guía del alumno | 1.0.0 |

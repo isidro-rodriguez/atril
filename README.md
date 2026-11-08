@@ -10,6 +10,7 @@ uv tool install atril            # instalar (o actualizar: uv tool upgrade atril
 atril validar                    # comprueba atril.toml y los temarios (la 1.ª vez, elige la estación)
 atril instalar                   # instala DeepTutor en app\ (Ollama es opcional: solo para indexar)
 atril arrancar                   # arranca DeepTutor y abre el navegador
+atril-gui                        # lo mismo en una ventana, sin consola
 ```
 
 Hay una sola estación por equipo. En la primera ejecución atril ofrece la carpeta actual si

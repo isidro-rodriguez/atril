@@ -5,6 +5,22 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.19.0] - 2026-11-08
+
+Fase 3: primera interfaz gráfica, para usar atril sin consola.
+
+### Added
+
+- `atril-gui`: ventana con el estado real de la estación (DeepTutor, Ollama, espacio libre y
+  última copia), accesos para abrir DeepTutor en el navegador (lo arranca si hace falta), pararlo,
+  volver a comprobar y abrir la carpeta de la estación, y un registro de actividad. Las
+  operaciones van en segundo plano: la ventana nunca se queda congelada y los errores se muestran
+  con el final del log de DeepTutor.
+- Primera ejecución gráfica: se elige la carpeta de la estación o se crea una nueva.
+- Al cerrar con DeepTutor en marcha se pregunta si pararlo.
+- Icono de atril (PNG y `.ico`) incluido en el paquete.
+- Dependencia `sv-ttk` (tema Sun Valley, aspecto de Windows 11, sin dependencias propias).
+
 ## [0.18.0] - 2026-11-08
 
 Fase 2 de la interfaz gráfica: un alumno puede crear sus temarios sin editar TOML a mano.
