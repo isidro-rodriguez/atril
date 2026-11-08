@@ -11,11 +11,11 @@ from typer.testing import CliRunner
 
 from atril import backup
 from atril.backup import BackupError
-from atril.commands import backup as commands
 from atril.config import load_station
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
 from atril.main import app
+from atril.ops import service
 
 runner = CliRunner()
 
@@ -217,7 +217,6 @@ def test_unreadable_file_makes_backup_incomplete(
         yield station.root / "data" / "bloqueado.db", "data/bloqueado.db"
 
     monkeypatch.setattr(backup, "station_files", with_missing)
-    monkeypatch.setattr(commands.backup, "station_files", with_missing)
 
     result = _invoke(station)
 
@@ -234,9 +233,9 @@ def test_backup_stops_and_restarts_deeptutor(
     write(station.deeptutor_cli, "")
     monkeypatch.setattr(DeepTutor, "backend_up", lambda self: True)
     monkeypatch.setattr(DeepTutor, "frontend_up", lambda self: False)
-    monkeypatch.setattr(commands, "shutdown", lambda dt: calls.append("parar"))
+    monkeypatch.setattr(service, "stop", lambda dt, reporter: calls.append("parar"))
     monkeypatch.setattr(
-        commands, "launch", lambda dt, timeout: calls.append("arrancar")
+        service, "start", lambda dt, reporter, timeout: calls.append("arrancar")
     )
 
     result = _invoke(station)

@@ -5,10 +5,9 @@ texto que viene de fuera (rutas, mensajes de configuración con ``[[fuente]]``,
 líneas de comandos) se escapa para que Rich no lo interprete como markup.
 """
 
-import os
-import subprocess
+import contextlib
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable, Sequence
 from pathlib import Path
 from typing import NoReturn
 
@@ -16,8 +15,10 @@ import typer
 from acodo.utils import valid_slug
 from rich.console import Console
 from rich.markup import escape
+from rich.panel import Panel
+from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn
 
-from atril.checks import Finding, Level, info, ok, warning
+from atril.checks import Finding, Level, info
 from atril.config import (
     ConfigError,
     Station,
@@ -28,6 +29,10 @@ from atril.config import (
 )
 from atril.config.station import STATION_FILE, init_station
 from atril.config.syllabus import KnowledgeBase
+from atril.errors import AtrilError
+from atril.lock import BusyError, station_lock
+from atril.ops import Advance
+from atril.ops.station import STATION_VARIABLE, persist_station, saved_station
 
 console = Console(soft_wrap=True)
 """Consola de salida normal; ``soft_wrap`` evita cortar rutas y mensajes largos."""
@@ -49,10 +54,6 @@ def fail(message: str) -> NoReturn:
     raise typer.Exit(1)
 
 
-STATION_VARIABLE = "ATRIL_ESTACION"
-"""Variable de usuario con la raíz de la única estación del equipo."""
-
-
 def station_root(ctx: typer.Context) -> Path:
     """Raíz de la estación guardada; en la primera ejecución, la configura."""
     if ctx.obj is not None:
@@ -67,24 +68,6 @@ def station_root(ctx: typer.Context) -> Path:
         root = _first_run()
     ctx.obj = root  # el resto del comando no vuelve a leerla
     return root
-
-
-def saved_station() -> Path | None:
-    """Estación guardada: del entorno o, en Windows, del registro del usuario.
-
-    ``setx`` no cambia el entorno de los terminales ya abiertos; por eso, si
-    falta en el entorno, se lee del registro.
-    """
-    value = os.environ.get(STATION_VARIABLE)
-    if not value and sys.platform == "win32":
-        import winreg
-
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
-                value, _ = winreg.QueryValueEx(key, STATION_VARIABLE)
-        except OSError:
-            value = None
-    return Path(str(value)) if value else None
 
 
 def _interactive() -> bool:
@@ -129,33 +112,8 @@ def ask_yes(question: str, *, default: bool = False) -> bool:
 
 def _save(root: Path) -> Path:
     """Guarda la estación como variable de usuario y la usa ya en este proceso."""
-    os.environ[STATION_VARIABLE] = str(root)
     show([persist_station(root)])
     return root
-
-
-def persist_station(root: Path) -> Finding:
-    """Guarda ``ATRIL_ESTACION`` en el entorno del usuario.
-
-    En Windows usa ``setx`` (registro del usuario, sin ficheros propios de
-    atril). En otros sistemas, indica la línea para el perfil de la shell.
-    """
-    if os.name != "nt":
-        return info(f"Añade a tu perfil de shell: export {STATION_VARIABLE}={root}")
-    result = subprocess.run(
-        ["setx", STATION_VARIABLE, str(root)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return warning(
-            f"No se ha podido guardar {STATION_VARIABLE}; hazlo con: "
-            f'setx {STATION_VARIABLE} "{root}"'
-        )
-    return ok(
-        f"Estación guardada: {root} (para cambiarla: setx {STATION_VARIABLE} ...)."
-    )
 
 
 def get_station(ctx: typer.Context) -> Station:
@@ -232,3 +190,56 @@ def show(findings: Iterable[Finding], title: str | None = None) -> bool:
 def success(message: str) -> None:
     """Mensaje final de éxito."""
     console.print(f"[bold green]{escape(message)}[/]")
+
+
+class ConsoleReporter:
+    """:class:`atril.ops.Reporter` sobre la consola Rich de la CLI."""
+
+    def show(self, findings: Sequence[Finding], title: str | None = None) -> None:
+        """Muestra las comprobaciones con :func:`show`."""
+        show(findings, title)
+
+    @contextlib.contextmanager
+    def busy(self, text: str) -> Generator[None]:
+        """Spinner con ``text`` mientras dura la espera."""
+        with console.status(escape(text)):
+            yield
+
+    @contextlib.contextmanager
+    def progress(self, text: str, total: int) -> Generator[Advance]:
+        """Barra de avance por bytes."""
+        with Progress(
+            TextColumn(f"[bold]{escape(text)}[/]"),
+            BarColumn(),
+            DownloadColumn(),
+            console=console,
+            transient=True,
+        ) as bar:
+            task = bar.add_task("", total=total)
+            yield lambda amount: bar.advance(task, amount)
+
+
+reporter = ConsoleReporter()
+"""Reporter compartido por los comandos."""
+
+
+def fail_error(exc: AtrilError) -> NoReturn:
+    """Muestra un error de atril (con su extracto de log, si lo hay) y termina."""
+    if exc.log:
+        console.print(
+            Panel(
+                escape("\n".join(exc.log)),
+                title=escape(exc.log_title),
+                title_align="left",
+                border_style="red",
+            )
+        )
+    fail(str(exc))
+
+
+def reserve(ctx: typer.Context, station: Station, operation: str) -> None:
+    """Reserva la estación hasta que termine el comando; si está ocupada, termina."""
+    try:
+        ctx.with_resource(station_lock(station, operation))
+    except BusyError as exc:
+        fail(str(exc))

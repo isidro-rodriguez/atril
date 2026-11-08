@@ -22,6 +22,7 @@ from typing import Any
 from atril import __version__
 from atril.checks import Finding, info, ok, warning
 from atril.config.station import Station
+from atril.errors import AtrilError
 
 MANIFEST = "atril-backup.json"
 """Manifiesto dentro de cada copia: ruta de la estación, fecha y versión."""
@@ -54,7 +55,7 @@ Progress = Callable[[int], None]
 """Recibe los bytes leídos desde la última llamada."""
 
 
-class BackupError(Exception):
+class BackupError(AtrilError):
     """Error de backup o restauración, con mensaje en español."""
 
 
@@ -153,10 +154,14 @@ def create(station: Station, folder: Path, progress: Progress | None = None) -> 
                     progress(size)
             _put_bytes(archive, MANIFEST, _manifest(station, result))
         partial.replace(target)
-    except OSError as exc:
+    except BaseException as exc:  # también cancelaciones: no queda un .part
         with contextlib.suppress(OSError):
             partial.unlink()
-        raise BackupError(f"no se puede escribir la copia en {folder}: {exc}") from exc
+        if isinstance(exc, OSError):
+            raise BackupError(
+                f"no se puede escribir la copia en {folder}: {exc}"
+            ) from exc
+        raise
     return result
 
 

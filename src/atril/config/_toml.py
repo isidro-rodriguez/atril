@@ -7,8 +7,10 @@ from typing import Any
 
 from acodo.utils import has_only_keys
 
+from atril.errors import AtrilError
 
-class ConfigError(Exception):
+
+class ConfigError(AtrilError):
     """Error en un fichero de configuración (``atril.toml`` o ``temario.toml``).
 
     El mensaje indica el fichero y, si procede, la tabla y la clave afectadas.

@@ -119,7 +119,7 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 | Núcleo | Nuevo `atril/ops/`: casos de uso sin Rich ni Typer que devuelven resultados o `Finding`, aceptan `progress(done, total, texto)` y un `threading.Event` de cancelación. `commands/` solo traduce argumentos, pinta y fija el código de salida; `gui/` igual con widgets. Los módulos actuales del núcleo no cambian | Capas `domain/`/`infrastructure/`; GUI que llame a la CLI por subprocess |
 | Errores | `AtrilError` (y subclases existentes) con mensaje en español; la CLI hace `fail()`, la GUI muestra un diálogo con detalle técnico | `typer.Exit` dentro de la lógica |
 | Confirmaciones | Las pide la interfaz antes de llamar a `ops`; nunca dentro de `ops` | |
-| Concurrencia | Un hilo de trabajo + `queue.Queue` leída con `after()` (Tk no admite llamadas desde otros hilos). Cancelación solo en puntos seguros (entre fuentes al indexar; antes de renombrar el `.part` de una copia). Bloqueo de estación `data/atril/atril.lock` para operaciones largas, compartido por CLI y GUI | |
+| Concurrencia | Un hilo de trabajo + `queue.Queue` leída con `after()` (Tk no admite llamadas desde otros hilos). Cancelación solo en puntos seguros (entre fuentes al indexar; antes de renombrar el `.part` de una copia). Bloqueo de estación `<raíz>/.atril.lock` (fuera de copias y restauraciones) para operaciones largas, compartido por CLI y GUI; reentrante en el mismo proceso y sustituible si su proceso ha muerto | |
 | Subprocesos | Desde `pythonw` todo `git`/`uv`/`npm`/`deeptutor` se lanza con `CREATE_NO_WINDOW` en Windows; la variable `ATRIL_ESTACION` se escribe en el registro (`winreg`) en lugar de `setx` | |
 | Secciones | Inicio (estado real, abrir DeepTutor, parar) · Temarios (temarios, KB, fuentes, descargar, comprobar, indexar) · Copias (crear, comprobar, restaurar con confirmación) · Administración (instalar, actualizar o volver a un commit, parches, validar, doctor, abrir `atril.toml`) · asistente de primera ejecución | Biblioteca, Diagnóstico y Servicios como secciones aparte |
 | Temarios del alumno | «Crear temario»: id slug a partir del nombre, `prompt.md` de plantilla, una KB `<id>` con `fuentes = ["*"]` y `vinculante = false`. «Añadir fuente»: PDF local (se copia a `fuentes/<carpeta>/`, fuente manual) o URL. Mismos casos de uso en la CLI: `atril temario crear` y `atril fuentes añadir` | Formato de temario paralelo |
@@ -138,7 +138,7 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 
 | Fase | Contenido | Versión |
 |---|---|---|
-| 1 | `ops/` para servicio (arrancar, parar, estado) y copias; `AtrilError`; bloqueo de estación; `CREATE_NO_WINDOW`. La CLI pasa a usar `ops` sin cambios visibles | 0.17.0 |
+| 1 ✅ | `ops/` para servicio (arrancar, parar, estado) y copias; `AtrilError`; bloqueo de estación; `CREATE_NO_WINDOW`. La CLI pasa a usar `ops` sin cambios visibles | 0.17.0 |
 | 2 | Temarios del alumno en la CLI: `[ollama]` opcional, `temario crear`, `fuentes añadir` (`tomlkit`), `ops` de temarios, fuentes y KB | 0.18.0 |
 | 3 | GUI mínima: primera ejecución, Inicio, abrir y parar DeepTutor, `atril-gui`. Se prueba con el alumno | 0.19.0 |
 | 4 | GUI de Temarios (crear, añadir fuentes, descargar, comprobar, indexar con progreso y cancelación) | 0.20.0 |
@@ -153,7 +153,7 @@ hay pantalla.
 
 - Backup: se retiran restic, rclone y los git bundles. Las KB ocupan varios GB y rclone exigía una configuración compleja; ahora son ficheros `atril-<fecha>.zip` (deflate 9) o `.tar.xz` (xz 9) en carpetas (disco externo o Google Drive para escritorio), verificados y con `conservar` copias por destino. Se retiran también `scripts/backup.py` y `scripts/migrar_estacion.py` (la migración ya está hecha).
 
-- Una sola estación por equipo, en la variable de usuario `ATRIL_ESTACION` (`setx`). Sin `--estacion` ni fichero en `%APPDATA%`. La primera ejecución ofrece la carpeta actual si tiene `atril.toml`, si no pregunta la ruta y, si allí no hay `atril.toml`, ofrece inicializarla.
+- Una sola estación por equipo, en la variable de usuario `ATRIL_ESTACION` (registro del usuario; desde 0.17.0 sin `setx`). Sin `--estacion` ni fichero en `%APPDATA%`. La primera ejecución ofrece la carpeta actual si tiene `atril.toml`, si no pregunta la ruta y, si allí no hay `atril.toml`, ofrece inicializarla.
 
 - El indexado puede dejar el equipo sin respuesta: el CLI de DT corre con prioridad baja de CPU y disco (no cambia el resultado), `[indexado] hilos` limita los hilos de PyTorch/Docling, y se avisa si el embedding no cabe entero en la VRAM (la parte en CPU satura el procesador). Con la GPU al 100 %, `lote_embedding` y `pausa_embedding` (perfil de embedding de DT: `batch_size`/`batch_delay`) dejan huecos para el escritorio.
 

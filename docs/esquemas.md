@@ -7,13 +7,15 @@ desconocida es un error (detecta erratas). Ejemplos completos en [`ejemplos/`](e
 
 La raíz de la estación es la carpeta que contiene `atril.toml`; no se declara dentro.
 Hay una sola estación por equipo, guardada en la variable de usuario `ATRIL_ESTACION`
-(Windows: `setx`, en el registro del usuario; sin fichero de configuración propio). En la
+(Windows: en el registro del usuario; sin fichero de configuración propio). En la
 primera ejecución, con un terminal, atril ofrece la carpeta actual si tiene `atril.toml`; si no,
 pregunta la ruta y, si allí no hay `atril.toml`, ofrece inicializarla con un `atril.toml` mínimo
 y `temarios\`.
 
 Estructura fija (no configurable): `app\` (DeepTutor), `data\` (`DEEPTUTOR_HOME`),
-`temarios\<id>\`.
+`temarios\<id>\`. Mientras dura una operación larga (backup, restauración, instalación,
+actualización, indexado) existe `.atril.lock` en la raíz: otra no puede empezar hasta que termine.
+Si el proceso que lo creó ya no existe, se sustituye.
 
 | Tabla | Clave | Tipo | Defecto | Notas |
 |---|---|---|---|---|

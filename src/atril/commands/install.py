@@ -8,7 +8,7 @@ from rich.markup import escape
 
 from atril import install
 from atril.checks import Finding, info, ok
-from atril.commands._common import console, fail, get_station, show, success
+from atril.commands._common import console, fail, get_station, reserve, show, success
 from atril.commands.deeptutor import launch, patch_finding, shutdown
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
@@ -31,6 +31,7 @@ def install_command(ctx: typer.Context, no_docling: NoDocling = False) -> None:
     parches, y termina con el diagnóstico de DeepTutor.
     """
     station = get_station(ctx)
+    reserve(ctx, station, "instalación de DeepTutor")
     dt = DeepTutor(station)
     _require_stopped(dt)
     installer = Installer(station, dt.env())
@@ -80,6 +81,7 @@ def update_command(
     parches, y termina con el diagnóstico.
     """
     station = get_station(ctx)
+    reserve(ctx, station, "actualización de DeepTutor")
     dt = DeepTutor(station)
     installer = Installer(station, dt.env())
     if not installer.cloned or not dt.installed:

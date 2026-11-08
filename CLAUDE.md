@@ -32,12 +32,15 @@
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
+│   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station)
 │   ├── config/             # TOML schemas: station.py (atril.toml), syllabus.py (temario.toml)
 │   ├── backup.py           # zip/tar.xz backups, verify, prune, extract and swap
 │   ├── checks.py           # Finding/Level: results shown by commands
 │   ├── deeptutor.py        # DeepTutor control (CLI, health URLs, orphans)
+│   ├── errors.py           # AtrilError (Spanish message + optional log), CancelledError
 │   ├── evaluation.py       # Full-text retrieval evaluation (app/ Python) and reports
 │   ├── install.py          # Install/update steps (git, uv, npm, ollama, deeptutor config)
+│   ├── lock.py             # Station lock (<root>/.atril.lock) for long operations
 │   ├── knowledge.py        # KB indexing: plan, ledger, CLI adds, run state, reindex API
 │   ├── net.py              # Minimal urllib helpers (is_up, get_json)
 │   ├── ollama.py           # Ollama status and checks
@@ -66,9 +69,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - **DeepTutor never enters atril's `uv.lock`.** Control it through its CLI
   (`app/.venv/Scripts/deeptutor.exe`) and its API (`localhost:8001`) via `subprocess` and
   `urllib`. Only exception: full-text evaluation runs with `app/`'s Python.
-- **One station per computer**, stored in the user variable `ATRIL_ESTACION` (`setx` on Windows;
-  read from the registry if the current environment lacks it). No `--estacion` option and no
-  config file of atril's own; the first run picks, or initializes, the station.
+- **One station per computer**, stored in the user variable `ATRIL_ESTACION` (written to
+  `HKCU\Environment` with `winreg` on Windows, no `setx`; read from the registry if the current
+  environment lacks it). No `--estacion` option and no config file of atril's own; the first
+  run picks, or initializes, the station.
 - **The station layout is fixed**: `<root>/atril.toml`, `app/`, `data/`, `temarios/<id>/`.
   `DEEPTUTOR_HOME` (`deeptutor --home`) is the station root; DeepTutor creates `data/` inside.
   Derive paths from `Station` / `Syllabus` properties, never hardcode them elsewhere.
@@ -84,6 +88,16 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   waits, `rich.table.Table` for listings and `Panel` for log excerpts. Always `escape()` external
   text (paths, config messages with `[[fuente]]`, command lines). Commands are grouped with
   `rich_help_panel` and help strings may use Rich markup.
+- **Use cases live in `atril.ops`** and never import Rich or Typer: they return results or
+  `Finding`s, report progress to an `ops.Reporter` (`show`, `busy`, `progress`) and raise
+  `atril.errors.AtrilError` (every module error derives from it). Confirmations are asked by the
+  interface before calling them. `commands/` only parses options, prints (`ConsoleReporter`,
+  `fail_error`) and sets the exit code; the future GUI does the same with widgets.
+- Long operations (backup, restore, install, update, `kb indexar`/`reindexar`) hold the station
+  lock (`lock.station_lock`, `commands._common.reserve`); it is reentrant within a process and an
+  abandoned lock (dead PID or reused PID) is replaced.
+- Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,
+  `pythonw`) Windows would open an empty console window per child.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;
   a command exits with code 1 when any finding is an error.
 - Only kill processes with an **argument that is a path inside the station root**, compared as

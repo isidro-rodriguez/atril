@@ -150,6 +150,11 @@ class Station:
         return self.data_dir / "user" / "runtime" / "launcher.json"
 
     @property
+    def lock_file(self) -> Path:
+        """Bloqueo de operaciones largas; en la raíz, fuera de copias y restauración."""
+        return self.root / ".atril.lock"
+
+    @property
     def syllabi_dir(self) -> Path:
         """Carpeta de temarios."""
         return self.root / "temarios"

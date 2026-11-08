@@ -20,6 +20,7 @@ from acodo.utils import get_file_hash, get_now
 from atril import net
 from atril.config._toml import check_record, load_state
 from atril.config.syllabus import CheckFrequency, Source, SourceKind, Syllabus
+from atril.errors import AtrilError
 
 PDF_MAGIC = b"%PDF-"
 """Cabecera de todo PDF; una descarga que no la tiene es una página de error."""
@@ -37,7 +38,7 @@ Progress = Callable[[int, int | None], None]
 """Avance de una descarga: bytes recibidos y total (``None`` si no se conoce)."""
 
 
-class DownloadError(Exception):
+class DownloadError(AtrilError):
     """La descarga ha fallado; el mensaje está en español."""
 
 

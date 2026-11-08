@@ -19,6 +19,7 @@ from atril.commands._common import (
     get_station,
     get_syllabus,
     load_or_fail,
+    reserve,
     show,
     success,
 )
@@ -205,6 +206,7 @@ def index(
     cambiadas o retiradas se resuelven con [bold]atril kb reindexar[/].
     """
     station = get_station(ctx)
+    reserve(ctx, station, "indexado")
     syllabus = get_syllabus(ctx, syllabus_id)
     kbs = _kbs(syllabus, kb_id)
     dt = DeepTutor(station)
@@ -249,6 +251,7 @@ def reindex(
     al repetir el comando continúa donde se quedó.
     """
     station = get_station(ctx)
+    reserve(ctx, station, "reindexado")
     syllabus, kb = find_kb(ctx, kb_id)
     dt = DeepTutor(station)
     if not dt.installed:

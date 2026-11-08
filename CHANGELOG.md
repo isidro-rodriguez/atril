@@ -5,6 +5,26 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.17.0] - 2026-11-08
+
+Fase 1 de la interfaz gráfica: la lógica se separa de la CLI para que la GUI la reutilice.
+
+### Added
+
+- Bloqueo de la estación (`.atril.lock` en la raíz) durante backup, restauración, instalación,
+  actualización e indexado: la CLI y la futura GUI no pueden pisarse. Un bloqueo de un proceso
+  que ya no existe se sustituye solo.
+- Una copia de seguridad puede cancelarse entre fichero y fichero sin dejar nada a medias
+  (lo usará la GUI).
+
+### Changed
+
+- Arrancar, parar, estado y las copias de seguridad pasan a `atril.ops`, sin Rich ni Typer; los
+  comandos solo muestran el resultado. La salida de la CLI no cambia salvo detalles de redacción.
+- Todos los errores de atril derivan de `AtrilError`, que puede llevar el final de un log.
+- `ATRIL_ESTACION` se guarda directamente en el registro del usuario en lugar de con `setx`.
+- Sin consola propia (GUI), los programas que lanza atril se abren sin ventana de consola.
+
 ## [0.16.0] - 2026-11-08
 
 Selección de las funcionalidades sugeridas por GPT (las de git y rclone ya no aplican).

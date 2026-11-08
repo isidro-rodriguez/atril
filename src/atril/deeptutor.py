@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from atril import net
 from atril.config.station import Station
-from atril.processes import PortOwner, is_alive, kill_tree, port_owners
+from atril.processes import PortOwner, is_alive, kill_tree, no_window, port_owners
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +56,9 @@ class DeepTutor:
         acepta y se apoya en ``DEEPTUTOR_HOME``.
         """
         command = [str(self.station.deeptutor_cli), *args]
-        return subprocess.run(command, env=self.env(), check=False).returncode
+        return subprocess.run(
+            command, env=self.env(), check=False, creationflags=no_window()
+        ).returncode
 
     def _home(self) -> tuple[str, str]:
         """Opción ``--home <raíz>``."""

@@ -7,6 +7,8 @@ si su línea de comandos pertenece a la estación.
 
 import contextlib
 import posixpath
+import subprocess
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,6 +63,18 @@ def _normalize(path: str) -> str:
     if not text:
         return ""
     return posixpath.normpath(text).rstrip("/").casefold()
+
+
+def no_window() -> int:
+    """Opciones de ``subprocess`` para lanzar programas de consola sin ventana.
+
+    Solo en Windows y cuando atril no tiene consola propia (la GUI, con
+    ``pythonw``): si no, cada ``git``, ``uv`` o ``deeptutor`` abriría una consola
+    vacía. Con consola se devuelve 0 para que la salida siga viéndose en ella.
+    """
+    if sys.platform == "win32" and sys.stdout is None:
+        return getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    return 0
 
 
 def lower_priority(pid: int) -> bool:

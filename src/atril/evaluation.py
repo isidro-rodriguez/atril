@@ -21,7 +21,8 @@ from acodo.utils import get_now
 
 from atril.config.station import Station
 from atril.config.syllabus import Syllabus
-from atril.processes import kill_tree
+from atril.errors import AtrilError
+from atril.processes import kill_tree, no_window
 
 PROGRESS_PREFIX = "ATRIL-PROGRESS"
 """Marca de las líneas de avance que emite el script."""
@@ -77,7 +78,7 @@ Progress = Callable[[int, int], None]
 """Avance: casos evaluados y total."""
 
 
-class EvaluationError(Exception):
+class EvaluationError(AtrilError):
     """La evaluación no ha podido completarse; el mensaje está en español."""
 
 
@@ -239,6 +240,7 @@ def run_evaluation(
             text=True,
             encoding="utf-8",
             env=env,
+            creationflags=no_window(),
         )
         try:
             for line in process.stdout or ():

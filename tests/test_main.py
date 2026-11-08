@@ -7,6 +7,7 @@ from support import write
 from typer.testing import CliRunner
 
 from atril import __version__
+from atril.checks import ok
 from atril.main import app
 
 runner = CliRunner()
@@ -65,7 +66,7 @@ def first_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
     monkeypatch.setattr(_common, "saved_station", lambda: None)
     monkeypatch.setattr(_common, "_interactive", lambda: True)
     monkeypatch.setattr(
-        _common, "persist_station", lambda root: saved.append(root) or _common.ok("")
+        _common, "persist_station", lambda root: saved.append(root) or ok("")
     )
     return saved
 

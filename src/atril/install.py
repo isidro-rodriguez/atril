@@ -21,6 +21,8 @@ from acodo.utils import get_file_hash
 from atril import ollama
 from atril.checks import Finding, error, info, ok, warning
 from atril.config.station import Station
+from atril.errors import AtrilError
+from atril.processes import no_window
 
 REQUIRED_TOOLS = ("git", "uv", "node", "npm")
 """Herramientas sin las que no se puede instalar."""
@@ -99,7 +101,7 @@ _VERSION_FILE = "deeptutor/__version__.py"
 """Fichero de ``app/`` con la versión de DeepTutor."""
 
 
-class StepError(Exception):
+class StepError(AtrilError):
     """Un paso de la instalación ha fallado; el mensaje está en español."""
 
 
@@ -110,7 +112,11 @@ def run_command(
 ) -> int:
     """Ejecuta ``command`` mostrando su salida y devuelve el código de salida."""
     return subprocess.run(
-        list(command), cwd=cwd, env=dict(env) if env else None, check=False
+        list(command),
+        cwd=cwd,
+        env=dict(env) if env else None,
+        check=False,
+        creationflags=no_window(),
     ).returncode
 
 
@@ -143,6 +149,7 @@ def capture(
             encoding="utf-8",
             errors="replace",
             check=False,
+            creationflags=no_window(),
         )
     except OSError as exc:
         raise StepError(f"no se puede ejecutar {command[0]}: {exc}.") from exc

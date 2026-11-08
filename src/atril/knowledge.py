@@ -30,7 +30,7 @@ from atril import net
 from atril.config._toml import StateFileError, check_record, load_state
 from atril.config.station import Station
 from atril.config.syllabus import KnowledgeBase, Source, SourceKind, Syllabus
-from atril.processes import kill_tree, lower_priority
+from atril.processes import kill_tree, lower_priority, no_window
 
 STALL_SECONDS = 15 * 60
 """Sin actividad durante este tiempo, el indexado probablemente está colgado."""
@@ -363,7 +363,11 @@ class Indexer:
         started = time.monotonic()
         with out_log.open("w", encoding="utf-8") as out:
             process = subprocess.Popen(
-                command, stdout=out, stderr=subprocess.STDOUT, env=self._env()
+                command,
+                stdout=out,
+                stderr=subprocess.STDOUT,
+                env=self._env(),
+                creationflags=no_window(),
             )
             lower_priority(process.pid)
             try:
@@ -471,6 +475,7 @@ def embedding_selection(station: Station, env: dict[str, str]) -> str:
         encoding="utf-8",
         env=env,
         check=False,
+        creationflags=no_window(),
     )
     lines = result.stdout.strip().splitlines()
     return lines[-1] if result.returncode == 0 and lines else "{}"

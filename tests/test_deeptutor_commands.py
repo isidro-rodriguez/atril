@@ -6,6 +6,7 @@ from support import write, write_other_patches
 from typer.testing import CliRunner
 
 from atril import deeptutor as dt_module
+from atril import ollama
 from atril.commands import deeptutor as commands
 from atril.config import load_station
 from atril.deeptutor import DeepTutor, Orphans
@@ -25,11 +26,11 @@ def station(station_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     write(station_dir / "app" / PATCH.file, f"x = {{{PATCH.old}}}\n")
     write_other_patches(station_dir / "app", PATCH.name)
     monkeypatch.setattr(
-        commands.ollama,
+        ollama,
         "get_status",
         lambda url: OllamaStatus(True, "0.12.0", ("qwen3-embedding:8b",)),
     )
-    monkeypatch.setattr(commands.ollama, "app_path", lambda: None)
+    monkeypatch.setattr(ollama, "app_path", lambda: None)
     clock = [0.0]  # reloj simulado: sleep avanza el tiempo sin esperar
 
     def fake_sleep(seconds: float) -> None:
@@ -88,9 +89,7 @@ def test_status_stopped(station: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_status_reports_errors(station: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _services(monkeypatch, backend=True, frontend=False)
-    monkeypatch.setattr(
-        commands.ollama, "get_status", lambda url: OllamaStatus(running=False)
-    )
+    monkeypatch.setattr(ollama, "get_status", lambda url: OllamaStatus(running=False))
 
     result = _invoke(station, "estado")
 
