@@ -1,7 +1,8 @@
 # atril
 
-CLI para gestionar una instalación local de [DeepTutor](https://github.com/HKUDS/DeepTutor)
-y sus temarios: fuentes, bases de conocimiento (KB), evaluación y backup.
+Ventana y CLI para gestionar una instalación local de
+[DeepTutor](https://github.com/HKUDS/DeepTutor) y sus temarios: fuentes, bases de conocimiento
+(KB), evaluación y backup. Pensado para Windows; la CLI funciona también en Linux y macOS.
 
 ## 🚀 Guía rápida
 
@@ -10,13 +11,31 @@ uv tool install atril            # instalar (o actualizar: uv tool upgrade atril
 atril validar                    # comprueba atril.toml y los temarios (la 1.ª vez, elige la estación)
 atril instalar                   # instala DeepTutor en app\ (Ollama es opcional: solo para indexar)
 atril arrancar                   # arranca DeepTutor y abre el navegador
-atril-gui                        # lo mismo en una ventana, sin consola
+atril-gui                        # la ventana (sin consola)
 ```
 
 Hay una sola estación por equipo. En la primera ejecución atril ofrece la carpeta actual si
 tiene `atril.toml`; si no, pregunta la ruta y, si allí no hay `atril.toml`, ofrece crearla. La
 guarda en la variable de usuario `ATRIL_ESTACION` y después funciona desde cualquier carpeta.
 Ayuda de cada comando: `atril <comando> --help`.
+
+### Ventana
+
+`atril-gui` abre una ventana para usar atril sin consola:
+
+| Apartado | Qué hace |
+|---|---|
+| Inicio | Estado de DeepTutor, Ollama y las herramientas; arrancar, parar e instalar |
+| Temarios | Temario activo, sus KB y fuentes; crear, indexar, reindexar y borrar |
+| Biblioteca | Fuentes del temario activo; añadir, descargar y buscar versiones nuevas |
+| Backups | Copias de cada destino; hacer, comprobar y restaurar |
+| Actividad | Historial de operaciones con su detalle técnico |
+| Ajustes | Todas las claves de `atril.toml` y herramientas (actualizar, diagnóstico...) |
+
+En Windows, cerrar la ventana con DeepTutor en marcha deja atril en el área de notificación,
+con un menú para mostrarla, abrir DeepTutor, arrancarlo o pararlo, hacer un backup o salir
+(«Salir» para DeepTutor y el Ollama que abrió atril). Sin DeepTutor en marcha, se cierra del
+todo. Abrir `atril-gui` de nuevo muestra la ventana existente.
 
 ### Configuración
 
@@ -29,7 +48,7 @@ atril validar                    # valida atril.toml y el temario.toml de cada t
 ```bash
 atril instalar                   # instala DeepTutor en app\ o completa la instalación
 atril actualizar [--commit <sha>]  # última versión de la rama (o vuelta a un commit) y reaplica ajustes
-atril arrancar                   # arranca DeepTutor (y Ollama si hace falta)
+atril arrancar                   # aplica parches pendientes y arranca DeepTutor (y Ollama si hace falta)
 atril parar                      # detiene DeepTutor y cierra sus procesos huérfanos
 atril estado                     # DeepTutor, parches, Ollama, espacio libre y última copia
 atril parches [--comprobar]      # aplica los parches de atril.toml sobre app\

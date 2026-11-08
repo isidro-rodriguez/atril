@@ -5,6 +5,13 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.28.2] - 2026-11-09
+
+### Changed
+
+- README: describe la ventana (apartados y área de notificación) y que `arrancar` aplica los
+  parches pendientes. Antes solo presentaba la CLI.
+
 ## [0.28.1] - 2026-11-09
 
 ### Fixed
