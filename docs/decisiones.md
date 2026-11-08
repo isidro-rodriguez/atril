@@ -143,6 +143,11 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 - La ventana se valida con capturas en Xvfb; Inter solo se registra en Windows (el Tk de Linux de
   uv no tiene Xft), así que tamaños y glifos se revisan allí. Inter (subconjunto latino) no tiene
   ✓, ✗ ni flechas: se usan iconos.
+- Rendimiento (0.23.1): `ttk` repite la imagen de un elemento para rellenarlo; una tarjeta de
+  30 px suponía miles de copias por repintado (5 s de arranque, 3 s por redimensionado). Imagen de
+  640 px, apartados ocultos con `grid_remove`, datos leídos solo cuando caducan, sondeo rápido de
+  puertos locales (Windows tarda ~2 s en rechazar cada dirección de `localhost`) y hash recordado
+  de los PDF grandes. Las fuentes con nombre se pierden si se libera su objeto de tkinter.
 - Cada `ttk.Style.configure` programa otro `<<ThemeChanged>>` y sv-ttk vuelve a aplicar su paleta
   a los widgets ya creados: los estilos se configuran solo en `style.apply`, que lo procesa al
   final.

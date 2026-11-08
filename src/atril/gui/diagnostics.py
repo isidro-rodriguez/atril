@@ -69,7 +69,7 @@ class DiagnosticsView(tk.Frame):
         text.grid(row=1, column=0, sticky="nsew")
         return text
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Comprueba todo con detalle (rutas incluidas)."""
         station = self.app.station
 
@@ -85,7 +85,12 @@ class DiagnosticsView(tk.Frame):
                 lines.append((level, f"{tool.name}: {tool.path or 'no encontrado'}"))
             return lines
 
-        self.app.run("Comprobando...", run, self._show_status, quiet=True)
+        started = self.app.run("Comprobando...", run, self._show_status, quiet=True)
+        self._fill_history()
+        return started
+
+    def shown(self) -> None:
+        """Al volver a Diagnóstico sin releer: solo el historial."""
         self._fill_history()
 
     def _show_status(self, lines: list[tuple[Level, str]]) -> None:

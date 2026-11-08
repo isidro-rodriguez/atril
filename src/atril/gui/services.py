@@ -151,10 +151,10 @@ class ServicesView(tk.Frame):
 
     # --- datos ------------------------------------------------------------------
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Comprueba servicios y herramientas en segundo plano."""
         station = self.app.station
-        self.app.run(
+        return self.app.run(
             "Comprobando servicios...",
             lambda reporter: load_services(station),
             self._show,

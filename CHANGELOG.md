@@ -5,6 +5,27 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.23.1] - 2026-11-08
+
+Rendimiento de la ventana: era inaceptable para un panel de arranque.
+
+### Fixed
+
+- Arrancar la ventana tardaba 5 s, cada redimensionado unos 3 s y cambiar de apartado hasta 1 s:
+  la imagen de las tarjetas medía 30 px y `ttk` la repetía miles de veces en cada repintado.
+  Ahora mide 640 px (1280 a 200 %) y los apartados ocultos salen del gestor de geometría:
+  arranque en 0,2 s, redimensionado en unos 25 ms y cambio de apartado en menos de 50 ms.
+- Cada visita a un apartado volvía a consultarlo todo. Ahora se lee la primera vez, tras cada
+  operación y, en Inicio y Servicios, pasado un minuto; pulsar el indicador de la cabecera
+  vuelve a comprobar el estado.
+- En Windows, consultar un servicio local parado tardaba unos 4 s (el sistema reintenta la
+  conexión rechazada en `::1` y `127.0.0.1`). Se sondea el puerto con 0,25 s antes de la
+  petición y se usa la dirección que responde; también acelera las llamadas a la API.
+- Temarios y Biblioteca releían y calculaban el hash de todos los PDF en cada visita; el hash de
+  los ficheros de más de 1 MiB se recuerda mientras no cambien tamaño ni fecha.
+- Las fuentes de la ventana (títulos, negritas) no se aplicaban: tkinter borraba las fuentes con
+  nombre al liberar su objeto y todo salía con la fuente por defecto.
+
 ## [0.23.0] - 2026-11-08
 
 Rediseño de la ventana (`atril-gui`) para que un alumno sin experiencia en consola la use sola.

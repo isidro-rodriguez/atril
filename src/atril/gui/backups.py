@@ -79,7 +79,7 @@ class BackupsView(tk.Frame):
             columns,
             (
                 ("Fecha", 200, "w"),
-                ("Tamaño", 100, "w"),
+                ("Tamaño", 110, "center"),
                 ("Destino", 320, "w"),
                 ("Verificación", 150, "w"),
             ),
@@ -100,10 +100,10 @@ class BackupsView(tk.Frame):
         self._note = style.label(card, "", color=style.MUTED, font=style.SMALL)
         self._note.grid(row=4, column=0, sticky="w", pady=(8, 0))
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Lista las copias de cada destino (sin verificarlas)."""
         station = self.app.station
-        self.app.run(
+        return self.app.run(
             "Buscando copias...",
             lambda reporter: backup_ops.listing(station, reporter),
             self._show,

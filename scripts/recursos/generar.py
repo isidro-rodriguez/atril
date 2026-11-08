@@ -56,6 +56,8 @@ FONTS = {
 
 CARD_RADIUS = 10
 """Radio de las esquinas de las tarjetas (px a 100 %)."""
+CARD_SIZE = 640
+"""Lado de la imagen de tarjeta a 100 %: grande para que ``ttk`` la repita poco."""
 
 
 def main(lucide: Path, fontsource: Path) -> None:
@@ -126,9 +128,34 @@ def card() -> None:
             outline=(223, 229, 238, 255),
             width=4 * scale,
         )
-        image.resize((size, size), Image.Resampling.LANCZOS).save(
-            OUT / f"tarjeta{suffix}.png"
+        small = image.resize((size, size), Image.Resampling.LANCZOS)
+        _expand(small, radius + scale, CARD_SIZE * scale).save(
+            OUT / f"tarjeta{suffix}.png", optimize=True
         )
+
+
+def _expand(image: Image.Image, border: int, size: int) -> Image.Image:
+    """Agranda una imagen 9-slice estirando sus bordes y su centro (uniformes).
+
+    ``ttk`` rellena el interior repitiendo la imagen: con una imagen pequeña,
+    una tarjeta grande son miles de copias en cada repintado.
+    """
+    small = image.size[0]
+    big = Image.new("RGBA", (size, size))
+    inner_small, inner_big = small - 2 * border, size - 2 * border
+    for sx, bx, sw, bw in (
+        (0, 0, border, border),
+        (border, border, inner_small, inner_big),
+        (small - border, size - border, border, border),
+    ):
+        for sy, by, sh, bh in (
+            (0, 0, border, border),
+            (border, border, inner_small, inner_big),
+            (small - border, size - border, border, border),
+        ):
+            piece = image.crop((sx, sy, sx + sw, sy + sh))
+            big.paste(piece.resize((bw, bh), Image.Resampling.NEAREST), (bx, by))
+    return big
 
 
 if __name__ == "__main__":

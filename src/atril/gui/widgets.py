@@ -73,8 +73,16 @@ class Sidebar(tk.Frame):
 class Header(tk.Frame):
     """Nombre, lema e indicador general de estado."""
 
-    def __init__(self, parent: tk.Misc, on_settings: Callable[[], None]) -> None:
-        """Construye la cabecera; el estado se pone con :meth:`set_status`."""
+    def __init__(
+        self,
+        parent: tk.Misc,
+        on_settings: Callable[[], None],
+        on_check: Callable[[], None],
+    ) -> None:
+        """Construye la cabecera; el estado se pone con :meth:`set_status`.
+
+        Pulsar el indicador vuelve a comprobar el estado.
+        """
         super().__init__(parent, background=style.HEADER, padx=28, pady=18)
         self.columnconfigure(0, weight=1)
         style.label(self, "Atril", background=style.HEADER, font=style.DISPLAY).grid(
@@ -96,6 +104,8 @@ class Header(tk.Frame):
             pady=6,
         )
         self._pill.grid(row=0, column=1, rowspan=2, padx=(0, 14))
+        self._pill.configure(cursor="hand2")
+        self._pill.bind("<Button-1>", lambda _: on_check())
         settings = tk.Label(
             self,
             image=style.icon(self, "settings-nav"),

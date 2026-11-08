@@ -311,3 +311,25 @@ def test_ledger_is_strict(syllabus: Syllabus, entry: dict) -> None:
 
     with pytest.raises(StateFileError):
         Ledger(ledger_path(syllabus))
+
+
+def test_file_digest_is_remembered_until_the_file_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    big = tmp_path / "grande.pdf"
+    big.write_bytes(b"%PDF" + b"x" * knowledge.CACHED_SIZE)
+    calls: list[Path] = []
+    real = knowledge.get_file_hash
+
+    def counting(path: Path) -> str:
+        calls.append(path)
+        return real(path)
+
+    monkeypatch.setattr(knowledge, "get_file_hash", counting)
+    first = knowledge.file_digest(big)
+    assert knowledge.file_digest(big) == first
+    assert len(calls) == 1  # la segunda vez no se relee
+
+    big.write_bytes(b"%PDF" + b"y" * (knowledge.CACHED_SIZE + 1))
+    assert knowledge.file_digest(big) != first
+    assert len(calls) == 2

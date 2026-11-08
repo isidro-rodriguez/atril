@@ -25,7 +25,7 @@ SCRIPT = textwrap.dedent(
         print("SIN-PANTALLA", flush=True)
         os._exit(0)
 
-    from atril.checks import ok
+    from atril.checks import Level, ok
     from atril.config import load_station
     from atril.config.station import init_station
     from atril.gui.app import App
@@ -83,6 +83,16 @@ SCRIPT = textwrap.dedent(
     copies_view = app.views["Copias"]
     assert len(copies_view._table.get_children()) == 1
 
+    # Volver a un apartado ya leído no vuelve a consultar nada.
+    calls = []
+    copies_view.refresh = lambda: calls.append(1) or True
+    app.show_view("Inicio")
+    app.show_view("Copias")
+    assert calls == []
+    app.log(Level.INFO, "x")  # no es una operación: no caduca nada
+    app.show_view("Copias")
+    assert calls == []
+
     app.show_view("Biblioteca")
     settle(app)
     assert app.views["Biblioteca"]._table.get_children() == ()  # temario vacío
@@ -95,8 +105,6 @@ SCRIPT = textwrap.dedent(
     settle(app)
     report = app.views["Diagnóstico"]._status.get("1.0", "end")
     assert "Estación:" in report and "git: /usr/bin/git" in report
-    from atril.checks import Level
-
     app.log(Level.WARNING, "Aviso de prueba")
     app._show_history()
     assert app.views["Diagnóstico"]._history.get_children()

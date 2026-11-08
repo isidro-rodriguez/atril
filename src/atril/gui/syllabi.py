@@ -95,10 +95,10 @@ class SyllabiView(tk.Frame):
             columns,
             (
                 ("Base de conocimiento", 220, "w"),
-                ("Fuentes", 80, "e"),
-                ("Indexadas", 90, "e"),
-                ("Pendientes", 100, "e"),
-                ("Último indexado", 150, "w"),
+                ("Fuentes", 90, "center"),
+                ("Indexadas", 100, "center"),
+                ("Pendientes", 110, "center"),
+                ("Último indexado", 160, "w"),
             ),
             strict=True,
         ):
@@ -120,10 +120,10 @@ class SyllabiView(tk.Frame):
 
     # --- datos ------------------------------------------------------------------
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Vuelve a leer los temarios y su estado en segundo plano."""
         station = self.app.station
-        self.app.run(
+        return self.app.run(
             "Leyendo temarios...",
             lambda reporter: load_all(station),
             self._show,

@@ -138,7 +138,7 @@ class SettingsView(tk.Frame):
             ).grid(row=row, column=2, sticky="w", padx=(16, 0))
         return card
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Carga los valores actuales de la estación."""
         station = self.app.station
         self._destinations.delete(0, "end")
@@ -151,6 +151,7 @@ class SettingsView(tk.Frame):
         self._indexing["lote_embedding"].set(indexing.batch_size)
         self._indexing["pausa_embedding"].set(indexing.pause_ms)
         self._note.configure(text="")
+        return True
 
     def add_folder(self) -> None:
         """Añade un destino elegido con el explorador."""

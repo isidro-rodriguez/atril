@@ -137,6 +137,9 @@ def apply(root: tk.Tk) -> None:
     root.configure(background=PAGE)
 
 
+_named_fonts: list[tkfont.Font] = []
+
+
 def _fonts(root: tk.Tk) -> None:
     """Crea las fuentes con nombre: Inter si está, si no la del sistema."""
     families = set(tkfont.families(root))
@@ -165,7 +168,11 @@ def _fonts(root: tk.Tk) -> None:
                 family=family, size=size, weight=weight
             )
             continue
-        tkfont.Font(root, name=name, family=family, size=size, weight=weight)
+        # Hay que conservar el objeto: al liberarse, tkinter borra la fuente con
+        # nombre y los widgets vuelven a la fuente por defecto.
+        _named_fonts.append(
+            tkfont.Font(root, name=name, family=family, size=size, weight=weight)
+        )
 
 
 def scale(root: tk.Misc) -> float:

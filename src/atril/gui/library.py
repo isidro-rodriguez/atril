@@ -96,7 +96,7 @@ class LibraryView(tk.Frame):
         self._table = ttk.Treeview(table, columns=columns, show="headings")
         for column, (title, width) in zip(
             columns,
-            (("Fuente", 320), ("Temario", 180), ("Base", 150), ("Estado", 160)),
+            (("Fuente", 320), ("Temario", 200), ("Base", 220), ("Estado", 160)),
             strict=True,
         ):
             self._table.heading(column, text=title, anchor="w")
@@ -116,10 +116,10 @@ class LibraryView(tk.Frame):
 
     # --- datos ------------------------------------------------------------------
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Lee todas las fuentes y su estado en segundo plano."""
         station = self.app.station
-        self.app.run(
+        return self.app.run(
             "Leyendo la biblioteca...",
             lambda reporter: load_all(station),
             self._show,

@@ -9,6 +9,7 @@ congelar la ventana, y cada una queda como un evento de actividad.
 
 import contextlib
 import sys
+import time
 import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
@@ -38,6 +39,12 @@ from atril.ops.station import persist_station, saved_station
 POLL_MS = 100
 """Cada cuánto se reparten los avisos del trabajo en segundo plano."""
 
+STATUS_TTL = 60.0
+"""Segundos que vale el estado de los servicios antes de volver a consultarlo."""
+
+LIVE = frozenset({"Inicio", "Servicios"})
+"""Apartados con servicios: se consultan de nuevo pasado :data:`STATUS_TTL`."""
+
 NARROW = 1400
 """Anchura (a 100 %) por debajo de la que el panel de actividad se pliega solo."""
 
@@ -50,7 +57,7 @@ type View = (
     | DiagnosticsView
     | SettingsView
 )
-"""Apartado de la ventana: un marco con ``refresh()``."""
+"""Apartado de la ventana: un marco con ``refresh() -> bool``."""
 
 SECTIONS = (
     ("Inicio", "house"),
@@ -79,6 +86,7 @@ class App(tk.Tk):
         self._idle = True
         self._closing = False
         self._auto_collapsed = False
+        self._loaded: dict[str, float] = {}
         self.closed = False
         self.title("Atril")
         style.apply(self)
@@ -98,7 +106,7 @@ class App(tk.Tk):
         self,
         text: str,
         task: Callable[[Reporter], T],
-        on_done: Callable[[T], None],
+        on_done: Callable[[T], object],
         *,
         quiet: bool = False,
         title: str | None = None,
@@ -164,11 +172,30 @@ class App(tk.Tk):
         self._header.set_status(level, status_word(level))
 
     def show_view(self, name: str) -> None:
-        """Muestra un apartado y lo actualiza."""
+        """Muestra un apartado; solo vuelve a leer sus datos si han caducado.
+
+        Cada apartado se lee la primera vez, tras cualquier operación (puede
+        haber cambiado algo) y, en los de servicios, pasado :data:`STATUS_TTL`.
+        Cambiar de apartado no espera a nada.
+        """
         self._sidebar.select(name)
         view = self.views[name]
-        view.tkraise()
-        view.refresh()
+        for other in self.views.values():
+            if other is not view:
+                other.grid_remove()  # oculto no se recoloca al redimensionar
+        view.grid()
+        loaded = self._loaded.get(name)
+        now = time.monotonic()
+        if loaded is None or (name in LIVE and now - loaded > STATUS_TTL):
+            if view.refresh():
+                self._loaded[name] = now
+        elif isinstance(view, HomeView | DiagnosticsView):
+            view.shown()
+
+    def check_now(self) -> None:
+        """Vuelve a comprobar el estado (indicador de la cabecera) y va a Inicio."""
+        self._loaded.pop("Inicio", None)
+        self.show_view("Inicio")
 
     def close(self) -> None:
         """Cierra la ventana sin dejar operaciones a medias.
@@ -216,7 +243,7 @@ class App(tk.Tk):
         self.rowconfigure(1, weight=1)
         self._sidebar = Sidebar(self, self.show_view)
         self._sidebar.grid(row=0, column=0, rowspan=2, sticky="nsw")
-        self._header = Header(self, lambda: self.show_view("Ajustes"))
+        self._header = Header(self, lambda: self.show_view("Ajustes"), self.check_now)
         self._header.grid(row=0, column=1, columnspan=2, sticky="ew")
 
         stack = tk.Frame(self, background=style.PAGE)
@@ -237,6 +264,7 @@ class App(tk.Tk):
             self._sidebar.add(name, icon)
             view = builders[name](stack, self)
             view.grid(row=0, column=0, sticky="nsew")
+            view.grid_remove()
             self.views[name] = view
 
         self._panel = ActivityPanel(self, lambda: self._show_history())
@@ -344,6 +372,7 @@ class App(tk.Tk):
             event.finish(Level.ERROR, _sentence(text))
         else:
             event.finish()
+        self._loaded.clear()  # la operación puede haber cambiado cualquier dato
         self.activity.save(event)
         self._show_activity()
 

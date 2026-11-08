@@ -242,12 +242,35 @@ def content_digest(source: Source, path: Path | None) -> str:
     if path is None:
         return f"url:{source.url}"
     if path.is_file():
-        return get_file_hash(path)
+        return file_digest(path)
     digest = hashlib.sha256()
     for file in sorted(path.rglob("*.md")):
         digest.update(file.relative_to(path).as_posix().encode())
-        digest.update(get_file_hash(file).encode())
+        digest.update(file_digest(file).encode())
     return digest.hexdigest()
+
+
+CACHED_SIZE = 1 << 20
+"""Tamaño a partir del que se recuerda el hash de un fichero (1 MiB)."""
+
+_digests: dict[tuple[str, int, int], str] = {}
+
+
+def file_digest(path: Path) -> str:
+    """SHA-256 de un fichero, recordado mientras no cambien tamaño ni fecha.
+
+    Los PDF de un temario ocupan cientos de MB: la ventana consulta el estado
+    a menudo y releerlos cada vez la dejaba esperando. Solo se recuerdan los
+    ficheros grandes: en Windows la fecha tiene una resolución de milisegundos
+    y dos escrituras seguidas del mismo tamaño podrían parecer iguales.
+    """
+    info = path.stat()
+    if info.st_size < CACHED_SIZE:
+        return get_file_hash(path)
+    key = (str(path.resolve()), info.st_size, info.st_mtime_ns)
+    if key not in _digests:
+        _digests[key] = get_file_hash(path)
+    return _digests[key]
 
 
 def plan(syllabus: Syllabus, kb: KnowledgeBase, ledger: Ledger) -> list[PlanItem]:

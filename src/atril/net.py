@@ -1,6 +1,7 @@
 """Peticiones HTTP mínimas (``urllib``): servicios locales y descargas."""
 
 import json
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +16,47 @@ USER_AGENT = (
 """User-Agent de las descargas: BOE y codigotecnico.org rechazan clientes genéricos."""
 
 
+LOOPBACK = {
+    "localhost": ("127.0.0.1", "::1"),
+    "127.0.0.1": ("127.0.0.1",),
+    "::1": ("::1",),
+}
+"""Direcciones que se prueban para cada nombre local."""
+
+PROBE_TIMEOUT = 0.25
+"""Segundos para ver si un puerto local escucha (en local responde en milisegundos)."""
+
+
+def local_url(url: str) -> str | None:
+    """URL con la dirección local que escucha, ``None`` si no escucha ninguna.
+
+    En Windows, conectar a un puerto local cerrado tarda unos 2 s por dirección
+    (reintenta pese al rechazo) y ``localhost`` prueba ``::1`` y ``127.0.0.1``:
+    un servicio parado costaba 4 s por consulta. Se sondea el puerto con un
+    tiempo corto y se usa la dirección que respondió. Las URL que no son locales
+    se devuelven sin cambios.
+
+    Examples:
+        >>> local_url("https://www.boe.es/a.pdf")
+        'https://www.boe.es/a.pdf'
+    """
+    parts = urllib.parse.urlsplit(url)
+    addresses = LOOPBACK.get(parts.hostname or "")
+    if addresses is None:
+        return url
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    for address in addresses:
+        try:
+            with socket.create_connection((address, port), timeout=PROBE_TIMEOUT):
+                pass
+        except OSError:
+            continue
+        host = f"[{address}]" if ":" in address else address
+        netloc = f"{host}:{parts.port}" if parts.port else host
+        return urllib.parse.urlunsplit(parts._replace(netloc=netloc))
+    return None
+
+
 def is_up(url: str, timeout: float = 3.0) -> bool:
     """Indica si ``url`` responde con un código HTTP menor que 500.
 
@@ -26,8 +68,11 @@ def is_up(url: str, timeout: float = 3.0) -> bool:
         ``True`` si el servidor responde (incluido un 4xx); ``False`` si no hay
         conexión, se agota el tiempo o responde con 5xx.
     """
+    target = local_url(url)
+    if target is None:
+        return False
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
+        with urllib.request.urlopen(target, timeout=timeout) as response:
             return response.status < 500
     except urllib.error.HTTPError as exc:
         return exc.code < 500
@@ -43,7 +88,10 @@ def get_json(url: str, timeout: float = 3.0) -> Any:
             (``urllib.error.URLError`` y ``HTTPError`` lo son).
         ValueError: Si la respuesta no es JSON.
     """
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    target = local_url(url)
+    if target is None:
+        raise urllib.error.URLError(f"no escucha nada en {url}")
+    with urllib.request.urlopen(target, timeout=timeout) as response:
         return json.load(response)
 
 
@@ -82,7 +130,10 @@ def request_json(
     elif payload is not None:
         data = json.dumps(payload).encode()
         headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    target = local_url(url)
+    if target is None:
+        raise urllib.error.URLError(f"no escucha nada en {url}")
+    request = urllib.request.Request(target, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read()

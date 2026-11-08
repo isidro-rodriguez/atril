@@ -148,15 +148,20 @@ class HomeView(tk.Frame):
 
     # --- datos ------------------------------------------------------------------
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         """Comprueba el estado de la estación en segundo plano."""
         station = self.app.station
-        self.app.run(
+        started = self.app.run(
             "Comprobando el estado...",
             lambda reporter: load_home(station, reporter),
             self._show,
             quiet=True,
         )
+        self._show_last_activity()
+        return started
+
+    def shown(self) -> None:
+        """Al volver a Inicio sin releer: solo la última actividad."""
         self._show_last_activity()
 
     def _show(self, data: HomeData) -> None:

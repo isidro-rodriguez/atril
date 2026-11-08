@@ -120,6 +120,12 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   Glyphs must exist in Inter's latin subset (no ✓, ✗ or arrows). View logic without Tk lives in
   `gui/model.py` and `gui/activity.py` so it is tested without a display; window tests skip when
   there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`.
+- GUI performance (it is a launcher; it must feel instant): switching sections never waits.
+  `App.show_view` reloads a view only the first time, after an operation, or past
+  `STATUS_TTL` for the service views; hidden views are `grid_remove`d. Keep `ttk` image elements
+  large (it tiles them) and keep references to named fonts. Never hash or scan files on the Tk
+  thread; `knowledge.file_digest` caches big files. Local HTTP goes through `net.local_url`
+  (fast port probe: Windows takes ~2 s per refused loopback address).
 - GUI deletions never erase user data: a deleted syllabus moves to `temarios/.papelera/`; its KBs
   are deleted in DeepTutor only with the explicit checkbox. The Ajustes view edits only the keys
   in `ops.settings.EDITABLE`.
