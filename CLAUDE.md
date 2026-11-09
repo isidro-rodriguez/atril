@@ -216,7 +216,7 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   embedding pace (`batch_size`/`batch_delay` of the active embedding profile, which `config apply`
   rewrites); `kb indexar` reapplies it before indexing.
 - `app/` is a shallow clone: update with `fetch --depth 1` + `reset --hard FETCH_HEAD`, only on a
-  clean tree, after reverting patches and after checking that `origin` and the current branch match
+  clean tree (files differing only in line endings, from older CRLF patch writes, do not count), after reverting patches and after checking that `origin` and the current branch match
   `atril.toml` (abort otherwise). `actualizar --commit <full sha>` goes to that commit instead
   (rollback; GitHub serves reachable SHAs to shallow fetches). `actualizar` reapplies `config apply`, parser/chunks and `doctor`;
   a venv with another Python version is recreated (`uv venv --clear`).

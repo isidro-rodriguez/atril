@@ -318,10 +318,22 @@ def test_update_checkout_refuses_dirty_tree(
     station_dir: Path, recorder: Recorder
 ) -> None:
     _origin(recorder)
-    recorder.outputs["status"] = " M deeptutor/x.py\n"
+    recorder.outputs["status"] = " M deeptutor/x.py\n?? nuevo.py\n"
+    recorder.codes["-c"] = 1  # cambio real, no solo finales de línea
 
-    with pytest.raises(StepError, match="cambios locales"):
+    # La ruta completa: la primera línea empieza por espacio y no se recorta.
+    with pytest.raises(StepError, match=r"\(deeptutor/x\.py, nuevo\.py\)"):
         _installer(station_dir).update_checkout()
+
+
+def test_update_checkout_ignores_line_ending_only_changes(
+    station_dir: Path, recorder: Recorder
+) -> None:
+    _origin(recorder)
+    recorder.outputs["status"] = " M deeptutor/x.py\n"  # solo CRLF: diff sale con 0
+
+    _installer(station_dir).update_checkout()
+    assert any("reset" in command for command in recorder.commands)
 
 
 def test_doctor_parses_json_after_noise(station_dir: Path, recorder: Recorder) -> None:

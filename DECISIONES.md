@@ -351,3 +351,4 @@ Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una colum
 | Validación | Las seis capturas, PNG de 1024×700 y un mínimo de 20 KB, en una carpeta temporal antes de sustituir las de salida | Dar por buena una generación incompleta |
 | GDI | `argtypes`/`restype` de cada función, cada resultado comprobado, bitmap deseleccionado antes de leerlo y borrarlo, y liberación en `finally` | |
 | Biblioteca | Doble clic en una fila abre su documento (`model.document_path` + `desktop.open_path`); sin documento en disco, un aviso (0.38.0) | |
+| Actualizar con CRLF | `install._local_changes`: un fichero modificado solo cuenta si `git diff --ignore-cr-at-eol` ve cambios (o es nuevo). Los parches de versiones antiguas dejaban CRLF y bloqueaban `actualizar` para siempre; el `reset` los normaliza (0.38.2) | Forzar `reset` con cualquier cambio local |

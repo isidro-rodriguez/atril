@@ -340,9 +340,9 @@ class Installer:
         """
         git = tool("git")
         self._check_origin(git)
-        dirty = capture([git, "-C", str(self.app), "status", "--porcelain"]).strip()
-        if dirty:
-            files = ", ".join(line[3:] for line in dirty.splitlines()[:5])
+        changed = self._local_changes(git)
+        if changed:
+            files = ", ".join(changed[:5])
             raise StepError(f"app/ tiene cambios locales ({files}); revísalos antes.")
         if commit is not None and not FULL_SHA.fullmatch(commit):
             raise StepError(
@@ -359,6 +359,25 @@ class Installer:
             [git, "-C", str(self.app), "reset", "--hard", "FETCH_HEAD"], "git reset"
         )
         return before, self.head().strip()
+
+    def _local_changes(self, git: str) -> list[str]:
+        """Ficheros de ``app/`` con cambios reales (``reset --hard`` los perdería).
+
+        No cuentan los que solo difieren en los finales de línea: versiones
+        anteriores de atril escribían los parches con CRLF en Windows, y el
+        ``reset`` deja el fichero como en el repositorio sin perder nada.
+        """
+        status = capture([git, "-C", str(self.app), "status", "--porcelain"])
+        changed = []
+        for line in status.splitlines():
+            if not line.strip():
+                continue
+            code, path = line[:2], line[3:]  # sin strip: el código empieza por espacio
+            command = [git, "-c", "core.safecrlf=false", "diff", "--quiet"]
+            command += ["--ignore-cr-at-eol", "HEAD", "--", path]
+            if code == "??" or run_command(command, cwd=self.app) != 0:
+                changed.append(path)
+        return changed
 
     def _check_origin(self, git: str) -> None:
         """Exige que ``app/`` siga el repo y la rama de ``atril.toml``.

@@ -5,6 +5,17 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.38.2] - 2026-11-09
+
+### Fixed
+
+- `atril actualizar` se negaba a seguir con «app/ tiene cambios locales» cuando un fichero
+  solo difería en los finales de línea: versiones anteriores de atril escribían los parches
+  con CRLF en Windows. Esas diferencias ya no cuentan (la actualización deja el fichero como
+  en el repositorio); los cambios reales y los ficheros nuevos siguen deteniéndola.
+- El mensaje de cambios locales cortaba la primera letra de la primera ruta
+  («eeptutor/...»).
+
 ## [0.38.1] - 2026-11-09
 
 ### Fixed
