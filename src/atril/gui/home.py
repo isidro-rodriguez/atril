@@ -55,7 +55,7 @@ SENTENCE_WIDTH = 410
 PRIMARY_BUTTONS = {
     Primary.INSTALL: ("Instalar DeepTutor", "download", "Accent.TButton"),
     Primary.REVIEW: ("Revisar en Ajustes", "sliders-horizontal", style.WARNING_BUTTON),
-    Primary.PATCH: ("Aplicar parche", "wrench", "Accent.TButton"),
+    Primary.PATCH: ("Aplicar parche", "wrench", style.WARNING_BUTTON),
     Primary.START: ("Arrancar DeepTutor", "play", "Accent.TButton"),
     Primary.STOP: ("Parar DeepTutor", "square", "TButton"),
 }

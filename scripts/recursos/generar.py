@@ -52,7 +52,7 @@ ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     "play": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
     "square": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
     "download": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
-    "wrench": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "wrench": (18, (("boton", NAV),)),
     "sliders-horizontal": (18, (("boton", NAV),)),
     "book-copy": (40, (("dato", NAV),)),
     "file-stack": (40, (("dato", NAV),)),
