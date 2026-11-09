@@ -45,6 +45,9 @@ nombre como `nombre (2).pdf`. Por eso las fuentes cambiadas o retiradas solo se 
 
 Si se interrumpe, repetirlo continúa donde se quedó.
 
+Si un reindexado no termina (se cierra DeepTutor, falla, se cancela), la KB vuelve a pedir
+**Reindexar** hasta que uno termine bien.
+
 !!! warning "Indexados interrumpidos"
     Si un indexado de DeepTutor quedó a medias (el proceso murió), atril lo marca como
     *interrumpido* y pide **reiniciar DeepTutor** antes de reindexar.

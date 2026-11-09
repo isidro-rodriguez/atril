@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.39.2] - 2026-11-09
+
+### Fixed
+
+- Un reindexado que DeepTutor no terminó (interrumpido, fallido, parcial o cancelado) vuelve a
+  pedir «Reindexar» en Temarios y en `atril kb estado`, aunque el registro de atril lo diera
+  por hecho (como ocurría antes de 0.39.1, que lo anotaba al lanzarlo). Repetirlo continúa
+  desde lo que DeepTutor ya tenía hecho.
+
 ## [0.39.1] - 2026-11-09
 
 ### Fixed

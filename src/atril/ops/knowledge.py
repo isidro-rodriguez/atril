@@ -96,21 +96,46 @@ def status(
     ledger = Ledger(ledger_path(syllabus))
     kbs = select_kbs(syllabus, kb_id)
     statuses = []
+    unfinished: list[Finding] = []
     for kb in kbs:
         kb_dir = station.kb_dir(kb.id)
         items = plan(syllabus, kb, ledger)
         stale = {PlanState.CHANGED, PlanState.REMOVED}
+        run = KbRun.load(kb_dir) if kb_dir.is_dir() else None
+        broken = unfinished_rebuild(run)
+        if broken:
+            unfinished.append(
+                warning(
+                    f"{kb.id}: el último reindexado quedó "
+                    f"{RUN_LABELS.get(run.state, run.state) if run else '?'}; "
+                    "reindexa para completarlo."
+                )
+            )
         statuses.append(
             KbStatus(
                 kb,
                 items,
-                KbRun.load(kb_dir) if kb_dir.is_dir() else None,
+                run,
                 (kb_dir / "metadata.json").is_file(),
                 ledger.kb(kb.id).pending_reindex
+                or broken
                 or any(item.state in stale for item in items),
             )
         )
-    return statuses, pending(syllabus, kbs, ledger)
+    return statuses, pending(syllabus, kbs, ledger) + unfinished
+
+
+def unfinished_rebuild(run: KbRun | None) -> bool:
+    """El último reindexado de DeepTutor no terminó (fallido, interrumpido...).
+
+    Solo cuenta el reindexado: un añadido que no terminó deja su fuente por
+    indexar, y eso se resuelve indexando.
+    """
+    return (
+        run is not None
+        and run.raw.get("action") == "rebuild"
+        and run.state in RETRY_STATES
+    )
 
 
 def pending(

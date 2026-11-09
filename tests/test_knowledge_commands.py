@@ -427,3 +427,24 @@ def test_reindex_waits_for_its_own_task_and_restores_stopped_deeptutor(
     assert len(written) >= 3
     # DeepTutor estaba parado: se arranca para reindexar y se para al terminar.
     assert reindex_env["lifecycle"] == ["arrancar", "parar"]
+
+
+@pytest.mark.parametrize(("action", "needs"), [("rebuild", True), ("upload", False)])
+def test_unfinished_rebuild_asks_for_reindex(
+    station: Path, action: str, needs: bool
+) -> None:
+    """Regresión: un reindexado interrumpido sigue pidiendo reindexar.
+
+    Aunque el registro propio lo diera por hecho (atril lo anotaba al lanzarlo).
+    """
+    loaded = load_station(station)
+    kb_dir = loaded.kb_dir("norm-edificacion-cte")
+    write(kb_dir / "metadata.json", "{}")
+    run = {"task_id": "t1", "action": action, "state": "interrupted"}
+    write(kb_dir / ".indexing-run.json", json.dumps(run))
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+
+    statuses, findings = knowledge_ops.status(loaded, syllabus, "norm-edificacion-cte")
+
+    assert statuses[0].needs_reindex is needs
+    assert any("reindexa para completarlo" in f.message for f in findings) is needs
