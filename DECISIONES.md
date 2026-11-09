@@ -339,3 +339,14 @@ Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una colum
 | Capturas | Física con cuatro KB (teoría, problemas, divulgación y normativa) y la Biblioteca ordenada por base | Una sola KB por temario |
 | Datos de Inicio | Formato corto («8 · Física», «52 · 1 sin fichero») recortado con «…» a 2 em del divisor, según el ancho real de cada columna (0.37.1) | Textos completos («8 temarios · activo: Física») |
 | Reapertura tras actualizar | El instalador abre la ventana en `DeinitializeSetup` con `--tras-instalar`, que espera a que desaparezca el mutex `AtrilSetup`; sin él, la ventana no se abre durante una instalación. Sin gestor de reinicio (0.37.1) | `[Run]` con `Check` (se ejecuta antes de que uv instale: abría la versión anterior) |
+
+## Publicación de la web (0.37.2)
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Cuándo | Solo con cada versión: `publish.yml` llama a `docs.yml` con el tag nuevo y todo se construye con el código de ese tag. A mano, solo se rehace un tag ya publicado | Publicar con cada push a `main` o en las pull requests |
+| Script de capturas | Parte de la publicación, sin modo manual. Estación en `D:\Estudio` (aislado por el runner: falla si existe, se borra al final) o en una carpeta temporal fuera de la CI | Marcas de propiedad en carpetas fijas |
+| Errores | Sin `mainloop`: el script procesa los eventos de Tk mientras espera, recoge los errores de callbacks y del trabajo en segundo plano y sale con código distinto de cero | Errores que se quedaban en un callback |
+| Sincronización | Cada apartado espera a mostrar sus datos y a que no haya trabajo ni eventos pendientes durante varias vueltas, con 60 s como máximo | Esperas fijas |
+| Validación | Las seis capturas, PNG de 1024×700 y un mínimo de 20 KB, en una carpeta temporal antes de sustituir las de salida | Dar por buena una generación incompleta |
+| GDI | `argtypes`/`restype` de cada función, cada resultado comprobado, bitmap deseleccionado antes de leerlo y borrarlo, y liberación en `finally` | |

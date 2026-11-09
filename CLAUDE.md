@@ -107,7 +107,11 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   `guia/`, technical in `documentacion/`; GUI captures come from the real window with a
   sample station: `scripts/capturas.py` (fixed dates, faked services, Windows example paths)
   generates them in `docs.yml` on `windows-latest`; they are gitignored, never committed
-  (`uv run zensical build` must pass). Keep it in sync with the GUI and CLI.
+  (`uv run zensical build` must pass). The site is published per release only: `publish.yml`
+  calls `docs.yml` (`workflow_call`) with the new tag and both jobs check out that tag. The
+  script is part of that pipeline, not a manual tool: it waits for each view to load (timeout),
+  turns any Tk or worker error into a non-zero exit, frees GDI objects in order and validates
+  every PNG before replacing the output folder. Keep it in sync with the GUI and CLI.
 - **CLI output uses Rich**, never `print`/`typer.echo`: the shared `console`/`err_console` from
   `commands._common`, `show()` for findings, `success()`/`fail()`, `console.status()` spinners for
   waits, `rich.table.Table` for listings and `Panel` for log excerpts. Always `escape()` external

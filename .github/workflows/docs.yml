@@ -1,40 +1,43 @@
 # .github/workflows/docs.yml
 name: Docs
 
+# La web se publica con cada versión de atril: publish.yml llama a este workflow
+# con el tag recién creado, y las capturas se generan con el código de ese tag.
+# A mano solo se puede rehacer la de un tag ya publicado (mismo proceso, nada
+# guardado de antes). Las capturas nunca se versionan ni se reutilizan.
 on:
-  push:
-    branches: [main]
-    paths: &docs-paths
-      - "docs/**"
-      - "src/**"
-      - "scripts/capturas.py"
-      - "docs_templates/**"
-      - "zensical.toml"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/docs.yml"
-  pull_request:
-    branches: [main]
-    paths: *docs-paths
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag de la versión publicada (vX.Y.Z)
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag de una versión publicada (vX.Y.Z)
+        required: true
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  # Las capturas se hacen con la ventana real del mismo commit, en Windows (su
-  # aspecto y sus rutas), con una estación de ejemplo: nunca se versionan.
+  # Las capturas se hacen con la ventana real de la versión, en Windows (su aspecto
+  # y sus rutas), con una estación de ejemplo. Si el script falla, no hay web nueva.
   capturas:
-    name: Capturas de la ventana
+    name: Capturas de la ventana (${{ inputs.tag }})
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
 
       - name: Instalar uv
         uses: astral-sh/setup-uv@v7
@@ -46,15 +49,25 @@ jobs:
       - name: Sincronizar dependencias
         run: uv sync --locked
 
+      - name: Comprobar que el tag es la versión del código
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          version=$(uv run python -c "import atril; print(atril.__version__)")
+          test "v$version" = "$TAG" || { echo "$TAG no es v$version"; exit 1; }
+
+      # Fuera del repositorio: el script las valida antes de dejarlas ahí.
       - name: Capturar la ventana
-        run: uv run --with pillow python scripts/capturas.py docs/assets/images/capturas
+        run: uv run --with pillow python scripts/capturas.py "${{ runner.temp }}/capturas"
 
       - name: Guardar las capturas
         uses: actions/upload-artifact@v4
         with:
-          name: capturas
-          path: docs/assets/images/capturas/*.png
+          name: capturas-${{ inputs.tag }}
+          path: ${{ runner.temp }}/capturas/*.png
           if-no-files-found: error
+          retention-days: 1
 
   build:
     name: Documentación (Zensical)
@@ -64,6 +77,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
 
       - name: Instalar uv
         uses: astral-sh/setup-uv@v7
@@ -78,10 +93,10 @@ jobs:
       - name: Recuperar las capturas
         uses: actions/download-artifact@v4
         with:
-          name: capturas
+          name: capturas-${{ inputs.tag }}
           path: docs/assets/images/capturas
 
-      # Una captura que falta o que la página no usa es un error, no una imagen rota.
+      # Una captura que falta es un error, no una imagen rota en la web.
       - name: Comprobar las capturas
         run: |
           used=$(grep -rhoE 'capturas/[a-z-]+\.png' docs | sort -u | sed 's|capturas/||')
@@ -92,16 +107,13 @@ jobs:
       - name: Construir documentación con Zensical
         run: uv run zensical build
 
-      # Solo se publica desde main; en las pull requests basta con que compile.
       - name: Subir el sitio como artefacto de Pages
-        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
   deploy:
     name: Publicar en GitHub Pages
-    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
 

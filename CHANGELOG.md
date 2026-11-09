@@ -5,6 +5,18 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.37.2] - 2026-11-09
+
+### Changed
+
+- La web se publica con cada versión de atril, con capturas generadas con el código de esa
+  versión, y no con cada cambio en `main`: así las imágenes siempre corresponden a la versión
+  que documentan.
+- El generador de capturas espera a que cada apartado haya cargado (con un plazo máximo),
+  convierte cualquier error de la ventana en un fallo de la publicación, libera correctamente
+  los recursos de Windows y valida todas las imágenes antes de entregarlas. Un fallo deja la
+  web anterior publicada, nunca capturas incompletas.
+
 ## [0.37.1] - 2026-11-09
 
 ### Fixed

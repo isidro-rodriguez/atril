@@ -60,22 +60,30 @@ uv run zensical serve   # vista previa en http://localhost:8000
 uv run zensical build   # genera el sitio en site/
 ```
 
-El sitio se publica en GitHub Pages con cada cambio en `main` (`.github/workflows/docs.yml`).
+El sitio se publica en GitHub Pages **con cada versión**: al crear la release, `publish.yml`
+llama a `docs.yml` con su tag, y la web se construye con el código de ese tag. Un cambio que
+solo toca `docs/` se ve en la web con la siguiente versión. A mano (`workflow_dispatch`) solo se
+puede rehacer la web de un tag ya publicado.
 
 ### Capturas
 
-Las capturas de la ventana no se versionan: `docs.yml` las genera en Windows con la ventana
-real del mismo commit y la construcción falla si falta alguna o si la versión no coincide con
-la de `pyproject.toml`. Para generarlas en local (antes de `zensical serve`):
+Las capturas de la ventana no se versionan ni se reutilizan. `docs.yml` las genera en Windows
+con `scripts/capturas.py`, que forma parte de la publicación (no es una herramienta de uso
+manual), en tres pasos separados:
+
+1. Prepara una estación de ejemplo (2.º de Bachillerato de Ciencias, fechas fijas) en
+   `D:\Estudio`, con las copias en `D:\Copias\Atril`. Falla si ya existen, y las borra al
+   terminar.
+2. Abre la ventana real con los servicios simulados.
+3. Espera a que cada apartado haya cargado (como mucho 60 s), lo captura y valida todas las
+   imágenes (las seis, PNG de 1024×700 y un tamaño mínimo) antes de entregarlas.
+
+Cualquier fallo termina con código de error, y entonces no se publica la web. Fuera de la CI
+usa una carpeta temporal; sirve para revisar el aspecto antes de `zensical serve`:
 
 ```bash
-uv run --with pillow python scripts/capturas.py
+uv run --with pillow python scripts/capturas.py docs/assets/images/capturas
 ```
-
-El script tiene tres pasos separados: prepara una estación de ejemplo (2.º de Bachillerato,
-fechas fijas), abre la ventana con los servicios simulados y captura cada apartado en
-`docs/assets/images/capturas/`. En Windows usa `D:\Estudio` y `D:\Copias\Atril`, y se niega
-si existen y no las creó él. En Linux usa una carpeta temporal (solo para revisar el aspecto).
 
 ## Versiones y publicación
 

@@ -1,23 +1,27 @@
 r"""Capturas de la web desde la ventana real de atril, con una estación de ejemplo.
 
-Uso (desde la raíz del repositorio)::
+Forma parte de la publicación: ``docs.yml`` lo ejecuta en Windows con el código de
+cada versión publicada (no es una herramienta de uso manual)::
 
-    uv run --with pillow python scripts/capturas.py [carpeta]
+    uv run --with pillow python scripts/capturas.py <carpeta>
 
-Por defecto escribe en ``docs/assets/images/capturas/`` (no se versionan: las
-genera la CI de la web en cada construcción). Tres pasos separados:
+Tres pasos separados:
 
 1. :func:`prepare` crea la estación de ejemplo: una alumna de 2.º de
    Bachillerato de Ciencias con un temario por asignatura, copias, verificaciones
    y actividad, todo con fechas fijas para que las capturas sean reproducibles.
 2. :func:`open_window` abre la ventana real con los servicios simulados
    (DeepTutor, Ollama y herramientas en marcha, sin buscar actualizaciones).
-3. :func:`capture` recorre los apartados y guarda cada uno en PNG.
+3. :func:`capture` recorre los apartados: espera a que cada uno haya cargado (con
+   un plazo máximo), lo captura y, al final, :func:`validate` comprueba todas las
+   imágenes antes de sustituir las de ``<carpeta>``.
 
-En Windows usa ``D:\Estudio`` (estación) y ``D:\Copias\Atril`` (copias), las
-rutas que se ven en la web. Para no pisar datos reales, se niega a usarlas si
-ya existen sin la marca que deja este script. En otros sistemas usa una carpeta
-temporal (solo para revisar el aspecto durante el desarrollo).
+Cualquier fallo (un apartado que no carga, un error en la ventana o en segundo
+plano, una imagen incompleta) termina con código distinto de cero y no deja
+capturas a medias. En la CI de Windows la estación vive en ``D:\Estudio`` y las
+copias en ``D:\Copias\Atril`` (las rutas que se ven en la web), que el runner
+aísla: si ya existen, falla sin tocarlas, y al terminar se borran. En cualquier
+otro caso, todo va a una carpeta temporal que se borra sola.
 """
 
 import datetime as dt
@@ -28,14 +32,23 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import tkinter as tk
 import tomllib
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "docs" / "assets" / "images" / "capturas"
-MARK = ".atril-capturas"
-"""Marca de las carpetas creadas por este script (las únicas que borra)."""
+
+SIZE = (1024, 700)
+"""Tamaño de cada captura: el de la ventana a 100 %."""
+
+MIN_BYTES = 20_000
+"""Tamaño mínimo razonable de un PNG de la ventana (uno vacío ocupa mucho menos)."""
+
+TIMEOUT = 60.0
+"""Segundos máximos para que un apartado termine de cargar."""
 
 NOW = dt.datetime(2026, 11, 9, 18, 30)
 """Momento fijo de las capturas: fechas y «Hoy/Ayer» no cambian entre ejecuciones."""
@@ -205,33 +218,38 @@ ACTIVITY = (
 # --- 1. datos ------------------------------------------------------------------------
 
 
-def folders() -> tuple[Path, Path]:
-    """Estación y destino de las copias."""
-    if sys.platform == "win32":
-        return Path(r"D:\Estudio"), Path(r"D:\Copias\Atril")
-    base = Path(tempfile.gettempdir()) / "atril-capturas"
-    return base / "Estudio", base / "Copias" / "Atril"
+class CaptureError(Exception):
+    """Fallo de la generación de capturas: no se publica ninguna."""
 
 
-def _fresh(folder: Path) -> None:
-    """Vacía ``folder`` si la creó este script; si no, se niega."""
-    if folder.exists():
-        if not (folder / MARK).exists():
-            raise SystemExit(f"{folder} ya existe y no es de este script: no se toca.")
-        shutil.rmtree(folder)
-    folder.mkdir(parents=True)
-    (folder / MARK).write_text("Carpeta de scripts/capturas.py\n", encoding="utf-8")
+@contextmanager
+def workspace() -> Iterator[tuple[Path, Path, Path]]:
+    """Estación, destino de las copias y carpeta de trabajo, borrados al terminar."""
+    with tempfile.TemporaryDirectory(prefix="atril-capturas-") as temp:
+        work = Path(temp)
+        if sys.platform == "win32" and os.environ.get("GITHUB_ACTIONS") == "true":
+            root, copies = Path(r"D:\Estudio"), Path(r"D:\Copias\Atril")
+            created = [root, copies.parent]
+        else:
+            root, copies = work / "Estudio", work / "Copias" / "Atril"
+            created = []
+        for folder in created:
+            if folder.exists():
+                raise CaptureError(f"{folder} ya existe: no se toca.")
+        try:
+            copies.mkdir(parents=True)
+            yield root, copies, work
+        finally:
+            for folder in created:
+                shutil.rmtree(folder, ignore_errors=True)
 
 
-def prepare() -> Path:
-    """Crea la estación de ejemplo y devuelve su raíz."""
+def prepare(root: Path, copies: Path, work: Path) -> None:
+    """Crea la estación de ejemplo en ``root`` (las copias, en ``copies``)."""
     from atril.config import load_station, load_syllabus
     from atril.config.station import init_station
     from atril.ops import syllabus as syllabus_ops
 
-    root, copies = folders()
-    _fresh(root)
-    _fresh(copies)
     init_station(root)
     config = root / "atril.toml"
     text = config.read_text(encoding="utf-8")
@@ -246,8 +264,7 @@ def prepare() -> Path:
     )
     station = load_station(root)
 
-    downloads = root.parent / "atril-capturas-pdf"
-    shutil.rmtree(downloads, ignore_errors=True)
+    downloads = work / "pdf"
     downloads.mkdir()
     for index, (name, documents) in enumerate(SUBJECTS.items()):
         syllabus = syllabus_ops.create(station, name)
@@ -275,13 +292,11 @@ def prepare() -> Path:
             load_syllabus(syllabus.root),
             index,
         )
-    shutil.rmtree(downloads)
     _backups(station, copies)
     _activity(station)
     (station.data_dir / "atril" / "ventana.json").write_text(
         json.dumps({"temario": "fisica"}), encoding="utf-8"
     )
-    return root
 
 
 def _physics_kbs(root: Path) -> None:
@@ -424,64 +439,110 @@ def open_window(root: Path):
 
 # --- 3. capturas ---------------------------------------------------------------------
 
+PLAN = (
+    ("inicio", "Inicio"),
+    ("temarios", "Temarios"),
+    ("biblioteca", "Biblioteca"),
+    ("backups", "Backups"),
+    ("actividad", "Actividad"),
+    ("ajustes-atril", "Ajustes"),
+)
+"""Cada captura y su apartado, en el orden de :data:`SHOTS`."""
 
-def capture(window, out: Path) -> list[Path]:
-    """Recorre los apartados y guarda cada uno; devuelve los ficheros."""
-    out.mkdir(parents=True, exist_ok=True)
-    saved: list[Path] = []
-    plan = [
-        ("inicio", "Inicio", None),
-        ("temarios", "Temarios", None),
-        ("biblioteca", "Biblioteca", "por base"),
-        ("backups", "Backups", None),
-        ("actividad", "Actividad", "primera"),
-        ("ajustes-atril", "Ajustes", "Atril"),
-    ]
 
-    def settle() -> None:
-        for _ in range(3):
-            thread = window.worker._thread
-            if thread is not None:
-                thread.join(10)
-            window.worker.poll()
-            window.update()
+def _rows(table) -> bool:
+    return bool(table.get_children())
 
-    def shoot(name: str) -> None:
-        window.geometry(
-            "+0+0"
-        )  # Windows la abre desplazada y la pantalla corta el resto
-        settle()
-        image = _grab(window)
-        expected = (window.winfo_width(), window.winfo_height())
-        if image.size != expected or _unpainted(image):
-            raise SystemExit(
-                f"Captura «{name}» incompleta ({image.size}, ventana {expected} en "
-                f"{window.winfo_rootx()},{window.winfo_rooty()}, "
-                f"pantalla {window.winfo_screenwidth()}x{window.winfo_screenheight()})."
+
+def _ready(window, view: str) -> bool:
+    """El apartado muestra ya sus datos (no el estado inicial vacío)."""
+    views = window.views
+    match view:
+        case "Inicio":
+            home = views["Inicio"]
+            return home._headline.cget("text") != "Comprobando…" and bool(
+                home._shown_stats
             )
-        target = out / f"{name}.png"
-        image.save(target, optimize=True)
-        saved.append(target)
+        case "Temarios":
+            return _rows(views["Temarios"]._kbs)
+        case "Biblioteca" | "Backups":
+            return _rows(views[view]._table)
+        case "Actividad":
+            return _rows(views["Actividad"]._list)
+    return True
 
-    def step(index: int = 0) -> None:
-        if index == len(plan):
-            window.destroy()
-            return
-        name, view, extra = plan[index]
-        window.show_view(view)
-        settle()
-        if extra == "primera":
+
+def _prepare_view(window, view: str) -> None:
+    """Ajustes previos de algunas capturas, una vez cargado el apartado."""
+    match view:
+        case (
+            "Biblioteca"
+        ):  # ordenada por base, para que se vean las cuatro KB de Física
+            window.views["Biblioteca"]._sorter.sort(1)
+        case "Actividad":  # con el detalle de la operación más reciente
             table = window.views["Actividad"]._list
             table.selection_set(table.get_children()[0])
-        elif extra == "por base":  # que se vean las cuatro KB de Física
-            window.views["Biblioteca"]._sorter.sort(1)
-        elif extra is not None:
-            window.views["Ajustes"].show_tab(extra)
-        window.after(700, lambda: (shoot(name), step(index + 1)))
+        case "Ajustes":
+            window.views["Ajustes"].show_tab("Atril")
 
-    window.after(1200, step)
-    window.mainloop()
-    return saved
+
+def capture(window, out: Path) -> None:
+    """Captura cada apartado de :data:`PLAN` en ``out`` y cierra la ventana.
+
+    Sin ``mainloop``: el script procesa los eventos de Tk mientras espera, así que
+    cualquier error (también en un callback de Tk o en el trabajo de segundo plano)
+    llega aquí, para la secuencia y sale como :class:`CaptureError`.
+    """
+    errors: list[BaseException] = []
+    window.report_callback_exception = lambda _type, exc, _tb: errors.append(exc)
+    submit = window.worker.submit
+
+    def watched(task, on_done, on_error):
+        def failed(exc: Exception) -> None:
+            errors.append(exc)
+            on_error(exc)
+
+        return submit(task, on_done, failed)
+
+    window.worker.submit = watched
+    try:
+        for name, view in PLAN:
+            window.geometry("+0+0")  # Windows la abre desplazada y la pantalla la corta
+            window.show_view(view)
+            _wait(window, errors, f"«{view}»", lambda v=view: _ready(window, v))
+            _prepare_view(window, view)
+            _wait(window, errors, f"«{view}» preparado", lambda: True)
+            _save(_grab(window), out / f"{name}.png", name)
+    finally:
+        window.destroy()
+
+
+def _wait(window, errors: list[BaseException], what: str, ready: Callable[[], bool]):
+    """Procesa eventos hasta que ``ready`` y la ventana estén quietos, o falla.
+
+    Quieta: sin trabajo en segundo plano ni tareas de Tk pendientes durante
+    varias vueltas seguidas (la última carga puede lanzar otra lectura).
+    """
+    deadline = time.monotonic() + TIMEOUT
+    calm = 0
+    while calm < 5:
+        window.update()
+        if errors:
+            raise CaptureError(f"Error en la ventana durante {what}: {errors[0]!r}")
+        if time.monotonic() > deadline:
+            raise CaptureError(f"{what} no ha terminado de cargar en {TIMEOUT:.0f} s.")
+        busy = window.worker.running or not ready()
+        calm = 0 if busy else calm + 1
+        time.sleep(0.1)
+
+
+def _save(image, target: Path, name: str) -> None:
+    """Guarda la captura si está entera."""
+    if image.size != SIZE or _unpainted(image):
+        raise CaptureError(
+            f"Captura «{name}» incompleta ({image.size}, se esperaba {SIZE})."
+        )
+    image.save(target, optimize=True)
 
 
 def _grab(window):
@@ -490,35 +551,92 @@ def _grab(window):
     En Windows usa ``PrintWindow``: no depende del tamaño de la pantalla (la del
     runner de GitHub recortaba la ventana). En Linux, una captura de la pantalla X.
     """
-    from PIL import Image, ImageGrab
+    from PIL import ImageGrab
 
-    width, height = window.winfo_width(), window.winfo_height()
-    if sys.platform != "win32":
-        x, y = window.winfo_rootx(), window.winfo_rooty()
-        box = (x, y, x + width, y + height)
-        return ImageGrab.grab(bbox=box, xdisplay=os.environ["DISPLAY"])
+    if sys.platform == "win32":
+        return _print_window(int(window.wm_frame(), 16))
+    x, y = window.winfo_rootx(), window.winfo_rooty()
+    box = (x, y, x + window.winfo_width(), y + window.winfo_height())
+    return ImageGrab.grab(bbox=box, xdisplay=os.environ["DISPLAY"])
+
+
+def _print_window(hwnd: int):
+    """``PrintWindow`` a un bitmap en memoria, liberando siempre cada recurso GDI.
+
+    El bitmap se deselecciona (se restaura el objeto anterior del contexto) antes
+    de leerlo con ``GetDIBits`` y de borrarlo, como exige la API de Windows.
+    """
     import ctypes
     from ctypes import wintypes
 
-    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
-    hwnd = int(window.wm_frame(), 16)
+    from PIL import Image
+
+    user32, gdi32 = ctypes.WinDLL("user32"), ctypes.WinDLL("gdi32")
+    user32.GetWindowRect.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.RECT))
+    user32.GetDC.argtypes = (wintypes.HWND,)
+    user32.GetDC.restype = wintypes.HDC
+    user32.ReleaseDC.argtypes = (wintypes.HWND, wintypes.HDC)
+    user32.PrintWindow.argtypes = (wintypes.HWND, wintypes.HDC, wintypes.UINT)
+    gdi32.CreateCompatibleDC.argtypes = (wintypes.HDC,)
+    gdi32.CreateCompatibleDC.restype = wintypes.HDC
+    gdi32.CreateCompatibleBitmap.argtypes = (wintypes.HDC, ctypes.c_int, ctypes.c_int)
+    gdi32.CreateCompatibleBitmap.restype = wintypes.HBITMAP
+    gdi32.SelectObject.argtypes = (wintypes.HDC, wintypes.HGDIOBJ)
+    gdi32.SelectObject.restype = wintypes.HGDIOBJ
+    gdi32.GetDIBits.argtypes = (
+        wintypes.HDC,
+        wintypes.HBITMAP,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        wintypes.UINT,
+    )
+    gdi32.DeleteObject.argtypes = (wintypes.HGDIOBJ,)
+    gdi32.DeleteDC.argtypes = (wintypes.HDC,)
+
     rect = wintypes.RECT()
-    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+        raise CaptureError("GetWindowRect ha fallado.")
     width, height = rect.right - rect.left, rect.bottom - rect.top
     screen = user32.GetDC(None)
-    memory = gdi32.CreateCompatibleDC(screen)
-    bitmap = gdi32.CreateCompatibleBitmap(screen, width, height)
-    gdi32.SelectObject(memory, bitmap)
+    if not screen:
+        raise CaptureError("GetDC ha fallado.")
     try:
-        if not user32.PrintWindow(hwnd, memory, 2):  # PW_RENDERFULLCONTENT
-            raise SystemExit("PrintWindow no ha podido pintar la ventana.")
-        header = (ctypes.c_uint32 * 10)(40, width, -height, 1 | (32 << 16), 0)
-        pixels = ctypes.create_string_buffer(width * height * 4)
-        gdi32.GetDIBits(memory, bitmap, 0, height, pixels, header, 0)
-        return Image.frombuffer("RGB", (width, height), pixels, "raw", "BGRX", 0, 1)
+        memory = gdi32.CreateCompatibleDC(screen)
+        if not memory:
+            raise CaptureError("CreateCompatibleDC ha fallado.")
+        try:
+            bitmap = gdi32.CreateCompatibleBitmap(screen, width, height)
+            if not bitmap:
+                raise CaptureError("CreateCompatibleBitmap ha fallado.")
+            try:
+                previous = gdi32.SelectObject(memory, bitmap)
+                if not previous:
+                    raise CaptureError("SelectObject ha fallado.")
+                try:
+                    if not user32.PrintWindow(hwnd, memory, 2):  # PW_RENDERFULLCONTENT
+                        raise CaptureError(
+                            "PrintWindow no ha podido pintar la ventana."
+                        )
+                finally:
+                    gdi32.SelectObject(memory, previous)
+                # BITMAPINFOHEADER: 32 bits, de arriba abajo, sin comprimir.
+                header = (ctypes.c_uint32 * 10)(40, width, -height, 1 | (32 << 16), 0)
+                pixels = ctypes.create_string_buffer(width * height * 4)
+                if (
+                    gdi32.GetDIBits(memory, bitmap, 0, height, pixels, header, 0)
+                    != height
+                ):
+                    raise CaptureError("GetDIBits no ha leído la imagen entera.")
+                return Image.frombuffer(
+                    "RGB", (width, height), pixels, "raw", "BGRX", 0, 1
+                )
+            finally:
+                gdi32.DeleteObject(bitmap)
+        finally:
+            gdi32.DeleteDC(memory)
     finally:
-        gdi32.DeleteObject(bitmap)
-        gdi32.DeleteDC(memory)
         user32.ReleaseDC(None, screen)
 
 
@@ -528,30 +646,77 @@ def _unpainted(image) -> bool:
     return corner.convert("L").getextrema()[1] < 16
 
 
-def check(saved: list[Path]) -> None:
-    """Falla si falta una captura o la versión no es la de ``pyproject.toml``."""
+# --- 4. comprobación -----------------------------------------------------------------
+
+
+def check_version() -> None:
+    """La ventana es la versión que se documenta (la de ``pyproject.toml``)."""
     import atril
 
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     expected = project["project"]["version"]
     if atril.__version__ != expected:
-        raise SystemExit(
+        raise CaptureError(
             f"La ventana es la versión {atril.__version__}, no la {expected} que se "
-            "documenta: ejecuta uv sync."
+            "documenta."
         )
-    missing = [name for name in SHOTS if not any(p.stem == name for p in saved)]
-    if missing:
-        raise SystemExit(f"Faltan capturas: {', '.join(missing)}.")
 
 
-def main() -> None:
-    """Prepara la estación, abre la ventana, captura y comprueba."""
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT
-    root = prepare()
-    saved = capture(open_window(root), out)
-    check(saved)
-    print(f"{len(saved)} capturas en {out}")
+def validate(folder: Path) -> None:
+    """Todas las capturas de :data:`SHOTS`, PNG válidos del tamaño y peso esperados."""
+    from PIL import Image
+
+    found = {path.name for path in folder.iterdir()}
+    expected = {f"{name}.png" for name in SHOTS}
+    if found != expected:
+        raise CaptureError(
+            f"Capturas inesperadas: faltan {sorted(expected - found)}, "
+            f"sobran {sorted(found - expected)}."
+        )
+    for name in sorted(expected):
+        path = folder / name
+        if path.stat().st_size < MIN_BYTES:
+            raise CaptureError(
+                f"{name} ocupa demasiado poco ({path.stat().st_size} B)."
+            )
+        with Image.open(path) as image:
+            image.verify()
+        with Image.open(path) as image:
+            if image.format != "PNG" or image.size != SIZE:
+                raise CaptureError(f"{name}: {image.format} de {image.size}.")
+
+
+def publish(folder: Path, out: Path) -> None:
+    """Sustituye las capturas de ``out`` por las de ``folder`` (ya validadas)."""
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob("*.png"):
+        old.unlink()
+    for new in folder.iterdir():
+        shutil.copy2(new, out / new.name)
+    validate(out)
+
+
+def main() -> int:
+    """Prepara la estación, captura, valida y publica; 1 si algo falla."""
+    if len(sys.argv) != 2:
+        print("Uso: capturas.py <carpeta>", file=sys.stderr)
+        return 2
+    out = Path(sys.argv[1]).resolve()
+    try:
+        check_version()
+        with workspace() as (root, copies, work):
+            prepare(root, copies, work)
+            shots = work / "capturas"
+            shots.mkdir()
+            capture(open_window(root), shots)
+            validate(shots)
+            publish(shots, out)
+    except CaptureError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    print(f"{len(SHOTS)} capturas en {out}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -96,6 +96,19 @@ jobs:
             --title "atril ${{ needs.check.outputs.version }}" \
             --generate-notes
 
+  # La web de esta versión, con capturas hechas con su código (docs.yml).
+  docs:
+    name: Web
+    needs: [ check, publish ]
+    if: needs.publish.result == 'success'
+    uses: ./.github/workflows/docs.yml
+    with:
+      tag: ${{ needs.check.outputs.tag }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
   installer:
     name: Instalador de Windows ${{ needs.check.outputs.version }}
     needs: [ check, publish ]
