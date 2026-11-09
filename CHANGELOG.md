@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### Fixed
+
+- Instalador: en Windows 11, uv fallaba al instalar Python («punto de montaje no confiable»,
+  os error 448). Inno Setup activa RedirectionGuard, que heredan sus procesos hijos e impide
+  recorrer el enlace de versión menor que crea uv. Ahora uv se lanza como el usuario original,
+  sin esa protección. El instalador de 0.29.0 se ha reconstruido con el arreglo.
+
 ## [0.29.0] - 2026-11-09
 
 ### Added

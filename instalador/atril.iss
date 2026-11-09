@@ -71,36 +71,36 @@ Type: filesandordirs; Name: "{app}\python"
 Type: files; Name: "{app}\instalacion.log"
 
 [Code]
-function SetEnvironmentVariable(Name, Value: String): Boolean;
-  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
-
 { Variables de uv: todo dentro de la carpeta del programa, sin caché ni Python
-  del sistema. }
-procedure PrepareUv();
+  del sistema. Se pasan en la propia línea de cmd porque uv no hereda el entorno
+  de Setup (ver InstallAtril). }
+function UvEnvironment(): String;
 var
   App: String;
 begin
   App := ExpandConstant('{app}');
-  SetEnvironmentVariable('UV_TOOL_DIR', App + '\herramientas');
-  SetEnvironmentVariable('UV_TOOL_BIN_DIR', App + '\bin');
-  SetEnvironmentVariable('UV_PYTHON_INSTALL_DIR', App + '\python');
-  SetEnvironmentVariable('UV_PYTHON_PREFERENCE', 'only-managed');
-  SetEnvironmentVariable('UV_NO_CACHE', '1');
-  SetEnvironmentVariable('UV_NO_MODIFY_PATH', '1');
+  Result := 'set "UV_TOOL_DIR=' + App + '\herramientas"&& '
+    + 'set "UV_TOOL_BIN_DIR=' + App + '\bin"&& '
+    + 'set "UV_PYTHON_INSTALL_DIR=' + App + '\python"&& '
+    + 'set "UV_PYTHON_PREFERENCE=only-managed"&& '
+    + 'set "UV_NO_CACHE=1"&& '
+    + 'set "UV_NO_MODIFY_PATH=1"&& ';
 end;
 
-{ Instala (o actualiza) atril con uv; la salida queda en instalacion.log. }
+{ Instala (o actualiza) atril con uv; la salida queda en instalacion.log.
+  Se lanza como el usuario original: los procesos hijos de Setup heredan
+  RedirectionGuard, que en Windows 11 impide a uv recorrer el enlace (junction)
+  que crea para la versión menor de Python (os error 448). }
 function InstallAtril(): Boolean;
 var
   Code: Integer;
   Command: String;
 begin
-  PrepareUv();
-  Command := '/C ""' + ExpandConstant('{app}\uv.exe') + '" tool install --force'
-    + ' --python {#PythonVersion} "atril=={#AppVersion}" > "'
+  Command := '/S /C "' + UvEnvironment() + '"' + ExpandConstant('{app}\uv.exe')
+    + '" tool install --force --python {#PythonVersion} "atril=={#AppVersion}" > "'
     + ExpandConstant('{app}\instalacion.log') + '" 2>&1"';
-  Result := Exec(ExpandConstant('{cmd}'), Command, ExpandConstant('{app}'),
-    SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+  Result := ExecAsOriginalUser(ExpandConstant('{cmd}'), Command,
+    ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
 end;
 
 function PathEntry(): String;
