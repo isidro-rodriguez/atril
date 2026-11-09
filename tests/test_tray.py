@@ -1,5 +1,8 @@
 """Pruebas de la espera al instalador (sin Windows: se simula su mutex)."""
 
+from collections.abc import Iterator
+from types import SimpleNamespace
+
 import pytest
 
 from atril.gui import app, tray
@@ -9,17 +12,21 @@ def test_wait_for_setup_until_mutex_disappears(monkeypatch: pytest.MonkeyPatch) 
     states = iter([True, True, False])
     clock = iter([0.0, 1.0, 2.0, 3.0])
     monkeypatch.setattr(tray, "setup_running", lambda: next(states))
-    monkeypatch.setattr(tray.time, "monotonic", lambda: next(clock))
-    monkeypatch.setattr(tray.time, "sleep", lambda _: None)
+    _fake_time(monkeypatch, clock)
     assert tray.wait_for_setup(timeout=10)
 
 
 def test_wait_for_setup_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
     clock = iter([0.0, 5.0, 11.0])
     monkeypatch.setattr(tray, "setup_running", lambda: True)
-    monkeypatch.setattr(tray.time, "monotonic", lambda: next(clock))
-    monkeypatch.setattr(tray.time, "sleep", lambda _: None)
+    _fake_time(monkeypatch, clock)
     assert not tray.wait_for_setup(timeout=10)
+
+
+def _fake_time(monkeypatch: pytest.MonkeyPatch, clock: Iterator[float]) -> None:
+    """Reloj falso solo para ``tray`` (sin tocar el ``time`` de todo el proceso)."""
+    fake = SimpleNamespace(monotonic=lambda: next(clock), sleep=lambda _: None)
+    monkeypatch.setattr(tray, "time", fake)
 
 
 @pytest.mark.parametrize(
