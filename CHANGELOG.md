@@ -5,6 +5,15 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.32.3] - 2026-11-09
+
+### Fixed
+
+- Actualizar desde la ventana fallaba y dejaba atril roto: el instalador empezaba antes de que
+  la ventana terminara de cerrarse, y uv no podía borrar los ficheros de su entorno, aún en uso
+  («Acceso denegado»). Ahora la ventana pasa su PID (`/esperar=`) y el instalador espera a que
+  termine. Además, la instalación con uv se reintenta hasta tres veces. La CI prueba este caso.
+
 ## [0.32.2] - 2026-11-09
 
 ### Fixed

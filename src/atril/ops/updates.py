@@ -7,6 +7,7 @@ lanza en modo silencioso: cierra atril, instala y vuelve a abrir la ventana.
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -190,10 +191,18 @@ def download_installer(
 def launch_installer(installer: Path) -> None:
     """Lanza el instalador sin preguntas y con reapertura de la ventana al final.
 
-    Quien lo llama debe cerrarse en seguida: el instalador sustituye sus ficheros.
+    Quien lo llama debe cerrarse en seguida: el instalador espera a que este
+    proceso termine (``/esperar``) antes de sustituir sus ficheros.
     """
     subprocess.Popen(
-        [str(installer), "/SILENT", "/SP-", "/NOCANCEL", "/abrir=si"],
+        [
+            str(installer),
+            "/SILENT",
+            "/SP-",
+            "/NOCANCEL",
+            "/abrir=si",
+            f"/esperar={os.getpid()}",  # no toca el entorno hasta que esto termine
+        ],
         creationflags=processes.no_window(),
         close_fds=True,
     )

@@ -94,18 +94,54 @@ begin
     + 'set "UV_NO_MODIFY_PATH=1"&& ';
 end;
 
+function OpenProcess(Access: DWORD; Inherit: BOOL; Pid: DWORD): THandle;
+  external 'OpenProcess@kernel32.dll stdcall';
+function WaitForSingleObject(Handle: THandle; Milliseconds: DWORD): DWORD;
+  external 'WaitForSingleObject@kernel32.dll stdcall';
+function CloseHandle(Handle: THandle): BOOL;
+  external 'CloseHandle@kernel32.dll stdcall';
+
+{ Actualización desde la ventana (/esperar=<pid>): espera a que esa ventana se
+  cierre del todo. Mientras su Python siga vivo, sus ficheros del entorno están en
+  uso y uv no puede sustituirlos. }
+function InitializeSetup(): Boolean;
+var
+  Pid: Integer;
+  Handle: THandle;
+begin
+  Pid := StrToIntDef(ExpandConstant('{param:esperar|0}'), 0);
+  if Pid > 0 then
+  begin
+    Handle := OpenProcess($00100000, False, Pid);  { SYNCHRONIZE }
+    if Handle <> 0 then
+    begin
+      WaitForSingleObject(Handle, 60000);
+      CloseHandle(Handle);
+    end;
+  end;
+  Result := True;
+end;
+
 { Instala (o actualiza) atril con uv; la salida queda en instalacion.log.
   Va por cmd para poner las variables de uv y redirigir la salida. }
 function InstallAtril(): Boolean;
 var
-  Code: Integer;
+  Code, Attempt: Integer;
   Command: String;
 begin
   Command := '/S /C "' + UvEnvironment() + '"' + ExpandConstant('{app}\uv.exe')
     + '" tool install --force --python {#PythonVersion} "atril=={#AppVersion}" > "'
     + ExpandConstant('{app}\instalacion.log') + '" 2>&1"';
-  Result := Exec(ExpandConstant('{cmd}'), Command,
-    ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+  { Unos reintentos: un antivirus o un proceso que acaba de cerrarse pueden
+    retener un fichero del entorno unos segundos. }
+  for Attempt := 1 to 3 do
+  begin
+    Result := Exec(ExpandConstant('{cmd}'), Command,
+      ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+    if Result then
+      exit;
+    Sleep(5000);
+  end;
 end;
 
 function ReopenAfterUpdate(): Boolean;

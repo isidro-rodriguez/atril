@@ -170,7 +170,8 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
 - Self-update (`ops.updates`): the GUI checks GitHub's latest release at startup (quiet, unless
   `[atril] buscar_actualizaciones = false`). Only an installer install (`installer_folder`) is
   updated in place: download, verify the release's SHA-256 `digest`, `tray.release_mutex()`,
-  launch the installer with `/SILENT /abrir=si` and quit; any other install only links the
+  launch the installer with `/SILENT /abrir=si /esperar=<pid>` (it waits for that process: the
+  venv files are in use until it exits) and quit; any other install only links the
   release page. The CLI only warns, in `atril estado` (same key). Tests run offline: `tests/conftest.py`
   makes `net.open_url` raise unless a test replaces it.
 - Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,

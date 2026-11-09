@@ -161,6 +161,14 @@ jobs:
           if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Atril.lnk")) { throw "falta el acceso directo" }
           $path = (Get-ItemProperty HKCU:\Environment).Path
           if ($path -notlike "*$app\bin*") { throw "bin no está en el PATH del usuario" }
+          # Actualización desde la ventana: un Python del entorno sigue vivo (ficheros en
+          # uso) y el instalador debe esperar a que termine (/esperar) antes de usar uv.
+          $busy = Start-Process "$app\herramientas\atril\Scripts\python.exe" -ArgumentList '-c', '"import psutil, time; time.sleep(20)"' -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+          Start-Process $setup -ArgumentList '/SILENT', '/SP-', '/SUPPRESSMSGBOXES', "/esperar=$($busy.Id)", '/LOG=actualizar.log' -Wait
+          Get-Content "$app\instalacion.log"
+          $version = & "$app\bin\atril.exe" --version
+          if ("$version" -notmatch [regex]::Escape($env:VERSION)) { throw "tras actualizar, atril --version: $version" }
           Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES' -Wait
           Start-Sleep -Seconds 5  # el desinstalador se relanza desde una copia temporal
           if (Test-Path "$app\bin") { throw "la desinstalación ha dejado $app\bin" }
@@ -176,7 +184,7 @@ jobs:
         if: failure()
         run: |
           New-Item -ItemType Directory registros -Force | Out-Null
-          Copy-Item instalar.log, "$env:LOCALAPPDATA\Programs\Atril\instalacion.log" registros -ErrorAction SilentlyContinue
+          Copy-Item instalar.log, actualizar.log, "$env:LOCALAPPDATA\Programs\Atril\instalacion.log" registros -ErrorAction SilentlyContinue
 
       - name: Guardar los registros si falla
         if: failure()
