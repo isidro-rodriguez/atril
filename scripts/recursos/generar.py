@@ -62,13 +62,13 @@ LINKS = ("github", "pypi")
 los de Lucide, con las variantes ``enlace`` y ``enlace-sel`` a 20 px base."""
 
 HERO_ICONS: dict[str, tuple[str, str]] = {
-    # Iconos de nivel grandes para el «Estado general» de Inicio (base 88).
+    # Iconos de nivel grandes para el «Estado general» de Inicio (base 104).
     "circle-check": ("ok", "#1a8f3c"),
     "info": ("info", "#0f5ec9"),
     "triangle-alert": ("aviso", "#d97706"),
     "circle-x": ("error", "#c42b1c"),
 }
-HERO_ICON = 88
+HERO_ICON = 104
 """Lado de los iconos de :data:`HERO_ICONS` a 100 %."""
 
 FONTS = {

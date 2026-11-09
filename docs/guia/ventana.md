@@ -7,7 +7,7 @@ esta web, el repositorio en GitHub y la página en PyPI.
 ## Inicio
 
 **Estado general** ocupa la mayor parte: un icono y una palabra grande («En marcha»,
-«Parado», «Necesita atención»…), una frase con lo siguiente que hacer y, abajo a la derecha,
+«Parado», «Atención»…), una frase con lo siguiente que hacer y, abajo a la derecha,
 los botones para abrir DeepTutor en el navegador y arrancarlo o pararlo. Debajo, cada
 herramienta con su estado y, si hace falta, un botón para instalarla o arrancarla. Pulsar un
 logotipo abre la web de esa herramienta.

@@ -46,7 +46,7 @@ from atril.processes import no_window
 if TYPE_CHECKING:
     from atril.gui.app import App
 
-SENTENCE_WIDTH = 400
+SENTENCE_WIDTH = 410
 """Ancho máximo (a 100 %) de la frase del estado general: una sola línea."""
 
 STAT_WIDTH = 190
@@ -181,7 +181,7 @@ class HomeView(tk.Frame):
         self._icon = tk.Label(top, background=style.CARD)
         self._icon.grid(row=0, column=0, rowspan=2, padx=(4, 0))
         tk.Frame(top, background=style.BORDER, width=max(1, round(factor))).grid(
-            row=0, column=1, rowspan=2, sticky="ns", padx=round(24 * factor)
+            row=0, column=1, rowspan=2, sticky="ns", padx=round(20 * factor)
         )
         self._headline = style.label(top, "Comprobando…", font=style.HEADLINE)
         self._headline.grid(row=0, column=2, sticky="sw")
@@ -196,7 +196,7 @@ class HomeView(tk.Frame):
             compound="left",
             command=self.open_browser,
         )
-        self._open.grid(row=0, column=0, sticky="ew", ipady=8, pady=(0, 10))
+        self._open.grid(row=0, column=0, sticky="ew", ipady=18, pady=(0, 10))
         self._open.grid_remove()
         self._toggle = self.app.action(
             ttk.Button(
@@ -205,10 +205,9 @@ class HomeView(tk.Frame):
                 compound="left",
                 style="Accent.TButton",
                 command=self.toggle,
-                width=22,
             )
         )
-        self._toggle.grid(row=1, column=0, sticky="ew", ipady=8)
+        self._toggle.grid(row=1, column=0, sticky="ew", ipady=18)
         tk.Frame(card, background=style.BORDER, height=max(1, round(factor))).grid(
             row=4, column=0, sticky="ew", pady=(round(10 * factor), round(16 * factor))
         )
@@ -230,7 +229,12 @@ class HomeView(tk.Frame):
         """Un dato del pie: icono, título y estado con su punto de color."""
         factor = style.scale(self)
         box = tk.Frame(parent, background=style.CARD, cursor="hand2")
-        box.grid(row=0, column=column)
+        box.grid(
+            row=0,
+            column=column,
+            sticky="w",
+            padx=(0 if column == 0 else round(20 * factor), 0),
+        )
         image = tk.Label(
             box, image=style.icon(self, name, 40), background=style.CARD, cursor="hand2"
         )
@@ -243,7 +247,7 @@ class HomeView(tk.Frame):
         )
         dot.create_oval(0, 0, size - 1, size - 1, fill=style.MUTED, outline="")
         dot.grid(row=1, column=1, sticky="w", padx=(0, round(6 * factor)))
-        text = style.label(box, "", color=style.MUTED)
+        text = style.label(box, "", font=style.SMALL, color=style.MUTED)
         text.grid(row=1, column=2, sticky="nw")
         index = column // 2
         for widget in (box, image, title, dot, text):
@@ -297,7 +301,7 @@ class HomeView(tk.Frame):
         self._facts = facts
         self.app.set_facts(facts)
         level, headline, sentence = overall(facts)
-        self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 88))
+        self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 104))
         self._headline.configure(text=headline)
         self._sentence.configure(text=_one_line(self._sentence, sentence))
         running = facts.backend_up or facts.frontend_up

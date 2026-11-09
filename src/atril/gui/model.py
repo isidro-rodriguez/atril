@@ -230,7 +230,7 @@ OVERALL = {
     Level.OK: ("En marcha", "DeepTutor está listo para estudiar."),
     Level.INFO: ("Parado", "Arranca atril para estudiar con DeepTutor."),
     Level.WARNING: ("Con avisos", "Funciona, con avisos que conviene revisar."),
-    Level.ERROR: ("Necesita atención", "Falta algo para poder usar DeepTutor."),
+    Level.ERROR: ("Atención", "Falta algo para poder usar DeepTutor."),
 }
 """Por nivel: titular y frase del estado general."""
 
@@ -241,13 +241,13 @@ def overall(facts: Facts) -> tuple[Level, str, str]:
     Examples:
         >>> facts = Facts(False, False, False, True, True, True, (), {}, None, True)
         >>> overall(facts)[1:]
-        ('Necesita atención', 'DeepTutor no está instalado: instálalo abajo.')
+        ('Atención', 'Instala DeepTutor para empezar.')
     """
     if not facts.deeptutor_installed:
         return (
             Level.ERROR,
             OVERALL[Level.ERROR][0],
-            "DeepTutor no está instalado: instálalo abajo.",
+            "Instala DeepTutor para empezar.",
         )
     missing = [name for key, (name, _) in TOOLS.items() if not facts.tools.get(key)]
     if missing:

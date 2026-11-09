@@ -70,7 +70,7 @@ SCRIPT = textwrap.dedent(
     assert not app.resizable()[0] and not app.resizable()[1]  # ventana fija
     home = app.views["Inicio"]
     assert isinstance(home, HomeView)
-    assert str(home._headline.cget("text")) == "Necesita atención"  # sin instalar
+    assert str(home._headline.cget("text")) == "Atención"  # sin instalar
     assert str(home._toggle.cget("text")) == "Instalar DeepTutor"
     assert [t._card.key for t in home._tiles][0] == "deeptutor"
 
