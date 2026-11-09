@@ -7,7 +7,7 @@ import pytest
 
 pytest.importorskip("tkinter")  # la ventana necesita tkinter (falta en algún Python)
 
-from atril.gui import app, tray  # noqa: E402
+from atril.gui import app, tray
 
 
 def test_wait_for_setup_until_mutex_disappears(monkeypatch: pytest.MonkeyPatch) -> None:
