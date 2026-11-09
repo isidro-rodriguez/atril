@@ -211,6 +211,7 @@ def reindex(
                 f"la KB {kb.id} aún no existe; indexa antes {syllabus.id}."
             )
         before = KbRun.load(kb_dir)
+        was_running = dt.backend_up()
         _ensure_running(dt, before, reporter)
         preflight(station, reporter)
 
@@ -230,6 +231,9 @@ def reindex(
             counter = f"[{number}/{len(changed)}]"
             _index_one(indexer, ledger, kb, item, counter, reporter, cancel)
 
+        # Los añadidos de arriba dejan su propio run: el reindexado se reconoce
+        # por su tarea, no por ser distinto del que había al empezar.
+        before = KbRun.load(kb_dir)
         if before is not None and before.state == "running":
             reporter.show(
                 [info("Ya hay un indexado en curso en esta KB; se sigue su progreso.")]
@@ -249,10 +253,9 @@ def reindex(
             if reply.get("noop"):
                 _finish_reindex(ledger, kb, removed)
                 return f"DeepTutor indica que no hace falta: {reply.get('message', '')}"
-            reporter.show(
-                [info(f"Reindexado lanzado (tarea {reply.get('task_id', '?')}).")]
-            )
-            _wait_new_run(kb_dir, before)
+            task = reply.get("task_id")
+            reporter.show([info(f"Reindexado lanzado (tarea {task or '?'}).")])
+            _wait_new_run(kb_dir, before, str(task) if task else None)
 
         run = _follow(kb_dir, reporter, cancel)
         if run is None or run.state != "completed":
@@ -267,6 +270,9 @@ def reindex(
                 f"el reindexado ha terminado como {state}: {message}.{hint}"
             )
         _finish_reindex(ledger, kb, removed)
+        if not was_running:
+            # Se arrancó solo para reindexar: se deja como estaba.
+            service.stop(dt, reporter)
         return f"KB {kb.id} reindexada."
 
 
@@ -402,12 +408,21 @@ def _remove_files(
     return findings
 
 
-def _wait_new_run(kb_dir: Path, before: KbRun | None) -> None:
-    """Espera a que DeepTutor publique el run del nuevo reindexado."""
+def _wait_new_run(kb_dir: Path, before: KbRun | None, task: str | None) -> None:
+    """Espera a que DeepTutor publique el run del reindexado lanzado.
+
+    Con la tarea que devuelve la API se espera exactamente ese run. DeepTutor lo
+    escribe al empezar, poco después de responder: hasta entonces el fichero
+    sigue con el run anterior (por ejemplo, el de un añadido ya completado).
+    """
     deadline = time.monotonic() + REINDEX_START_TIMEOUT
     while time.monotonic() < deadline:
         run = KbRun.load(kb_dir)
-        if run is not None and (before is None or run.task_id != before.task_id):
+        if run is not None and (
+            run.task_id == task
+            if task
+            else before is None or run.task_id != before.task_id
+        ):
             return
         time.sleep(1)
     raise AtrilError("DeepTutor no ha empezado el reindexado; revisa su log.")

@@ -237,7 +237,8 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   `[indexado] hilos` as thread limit; `fuentes/indexado.json` records the indexed hash per KB and
   source. DeepTutor stores a changed file with the same name as `name (2).pdf` and never purges vectors, so changed
   and removed sources are handled only in `kb reindexar`: delete the old file through the API,
-  re-add, then `POST /reindex` with the active `embedding_model`. Success of an add is a **new**
+  re-add, then `POST /reindex` with the active `embedding_model` and follow the run of the task
+  it returns (the adds leave their own completed runs); if DeepTutor was stopped, stop it after. Success of an add is a **new**
   completed run (different `task_id`) or DeepTutor's "already indexed" message, never a lookup by
   file name. Run state comes from `<kb>/.indexing-run.json`; a `running` run whose owner process
   died counts as `interrupted`, and those states require restarting DeepTutor before reindexing.

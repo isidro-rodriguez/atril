@@ -5,6 +5,18 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.39.1] - 2026-11-09
+
+### Fixed
+
+- Reindexar daba la KB por reindexada en cuanto lanzaba el trabajo, si antes se había añadido
+  alguna fuente: confundía el run del añadido (ya completado) con el del reindexado. DeepTutor
+  seguía calculando vectores en la GPU durante más de 20 minutos sin que atril lo mostrara, y
+  al cerrar la ventana atril quedaba oculto con DeepTutor en marcha. Ahora espera al run de la
+  tarea que ha lanzado hasta que termina.
+- Si DeepTutor estaba parado, reindexar lo arranca para usar su API y ahora lo vuelve a parar
+  al terminar, en vez de dejarlo en marcha.
+
 ## [0.39.0] - 2026-11-09
 
 ### Added

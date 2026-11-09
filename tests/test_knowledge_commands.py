@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 
@@ -384,3 +385,45 @@ def test_download_cancel_between_sources(station: Path) -> None:
 
     with pytest.raises(CancelledError):
         source_ops.download(syllabus, Recorder(), cancel=cancel)
+
+
+def test_reindex_waits_for_its_own_task_and_restores_stopped_deeptutor(
+    station: Path, reindex_env: dict[str, list], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regresión: el run de un añadido (otra tarea) no da el reindexado por hecho."""
+    kb_dir = load_station(station).kb_dir("norm-edificacion-cte")
+    syllabus = load_syllabus(station / "temarios" / "normativa")
+    loe_path = syllabus.source_path(syllabus.sources[1])
+    assert loe_path is not None
+    write(loe_path, "%PDF LOE modificada")
+
+    def add_with_run(self: Indexer, kb_id: str, item, tick=None) -> AddResult:
+        # Como `deeptutor kb add`: deja su propio run, ya completado.
+        run = {"task_id": "anadido", "state": "completed"}
+        write(kb_dir / ".indexing-run.json", json.dumps(run))
+        return AddResult(True, 0.5)
+
+    def reindex_later(self: KnowledgeApi, kb_id: str, selection: str) -> dict:
+        return {"task_id": "t1"}  # DeepTutor escribe su run un poco después
+
+    states = iter(["running", "running", "completed"])
+    written: list[str] = []
+
+    def sleep(seconds: float) -> None:
+        state = next(states, "completed")
+        run = {"task_id": "t1", "state": state, "pid": os.getpid()}
+        write(kb_dir / ".indexing-run.json", json.dumps(run))
+        written.append(state)
+
+    monkeypatch.setattr(Indexer, "add", add_with_run)
+    monkeypatch.setattr(KnowledgeApi, "reindex", reindex_later)
+    monkeypatch.setattr(DeepTutor, "backend_up", lambda self: False)
+    monkeypatch.setattr(time, "sleep", sleep)
+
+    result = _invoke(station, "kb", "reindexar", "norm-edificacion-cte")
+
+    assert result.exit_code == 0, result.output
+    assert written[-1] == "completed"  # siguió el run t1 hasta el final
+    assert len(written) >= 3
+    # DeepTutor estaba parado: se arranca para reindexar y se para al terminar.
+    assert reindex_env["lifecycle"] == ["arrancar", "parar"]

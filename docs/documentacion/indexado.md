@@ -40,7 +40,8 @@ nombre como `nombre (2).pdf`. Por eso las fuentes cambiadas o retiradas solo se 
 2. Quita de la KB las versiones anteriores y las fuentes retiradas.
 3. Añade las versiones nuevas.
 4. Rehace fragmentos y vectores con el modelo de embedding activo, reutilizando el lector en
-   caché.
+   caché, y espera a que DeepTutor termine (puede tardar bastante: es trabajo de la GPU).
+5. Si arrancó DeepTutor solo para esto, lo para al terminar.
 
 Si se interrumpe, repetirlo continúa donde se quedó.
 
