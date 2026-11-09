@@ -14,7 +14,7 @@ from atril.checks import Finding, error, info, ok, warning
 from atril.config.station import Station
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError
-from atril.ops import Reporter
+from atril.ops import Reporter, updates
 from atril.patches import PATCHES, PatchState
 from atril.processes import PortOwner
 
@@ -124,7 +124,11 @@ def stop(dt: DeepTutor, reporter: Reporter) -> None:
 
 
 def status(station: Station, reporter: Reporter) -> list[Section]:
-    """Estado de DeepTutor, parches, Ollama, espacio libre y la última copia."""
+    """Estado de DeepTutor, parches, Ollama, espacio libre y la última copia.
+
+    Si ``[atril] buscar_actualizaciones`` lo permite, también si hay una versión
+    nueva de atril.
+    """
     dt = DeepTutor(station)
     with reporter.busy("Consultando DeepTutor y Ollama..."):
         sections: list[Section] = [("DeepTutor", service_findings(dt))]
@@ -132,6 +136,9 @@ def status(station: Station, reporter: Reporter) -> list[Section]:
             sections.append(("Parches", patch_findings(station)))
         sections.append(("Ollama", _ollama_findings(station)))
     sections.append(("Estación y copias", backup.station_findings(station)))
+    if station.atril.check_updates:
+        with reporter.busy("Buscando una versión nueva de atril..."):
+            sections.append(("Atril", updates.update_findings()))
     return sections
 
 

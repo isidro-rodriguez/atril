@@ -7,6 +7,17 @@ import pytest
 from support import EXAMPLES
 
 
+@pytest.fixture(autouse=True)
+def _offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sin red: cada prueba que descarga sustituye ``net.open_url`` por su cuenta."""
+    from atril import net
+
+    def offline(url: str, timeout: float = 300.0) -> None:
+        raise OSError(f"sin red en las pruebas: {url}")
+
+    monkeypatch.setattr(net, "open_url", offline)
+
+
 @pytest.fixture
 def station_dir(tmp_path: Path) -> Path:
     """Estación con los ficheros de ``docs/ejemplos`` (temario ``normativa``).

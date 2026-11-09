@@ -87,6 +87,35 @@ def test_status_stopped(station: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Ollama 0.12.0" in result.output
 
 
+def test_status_reports_new_atril_version(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from atril.ops import updates
+
+    _services(monkeypatch, backend=False, frontend=False)
+    monkeypatch.setattr(
+        updates, "check", lambda current="": updates.Release("9.0.0", "https://x")
+    )
+    monkeypatch.setattr(updates, "installer_folder", lambda prefix=None: None)
+
+    result = _invoke(station, "estado")
+
+    assert result.exit_code == 0, result.output
+    assert "Versión nueva de atril: 9.0.0" in result.output
+    assert "uv tool upgrade atril" in result.output
+
+
+def test_status_without_connection_is_not_an_error(
+    station: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _services(monkeypatch, backend=False, frontend=False)
+
+    result = _invoke(station, "estado")  # net.open_url falla (conftest)
+
+    assert result.exit_code == 0, result.output
+    assert "No se ha podido comprobar si hay una versión nueva" in result.output
+
+
 def test_status_reports_errors(station: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _services(monkeypatch, backend=True, frontend=False)
     monkeypatch.setattr(ollama, "get_status", lambda url: OllamaStatus(running=False))

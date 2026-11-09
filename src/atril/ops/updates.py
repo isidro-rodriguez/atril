@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from atril import __version__, net, processes
+from atril.checks import Finding, info, ok, warning
 from atril.errors import AtrilError, CancelledError
 from atril.ops import Reporter
 
@@ -104,6 +105,22 @@ def check(current: str = __version__) -> Release | None:
     """
     release = latest_release()
     return release if is_newer(release.version, current) else None
+
+
+def update_findings(current: str = __version__) -> list[Finding]:
+    """Si hay una versión nueva de atril, para ``atril estado``.
+
+    Sin conexión no es un error: solo se dice que no se ha podido comprobar.
+    """
+    try:
+        release = check(current)
+    except AtrilError:
+        return [info("No se ha podido comprobar si hay una versión nueva de atril.")]
+    if release is None:
+        return [ok(f"atril {current}: es la última versión.")]
+    return [
+        warning(f"Versión nueva de atril: {release.version} (tienes la {current}).")
+    ]
 
 
 def installer_folder(prefix: Path | None = None) -> Path | None:

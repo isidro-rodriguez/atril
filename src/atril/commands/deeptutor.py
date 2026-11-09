@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from atril.checks import Level
 from atril.commands._common import (
     console,
     fail,
@@ -20,7 +21,7 @@ from atril.commands._common import (
 )
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError
-from atril.ops import installation, service
+from atril.ops import installation, service, updates
 from atril.ops.service import patch_finding as patch_finding
 
 
@@ -72,10 +73,21 @@ def shutdown(dt: DeepTutor) -> None:
 
 
 def status(ctx: typer.Context) -> None:
-    """Muestra DeepTutor, parches, Ollama, espacio libre y la última copia."""
+    """Muestra DeepTutor, parches, Ollama, espacio, última copia y versión nueva."""
     clean = True
+    newer = False
     for title, findings in service.status(get_station(ctx), reporter):
         clean = show(findings, title) and clean
+        newer = newer or (
+            title == "Atril" and any(f.level is Level.WARNING for f in findings)
+        )
+    if newer:
+        console.print(
+            "[yellow]Para actualizar: abre la ventana (atril gui), que lo hace sola, o "
+            "descarga el instalador nuevo.[/]"
+            if updates.installer_folder()
+            else "[yellow]Para actualizar: uv tool upgrade atril[/]"
+        )
     if not clean:
         raise typer.Exit(1)
 

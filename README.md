@@ -43,7 +43,7 @@ todo. Abrir `atril-gui` de nuevo muestra la ventana existente.
 
 Al abrirse, la ventana busca una versión nueva de atril. Si lo instalaste con el instalador, se
 actualiza sola tras confirmarlo. Se desactiva en Ajustes > Atril
-(`[atril] buscar_actualizaciones = false`).
+(`[atril] buscar_actualizaciones = false`), que también decide si `atril estado` lo comprueba.
 
 ### Configuración
 
@@ -58,7 +58,7 @@ atril instalar                   # instala DeepTutor en app\ o completa la insta
 atril actualizar [--commit <sha>]  # última versión de la rama (o vuelta a un commit) y reaplica ajustes
 atril arrancar                   # aplica parches pendientes y arranca DeepTutor (y Ollama si hace falta)
 atril parar                      # detiene DeepTutor y cierra sus procesos huérfanos
-atril estado                     # DeepTutor, parches, Ollama, espacio libre y última copia
+atril estado                     # DeepTutor, parches, Ollama, espacio, última copia y versión nueva
 atril parches [--comprobar]      # aplica los parches de atril.toml sobre app\
 ```
 
