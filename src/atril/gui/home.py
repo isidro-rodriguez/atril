@@ -127,75 +127,106 @@ class HomeView(tk.Frame):
     """Estado general con el botón Arrancar/Parar y las herramientas."""
 
     def __init__(self, parent: tk.Misc, app: "App") -> None:
-        """Construye las dos tarjetas, que ocupan todo el apartado."""
+        """Construye el bloque de estado (principal) y las herramientas (compactas)."""
         super().__init__(parent, background=style.PAGE)
         self.app = app
         self._facts: Facts | None = None
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
-        self._build_status().grid(row=0, column=0, sticky="ew")
-        self._build_tools().grid(row=1, column=0, sticky="nsew", pady=(14, 0))
+        self.rowconfigure(0, weight=1)
+        self._build_status().grid(row=0, column=0, sticky="nsew")
+        self._build_tools().grid(row=1, column=0, sticky="ew", pady=(14, 0))
 
     def _build_status(self) -> ttk.Frame:
-        """Tarjeta de estado: icono, titular, frase, últimas fechas y el botón."""
-        card = style.card(self, "Estado general")
-        card.columnconfigure(1, weight=1)
-        self._icon = tk.Label(card, background=style.CARD)
-        self._icon.grid(row=1, column=0, rowspan=2, sticky="nw", padx=(0, 14))
-        self._headline = style.label(card, "Comprobando…", font=style.TITLE)
-        self._headline.grid(row=1, column=1, sticky="sw")
-        self._sentence = style.label(card, "", color=style.MUTED, wraplength=440)
-        self._sentence.grid(row=2, column=1, sticky="nw")
+        """Estado general: icono y titular grandes, frase, botones y últimas fechas.
 
-        side = tk.Frame(card, background=style.CARD)
-        # Arriba alineado con el titular; los botones no invaden su columna.
-        side.grid(row=1, column=2, rowspan=3, sticky="ne", padx=(24, 0))
-        style.label(side, "Última actividad", font=style.SMALL, color=style.MUTED).grid(
-            row=0, column=0, sticky="w"
+        Es el bloque principal de la ventana (fondo destacado): ocupa el alto que
+        dejan las herramientas.
+        """
+        block = style.hero(self)
+        block.columnconfigure(0, weight=1)
+        block.rowconfigure(0, weight=1)
+        block.rowconfigure(5, weight=1)
+        background = style.HERO
+        style.label(
+            block,
+            "Estado general",
+            background=background,
+            font=style.STRONG,
+            color=style.MUTED,
+        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
+        self._headline = style.label(
+            block, "Comprobando…", background=background, font=style.DISPLAY
         )
-        self._last_activity = style.label(side, "Sin actividad", font=style.STRONG)
-        self._last_activity.grid(row=1, column=0, sticky="w", pady=(0, 8))
-        style.label(side, "Último backup", font=style.SMALL, color=style.MUTED).grid(
-            row=2, column=0, sticky="w"
+        self._headline.configure(compound="left")
+        self._headline.grid(row=2, column=0, sticky="w")
+        self._sentence = style.label(
+            block,
+            "",
+            background=background,
+            font=style.LEAD,
+            color=style.MUTED,
+            wraplength=round(480 * style.scale(self)),
         )
-        self._last_backup = style.label(side, "Comprobando…", font=style.STRONG)
-        self._last_backup.grid(row=3, column=0, sticky="w")
+        self._sentence.grid(row=3, column=0, sticky="w", pady=(8, 0))
 
-        buttons = tk.Frame(card, background=style.CARD)
-        buttons.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(16, 0))
-        buttons.columnconfigure(0, weight=1)
+        buttons = tk.Frame(block, background=background)
+        buttons.grid(row=4, column=0, sticky="w", pady=(22, 0))
         self._toggle = self.app.action(
             ttk.Button(
-                buttons, text="Arrancar", style="Accent.TButton", command=self.toggle
+                buttons,
+                text="Arrancar",
+                style="Accent.TButton",
+                command=self.toggle,
+                width=20,
             )
         )
-        self._toggle.grid(row=0, column=0, sticky="ew", ipady=6)
+        self._toggle.grid(row=0, column=0, sticky="w", ipady=8)
         self._open = ttk.Button(
             buttons, text="Abrir en el navegador", command=self.open_browser
         )
-        self._open.grid(row=0, column=1, sticky="e", padx=(10, 0), ipady=6)
+        self._open.grid(row=0, column=1, sticky="w", padx=(10, 0), ipady=8)
         self._open.grid_remove()
-        return card
+
+        side = tk.Frame(block, background=background)
+        side.grid(row=1, column=1, rowspan=4, sticky="ne", padx=(24, 0))
+        self._last_activity = self._fact(side, 0, "Última actividad", "Sin actividad")
+        self._last_backup = self._fact(side, 1, "Último backup", "Comprobando…")
+        return block
+
+    def _fact(self, parent: tk.Frame, row: int, title: str, value: str) -> tk.Label:
+        """Recuadro blanco con un dato del estado; devuelve la etiqueta del valor."""
+        factor = style.scale(self)
+        box = ttk.Frame(
+            parent,
+            style="HeroTile.Atril.TFrame",
+            padding=(round(14 * factor), round(10 * factor)),
+            width=round(250 * factor),
+        )
+        box.grid(row=row, column=0, sticky="ew", pady=(0 if row == 0 else 10, 0))
+        style.label(box, title, font=style.SMALL, color=style.MUTED).grid(
+            row=0, column=0, sticky="w"
+        )
+        value_label = style.label(box, value, font=style.STRONG)
+        value_label.grid(row=1, column=0, sticky="w")
+        return value_label
 
     def _build_tools(self) -> ttk.Frame:
-        """Tarjeta de herramientas: dos por fila, todas del mismo tamaño."""
+        """Herramientas en baldosas de una fila: dos por fila, todas iguales."""
         card = style.card(self, "Herramientas")
         card.columnconfigure(0, weight=1)
-        card.rowconfigure(1, weight=1)
         grid = tk.Frame(card, background=style.CARD)
-        grid.grid(row=1, column=0, sticky="nsew")
+        grid.grid(row=1, column=0, sticky="ew")
         self._tiles: list[ToolTile] = []
         for index in range(len(ORDER)):
             row, column = divmod(index, 2)
             grid.columnconfigure(column, weight=1, uniform="tools")
-            grid.rowconfigure(row, weight=1, uniform="tools")
             tile = ToolTile(grid, self.act, self.open_website)
             tile.grid(
                 row=row,
                 column=column,
-                sticky="nsew",
+                sticky="ew",
                 padx=(0 if column == 0 else 10, 0),
-                pady=(0 if row == 0 else 10, 0),
+                pady=(0 if row == 0 else 8, 0),
             )
             self.app.action(tile.button)
             self._tiles.append(tile)
@@ -232,8 +263,9 @@ class HomeView(tk.Frame):
         self._last_backup.configure(text=data.last_backup or "Ninguno")
         self.app.set_facts(facts)
         level, headline, sentence = overall(facts)
-        self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 36))
-        self._headline.configure(text=headline)
+        self._headline.configure(
+            text=f"  {headline}", image=style.icon(self, style.LEVEL_ICONS[level], 44)
+        )
         self._sentence.configure(text=sentence)
         running = facts.backend_up or facts.frontend_up
         text = "Parar" if running else "Arrancar"
@@ -243,6 +275,8 @@ class HomeView(tk.Frame):
             text=text, style="TButton" if running else "Accent.TButton"
         )
         if facts.deeptutor_running:
+            # En marcha, lo principal es abrirlo: el botón destacado es ese.
+            self._open.configure(style="Accent.TButton")
             self._open.grid()
         else:
             self._open.grid_remove()

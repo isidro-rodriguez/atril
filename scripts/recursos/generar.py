@@ -28,7 +28,7 @@ SCALES = (1.0, 1.5, 2.0)
 """Escalas de los PNG: 100 %, 150 % y 200 % de pantalla."""
 
 NAV, SELECTED = "#3d4f6e", "#0f5ec9"
-BRAND = 48
+BRAND = 28
 """Lado de los logotipos de las herramientas a 100 %."""
 ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     # nombre Lucide: (tamaño base, ((variante, color), ...))
@@ -48,6 +48,16 @@ ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     "loader-circle": (18, (("info", "#0f5ec9"),)),
 }
 
+HERO_ICONS: dict[str, tuple[str, str]] = {
+    # Iconos de nivel grandes para el «Estado general» de Inicio (base 44).
+    "circle-check": ("ok", "#1a8f3c"),
+    "info": ("info", "#0f5ec9"),
+    "triangle-alert": ("aviso", "#d97706"),
+    "circle-x": ("error", "#c42b1c"),
+}
+HERO_ICON = 44
+"""Lado de los iconos de :data:`HERO_ICONS` a 100 %."""
+
 FONTS = {
     "400": "Inter-Regular.ttf",
     "600": "Inter-SemiBold.ttf",
@@ -56,6 +66,12 @@ FONTS = {
 
 CARD_RADIUS = 10
 """Radio de las esquinas de las tarjetas (px a 100 %)."""
+HERO = (244, 248, 254, 255)
+"""Fondo del bloque destacado de Inicio (``#f4f8fe``)."""
+HERO_LINE = (200, 218, 244, 255)
+"""Borde del bloque destacado (``#c8daf4``)."""
+LINE = (223, 229, 238, 255)
+"""Borde de las tarjetas (``#dfe5ee``)."""
 FIELD = (250, 250, 250, 255)
 """Fondo de las tablas de sv-ttk (``#fafafa``), para los recuadros de texto."""
 CARD_SIZE = 640
@@ -106,6 +122,13 @@ def icons(lucide: Path) -> None:
                     size = round(base * scale)
                     target = OUT / "iconos" / f"{name}-{variant}-{size}.png"
                     render(svg, size, target)
+        for name, (variant, color) in HERO_ICONS.items():
+            source = (lucide / f"{name}.svg").read_text(encoding="utf-8")
+            svg = Path(folder) / f"{name}-{variant}-grande.svg"
+            svg.write_text(source.replace("currentColor", color), encoding="utf-8")
+            for scale in SCALES:
+                size = round(HERO_ICON * scale)
+                render(svg, size, OUT / "iconos" / f"{name}-{variant}-{size}.png")
 
 
 def brands() -> None:
@@ -154,14 +177,21 @@ def fonts(fontsource: Path) -> None:
 def card() -> None:
     """Imágenes 9-slice con borde fino y esquinas redondeadas.
 
-    ``tarjeta`` es blanca (tarjetas y baldosas) y ``campo`` tiene el fondo de
-    las tablas (textos largos dentro de una tarjeta).
+    ``tarjeta`` es blanca (tarjetas y baldosas), ``campo`` tiene el fondo de
+    las tablas (textos largos dentro de una tarjeta) y ``destacado``, el azul
+    muy claro del «Estado general» de Inicio.
     """
-    for name, fill in (("tarjeta", (255, 255, 255, 255)), ("campo", FIELD)):
-        _card(name, fill)
+    for name, fill, line in (
+        ("tarjeta", (255, 255, 255, 255), LINE),
+        ("campo", FIELD, LINE),
+        ("destacado", HERO, HERO_LINE),
+    ):
+        _card(name, fill, line)
 
 
-def _card(name: str, fill: tuple[int, int, int, int]) -> None:
+def _card(
+    name: str, fill: tuple[int, int, int, int], line: tuple[int, int, int, int]
+) -> None:
     """Imagen 9-slice ``name`` a 1x y 2x con relleno ``fill``."""
     for scale, suffix in ((1, ""), (2, "@2x")):
         radius = CARD_RADIUS * scale
@@ -172,7 +202,7 @@ def _card(name: str, fill: tuple[int, int, int, int]) -> None:
             (0, 0, size * 4 - 1, size * 4 - 1),
             radius=radius * 4,
             fill=fill,
-            outline=(223, 229, 238, 255),
+            outline=line,
             width=4 * scale,
         )
         small = image.resize((size, size), Image.Resampling.LANCZOS)

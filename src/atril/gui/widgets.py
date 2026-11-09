@@ -111,13 +111,14 @@ class Footer(tk.Frame):
 
 
 class ToolTile(ttk.Frame):
-    """Tarjeta de una herramienta: logotipo, nombre, estado y una acción.
+    """Baldosa compacta de una herramienta: logotipo, nombre, estado y una acción.
 
-    Todo va centrado en vertical. Pulsar el logotipo abre la web de la
+    Todo en una fila para que las herramientas ocupen poco y el «Estado general»
+    sea el bloque principal de Inicio. Pulsar el logotipo abre la web de la
     herramienta (si la tiene).
     """
 
-    LOGO = 48
+    LOGO = 28
     """Lado del logotipo a 100 %."""
 
     def __init__(
@@ -126,27 +127,27 @@ class ToolTile(ttk.Frame):
         on_action: Callable[[ToolCard], None],
         on_logo: Callable[[ToolCard], None],
     ) -> None:
-        """Construye la tarjeta vacía, que se rellena con :meth:`show`."""
+        """Construye la baldosa vacía, que se rellena con :meth:`show`."""
         factor = style.scale(parent)
         super().__init__(
             parent,
             style="Tile.Atril.TFrame",
-            padding=(round(16 * factor), round(12 * factor)),
+            padding=(round(12 * factor), round(7 * factor)),
         )
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(0, weight=1)
-        self.rowconfigure(3, weight=1)
+        self.columnconfigure(2, weight=1)
         self._on_action = on_action
         self._card: ToolCard | None = None
         self._logo = tk.Label(self, background=style.CARD)
-        self._logo.grid(row=0, column=0, rowspan=4, padx=(0, 16))
+        self._logo.grid(row=0, column=0, padx=(0, 10))
         self._logo.bind("<Button-1>", lambda _: self._card and on_logo(self._card))
-        self._title = style.label(self, "", font=style.SUBTITLE)
-        self._title.grid(row=1, column=1, sticky="w")
-        self._state = style.label(self, "", color=style.MUTED)
-        self._state.grid(row=2, column=1, sticky="w")
+        self._title = style.label(self, "", font=style.STRONG)
+        self._title.grid(row=0, column=1, sticky="w", padx=(0, 8))
+        self._state = style.label(self, "", font=style.SMALL, color=style.MUTED)
+        self._state.grid(row=0, column=2, sticky="w")
         self._done = tk.Label(self, background=style.CARD)
         self._button = ttk.Button(self, command=self._act, width=10)
+        # Alto fijo: con botón o sin él, todas las baldosas miden lo mismo.
+        self.rowconfigure(0, minsize=round(34 * factor))
 
     def show(self, card: ToolCard, website: bool) -> None:
         """Pinta la herramienta y su única acción (o la marca de instalada)."""
@@ -168,11 +169,11 @@ class ToolTile(ttk.Frame):
         self._button.grid_remove()
         if card.action is Action.NONE:
             if card.level is Level.OK:
-                self._done.configure(image=style.icon(self, "circle-check-ok", 22))
-                self._done.grid(row=0, column=2, rowspan=4)
+                self._done.configure(image=style.icon(self, "circle-check-ok", 18))
+                self._done.grid(row=0, column=3)
             return
         self._button.configure(text=card.action.value)
-        self._button.grid(row=0, column=2, rowspan=4)
+        self._button.grid(row=0, column=3)
 
     def _act(self) -> None:
         """Lanza la acción de la herramienta."""
