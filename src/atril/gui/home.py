@@ -21,7 +21,7 @@ from atril.config.station import Station
 from atril.deeptutor import Assistant, DeepTutor, active_assistant
 from atril.errors import AtrilError
 from atril.gui import style
-from atril.gui.dialogs import ask_yes_no
+from atril.gui.dialogs import ask_yes_no, show_message
 from atril.gui.model import (
     ORDER,
     WEBSITES,
@@ -37,6 +37,7 @@ from atril.gui.model import (
     sources_stat,
     syllabi_stat,
     tool_cards,
+    tools_missing,
 )
 from atril.gui.settings import SettingsView
 from atril.gui.widgets import ToolTile
@@ -322,8 +323,12 @@ class HomeView(tk.Frame):
         if kind == "Accent.TButton" and facts.deeptutor_running:
             kind = "TButton"  # en marcha, el destacado es «Abrir en el navegador»
         variant = "boton-acento" if kind == "Accent.TButton" else "boton"
-        self._toggle.configure(
-            text=text, image=style.icon(self, f"{symbol}-{variant}", 18), style=kind
+        image = style.icon(self, f"{symbol}-{variant}", 18)
+        # La misma imagen desactivado: si no, Tk la tapa con una trama.
+        self._toggle.configure(text=text, image=f"{image} disabled {image}", style=kind)
+        # Sin todas las herramientas no se arranca (ni se podría actualizar).
+        self.app.block(
+            self._toggle, self._primary is Primary.START and tools_missing(facts)
         )
         if facts.deeptutor_running:
             # En marcha, lo principal es abrirlo: el botón destacado es ese.
@@ -380,6 +385,17 @@ class HomeView(tk.Frame):
 
     def start(self) -> None:
         """Abre Ollama si hace falta, arranca DeepTutor y lo abre en el navegador."""
+        if self._facts is not None and tools_missing(self._facts):
+            # También desde el área de notificación, donde no hay botón desactivado.
+            self.app.show_window()
+            self.app.show_view("Inicio")
+            show_message(
+                self,
+                "No se puede arrancar",
+                "Falta herramienta por instalar. Instálala en Inicio, en Herramientas.",
+                Level.WARNING,
+            )
+            return
         station = self.app.station
 
         def run(reporter: Reporter) -> str:

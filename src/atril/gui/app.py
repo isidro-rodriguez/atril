@@ -89,6 +89,7 @@ class App(tk.Tk):
         self._event: Event | None = None
         self._quiet = False
         self._actions: list[ttk.Button] = []
+        self._blocked: set[str] = set()
         self._cancels: list[ttk.Button] = []
         self._idle = True
         self._closing = False
@@ -187,6 +188,14 @@ class App(tk.Tk):
         """Registra un botón que se desactiva mientras hay una operación."""
         self._actions.append(button)
         return button
+
+    def block(self, button: ttk.Button, blocked: bool) -> None:
+        """Desactiva un botón de acción aunque no haya operación (o lo libera)."""
+        if blocked:
+            self._blocked.add(str(button))
+        else:
+            self._blocked.discard(str(button))
+        button.state(["disabled"] if blocked or not self._idle else ["!disabled"])
 
     def cancel_button(self, button: ttk.Button) -> ttk.Button:
         """Registra un botón que solo se activa mientras hay una operación."""
@@ -620,7 +629,8 @@ class App(tk.Tk):
         """Activa los botones de acción o los de cancelar según haya operación."""
         self._idle = idle
         for button in self._actions:
-            button.state(["!disabled"] if idle else ["disabled"])
+            free = idle and str(button) not in self._blocked
+            button.state(["!disabled"] if free else ["disabled"])
         for button in self._cancels:
             button.state(["disabled"] if idle else ["!disabled"])
 

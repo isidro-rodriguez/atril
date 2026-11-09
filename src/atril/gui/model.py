@@ -253,7 +253,7 @@ def overall(facts: Facts) -> tuple[Level, str, str]:
     """
     if not facts.deeptutor_installed:
         return Level.ERROR, "Atención", "Instala DeepTutor para empezar."
-    if any(not facts.tools.get(key) for key in TOOLS):
+    if tools_missing(facts):
         # Las herramientas que faltan ya se ven abajo, en sus baldosas.
         return Level.ERROR, "Atención", "Falta herramienta por instalar."
     if _patch_level(facts) is Level.ERROR:
@@ -262,6 +262,11 @@ def overall(facts: Facts) -> tuple[Level, str, str]:
         return Level.WARNING, "Con avisos", "Parche pendiente."
     level = Level.OK if facts.deeptutor_running else Level.INFO
     return level, *OVERALL[level]
+
+
+def tools_missing(facts: Facts) -> bool:
+    """Falta alguna herramienta de instalación (también hacen falta al actualizar)."""
+    return any(not facts.tools.get(key) for key in TOOLS)
 
 
 def primary(facts: Facts) -> Primary:
