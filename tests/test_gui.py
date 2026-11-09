@@ -311,3 +311,20 @@ def test_activity_with_corrupt_bytes_keeps_readable_events(tmp_path) -> None:
 
     history = ActivityLog(path)  # no lanza: la ventana puede abrir
     assert [event.title for event in history.events] == ["Hacer backup", "Arrancar"]
+
+
+def test_report_text_lists_what_needs_attention() -> None:
+    from atril.checks import Finding
+    from atril.gui.activity import REPORT_LINES, Event, report_text
+
+    event = Event("Instalar DeepTutor")
+    event.add([Finding(Level.OK, "git: ok")])
+    event.add([Finding(Level.WARNING, f"aviso {n}") for n in range(REPORT_LINES + 2)])
+    event.add([Finding(Level.ERROR, "arranque-sin-ventana: revisa el parche.")])
+    event.finish()
+
+    lines = report_text(event).splitlines()
+    assert lines[0] == "arranque-sin-ventana: revisa el parche."  # el resumen, primero
+    assert lines[1:-2] == [f"· aviso {n}" for n in range(REPORT_LINES)]
+    assert lines[-2:] == ["Y 2 más.", "El detalle está en Actividad."]
+    assert event.level is Level.ERROR

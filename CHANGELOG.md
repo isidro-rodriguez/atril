@@ -5,6 +5,20 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.39.0] - 2026-11-09
+
+### Added
+
+- Ajustes > Herramientas: Instalar o reparar, Actualizar DeepTutor (y Volver), Aplicar
+  ajustes, Diagnóstico y Validar configuración avisan al terminar con un mensaje del
+  resultado y los avisos o errores que haya que revisar. Antes solo quedaba en Actividad, que
+  ya no está a la vista como cuando era un panel lateral.
+
+### Removed
+
+- Los botones «Abrir registros» y «Abrir atril.toml» de Herramientas: los registros y la
+  configuración se consultan en Actividad y en las pestañas de Ajustes.
+
 ## [0.38.3] - 2026-11-09
 
 ### Fixed

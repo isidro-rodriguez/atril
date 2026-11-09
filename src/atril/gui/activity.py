@@ -160,6 +160,34 @@ class ActivityLog:
                 out.write(f"{stamp} {self.path}: {exc}\n")
 
 
+REPORT_LINES = 5
+"""Avisos y errores que se citan, como mucho, en el aviso de fin de operación."""
+
+
+def report_text(event: Event) -> str:
+    """Texto del aviso al terminar una operación: su resultado y lo que hay que mirar.
+
+    Examples:
+        >>> event = Event("Diagnóstico")
+        >>> event.add([Finding(Level.OK, "LLM listo."), Finding(Level.OK, "RAG.")])
+        >>> event.finish()
+        >>> print(report_text(event))
+        RAG.
+        El detalle está en Actividad.
+    """
+    issues = [
+        message
+        for value, message in event.detail
+        if Level(value) in {Level.WARNING, Level.ERROR} and message != event.summary
+    ]
+    lines = [event.summary, *(f"· {m}" for m in issues[:REPORT_LINES])]
+    if len(issues) > REPORT_LINES:
+        lines.append(f"Y {len(issues) - REPORT_LINES} más.")
+    if len(event.detail) > 1:
+        lines.append("El detalle está en Actividad.")
+    return "\n".join(lines)
+
+
 def _load(path: Path) -> list[Event]:
     """Eventos del fichero; las líneas que no se entienden se ignoran.
 

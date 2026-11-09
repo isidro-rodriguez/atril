@@ -19,7 +19,6 @@ from atril.checks import Level, error, ok
 from atril.config.station import ARCHIVE_FORMATS, PARSERS, Station
 from atril.errors import AtrilError
 from atril.gui import style
-from atril.gui.desktop import open_path
 from atril.gui.dialogs import ask_yes_no, show_message
 from atril.gui.widgets import TabBar
 from atril.install import FULL_SHA
@@ -669,14 +668,6 @@ class SettingsView(tk.Frame):
         self.app.action(ttk.Button(commit, text="Volver", command=self.rollback)).grid(
             row=0, column=2
         )
-        files = tk.Frame(tab, background=style.CARD)
-        files.grid(row=start + 2, column=0, columnspan=2, sticky="w", pady=(14, 0))
-        ttk.Button(files, text="Abrir registros", command=self.open_logs).grid(
-            row=0, column=0, padx=(0, 8)
-        )
-        ttk.Button(files, text="Abrir atril.toml", command=self.open_config).grid(
-            row=0, column=1
-        )
 
     # --- valores ------------------------------------------------------------------
 
@@ -828,7 +819,11 @@ class SettingsView(tk.Frame):
             reporter.show([ok("DeepTutor instalado.")])
 
         self.app.run(
-            "Instalando DeepTutor...", run, _nothing, title="Instalar DeepTutor"
+            "Instalando DeepTutor...",
+            run,
+            _nothing,
+            title="Instalar DeepTutor",
+            report=True,
         )
 
     def update_deeptutor(self, commit: str | None = None) -> None:
@@ -857,7 +852,11 @@ class SettingsView(tk.Frame):
                 self._commit.set(previous)
 
         self.app.run(
-            "Actualizando DeepTutor...", run, done, title="Actualizar DeepTutor"
+            "Actualizando DeepTutor...",
+            run,
+            done,
+            title="Actualizar DeepTutor",
+            report=True,
         )
 
     def rollback(self) -> None:
@@ -888,7 +887,9 @@ class SettingsView(tk.Frame):
             installation_ops.apply_settings(station, reporter)
             reporter.show([ok("Ajustes aplicados a DeepTutor.")])
 
-        self.app.run("Aplicando ajustes...", run, _nothing, title="Aplicar ajustes")
+        self.app.run(
+            "Aplicando ajustes...", run, _nothing, title="Aplicar ajustes", report=True
+        )
 
     def doctor(self) -> None:
         """Pasa el diagnóstico de DeepTutor."""
@@ -898,6 +899,7 @@ class SettingsView(tk.Frame):
             lambda reporter: reporter.show(installation_ops.doctor(station, reporter)),
             _nothing,
             title="Diagnóstico de DeepTutor",
+            report=True,
         )
 
     def validate(self) -> None:
@@ -914,7 +916,9 @@ class SettingsView(tk.Frame):
                 ]
             )
 
-        self.app.run("Validando...", run, _nothing, title="Validar configuración")
+        self.app.run(
+            "Validando...", run, _nothing, title="Validar configuración", report=True
+        )
 
     def copy_report(self) -> None:
         """Copia al portapapeles un informe técnico (rutas, versiones, estado)."""
@@ -938,15 +942,6 @@ class SettingsView(tk.Frame):
             show_message(self, "Copiar informe", "Informe copiado al portapapeles.")
 
         self.app.run("Preparando el informe...", run, copied, quiet=True)
-
-    def open_logs(self) -> None:
-        """Abre la carpeta de registros de atril."""
-        logs = self.app.station.logs_dir
-        open_path(logs if logs.is_dir() else self.app.station.data_dir)
-
-    def open_config(self) -> None:
-        """Abre ``atril.toml`` con el editor del sistema."""
-        open_path(self.app.station.config_file)
 
 
 def _set_enabled(widget: tk.Misc, enabled: bool) -> None:

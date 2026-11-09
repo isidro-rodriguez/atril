@@ -24,7 +24,7 @@ from atril.config.station import STATION_FILE, Station, init_station
 from atril.deeptutor import DeepTutor
 from atril.errors import AtrilError, CancelledError
 from atril.gui import style, tray
-from atril.gui.activity import ActivityLog, Event
+from atril.gui.activity import ActivityLog, Event, report_text
 from atril.gui.backups import BackupsView
 from atril.gui.dialogs import ask_three, ask_yes_no, show_message
 from atril.gui.history import HistoryView
@@ -131,13 +131,16 @@ class App(tk.Tk):
         quiet: bool = False,
         title: str | None = None,
         on_error: Callable[[Exception], object] | None = None,
+        report: bool = False,
     ) -> bool:
         """Lanza ``task`` en segundo plano si no hay otra operación en marcha.
 
         Cada operación es un evento de actividad (``title`` o ``text``). Las
         lecturas ``quiet`` (al mostrar un apartado) no dejan rastro ni bloquean
         botones; si fallan, se llama a ``on_error`` (o no se hace nada). Una
-        operación pedida mientras corre una lectura espera a que acabe.
+        operación pedida mientras corre una lectura espera a que acabe. Con
+        ``report``, al terminar bien se avisa de su resultado en un mensaje (los
+        fallos siempre se avisan), para operaciones cuyo efecto no se ve en pantalla.
         """
         if self._closing:
             return False
@@ -146,7 +149,12 @@ class App(tk.Tk):
                 self.after(
                     POLL_MS,
                     lambda: self.run(
-                        text, task, on_done, title=title, on_error=on_error
+                        text,
+                        task,
+                        on_done,
+                        title=title,
+                        on_error=on_error,
+                        report=report,
                     ),
                 )
                 return True
@@ -163,6 +171,8 @@ class App(tk.Tk):
         def done(result: T) -> None:
             self._finish(event)
             on_done(result)
+            if report and event is not None and not (self._closing or self.hidden):
+                show_message(self, event.title, report_text(event), event.level)
 
         def failed(exc: Exception) -> None:
             if quiet:

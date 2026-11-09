@@ -138,6 +138,8 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`;
   a failed save warns once in the footer and goes to `atril-diagnostico.log` (temp folder).
   Backup checks persist in `data/atril/verificaciones.json`, valid while size and mtime match.
+  Operations whose effect is not visible (Ajustes > Herramientas) pass `report=True` to
+  `App.run`: a `Modal` with `activity.report_text` on success (failures always get one).
   Inicio's main button resolves the shown state (`model.primary`); `App.block` keeps an action
   button disabled across operations (start while a tool is missing). `style.WARNING_BUTTON` is
   the logo's orange with navy text, for warnings only.

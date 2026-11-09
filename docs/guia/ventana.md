@@ -100,6 +100,9 @@ Todo lo que se puede configurar, en pestañas:
 Al guardar, atril comprueba el fichero entero y te dice qué hace falta para que el cambio
 surta efecto (aplicarlo, reinstalar o reindexar).
 
+Al terminar una herramienta, un mensaje dice cómo ha ido y lo que haya que revisar. El
+detalle completo queda en Actividad.
+
 ## Área de notificación
 
 Si cierras la ventana con DeepTutor en marcha, atril se queda junto al reloj de Windows. Con
