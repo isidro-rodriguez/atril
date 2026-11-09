@@ -143,7 +143,15 @@ def apply(root: tk.Tk) -> None:
     # Recuadro con el fondo de las tablas para textos largos (detalle de Actividad).
     style.layout("Field.Atril.TFrame", [("Atril.Field.bg", {"sticky": "nsew"})])
     style.configure("Field.Atril.TFrame", background=CARD)
-    for widget in ("TButton", "Accent.TButton", "TCheckbutton", "TEntry", "TCombobox"):
+    _warning_button(root, style)
+    for widget in (
+        "TButton",
+        "Accent.TButton",
+        WARNING_BUTTON,
+        "TCheckbutton",
+        "TEntry",
+        "TCombobox",
+    ):
         style.configure(widget, font=BODY)
     style.configure("Treeview", font=BODY, rowheight=round(28 * scale(root)))
     em = round(13 * scale(root))  # 1 em de BODY (10 pt) en píxeles
@@ -152,6 +160,37 @@ def apply(root: tk.Tk) -> None:
     # aplicar su paleta: se procesa ya, antes de que existan los widgets.
     root.update()
     root.configure(background=PAGE)
+
+
+WARNING_BUTTON = "Warning.Atril.TButton"
+"""Botón naranja (el del logotipo) para resolver un aviso, con texto marino."""
+
+
+def _warning_button(root: tk.Tk, style: ttk.Style) -> None:
+    """Crea :data:`WARNING_BUTTON` como el destacado de sv-ttk, en naranja."""
+    images = {}
+    for state in ("", "-hover", "-pulsado", "-desactivado"):
+        image = tk.PhotoImage(master=root, data=_resource(f"boton-aviso{state}.png"))
+        _images[(f"boton-aviso{state}", 0)] = image  # que no se libere
+        images[state] = image
+    style.element_create(
+        "Atril.Warning.button",
+        "image",
+        images[""],
+        ("disabled", images["-desactivado"]),
+        ("pressed", images["-pulsado"]),
+        ("active", images["-hover"]),
+        border=5,
+        sticky="nsew",
+    )
+    root.tk.eval(  # la misma estructura que Accent.TButton de sv-ttk
+        f"ttk::style layout {WARNING_BUTTON} {{Atril.Warning.button -children "
+        "{Button.padding -children {Button.label -side left -expand 1}}}"
+    )
+    style.configure(
+        WARNING_BUTTON, padding=(8, 2, 8, 3), anchor="center", foreground=NAVY
+    )
+    style.map(WARNING_BUTTON, foreground=[("disabled", MUTED)])
 
 
 _named_fonts: list[tkfont.Font] = []

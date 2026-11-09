@@ -28,14 +28,17 @@ from atril.gui.model import (
     Action,
     Facts,
     HomeStat,
+    Primary,
     ToolCard,
     backup_stat,
     load_all,
     overall,
+    primary,
     sources_stat,
     syllabi_stat,
     tool_cards,
 )
+from atril.gui.settings import SettingsView
 from atril.gui.widgets import ToolTile
 from atril.install import run_command, tool
 from atril.ops import Reporter, service
@@ -48,6 +51,15 @@ if TYPE_CHECKING:
 
 SENTENCE_WIDTH = 410
 """Ancho máximo (a 100 %) de la frase del estado general: una sola línea."""
+
+PRIMARY_BUTTONS = {
+    Primary.INSTALL: ("Instalar DeepTutor", "download", "Accent.TButton"),
+    Primary.REVIEW: ("Revisar en Ajustes", "sliders-horizontal", style.WARNING_BUTTON),
+    Primary.PATCH: ("Aplicar parche", "wrench", "Accent.TButton"),
+    Primary.START: ("Arrancar DeepTutor", "play", "Accent.TButton"),
+    Primary.STOP: ("Parar DeepTutor", "square", "TButton"),
+}
+"""Texto, icono y estilo del botón principal del estado general."""
 
 STAT_WIDTH = 190
 """Ancho máximo (a 100 %) del texto de cada dato del estado general."""
@@ -159,6 +171,7 @@ class HomeView(tk.Frame):
         self.app = app
         self._facts: Facts | None = None
         self._shown_stats: tuple[HomeStat, ...] = ()
+        self._primary = Primary.START
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self._build_status().grid(row=0, column=0, sticky="nsew")
@@ -304,17 +317,13 @@ class HomeView(tk.Frame):
         self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 104))
         self._headline.configure(text=headline)
         self._sentence.configure(text=_one_line(self._sentence, sentence))
-        running = facts.backend_up or facts.frontend_up
-        text, symbol = (
-            ("Parar DeepTutor", "square") if running else ("Arrancar DeepTutor", "play")
-        )
-        if not facts.deeptutor_installed:
-            text, symbol = "Instalar DeepTutor", "download"
-        variant = "boton" if running else "boton-acento"
+        self._primary = primary(facts)
+        text, symbol, kind = PRIMARY_BUTTONS[self._primary]
+        if kind == "Accent.TButton" and facts.deeptutor_running:
+            kind = "TButton"  # en marcha, el destacado es «Abrir en el navegador»
+        variant = "boton-acento" if kind == "Accent.TButton" else "boton"
         self._toggle.configure(
-            text=text,
-            image=style.icon(self, f"{symbol}-{variant}", 18),
-            style="TButton" if running else "Accent.TButton",
+            text=text, image=style.icon(self, f"{symbol}-{variant}", 18), style=kind
         )
         if facts.deeptutor_running:
             # En marcha, lo principal es abrirlo: el botón destacado es ese.
@@ -336,14 +345,38 @@ class HomeView(tk.Frame):
     # --- acciones ---------------------------------------------------------------
 
     def toggle(self) -> None:
-        """Arranca (y abre) o para atril según su estado."""
-        facts = self._facts
-        if facts is not None and not facts.deeptutor_installed:
-            self.install_deeptutor()
-        elif facts is not None and (facts.backend_up or facts.frontend_up):
-            self.stop_deeptutor()
-        else:
-            self.start()
+        """Hace lo que resuelve el estado general (ver :func:`model.primary`)."""
+        match self._primary:
+            case Primary.INSTALL:
+                self.install_deeptutor()
+            case Primary.REVIEW:
+                self.app.show_view("Ajustes")
+                settings = self.app.views["Ajustes"]
+                if isinstance(settings, SettingsView):
+                    settings.show_tab("Avanzado")  # donde se eligen los parches
+            case Primary.PATCH:
+                self.apply_patches()
+            case Primary.STOP:
+                self.stop_deeptutor()
+            case Primary.START:
+                self.start()
+
+    def apply_patches(self) -> None:
+        """Aplica los parches pendientes sin arrancar DeepTutor."""
+        station = self.app.station
+
+        def run(reporter: Reporter) -> None:
+            findings = service.apply_pending_patches(station)
+            reporter.show(findings)
+            if any(f.level is Level.ERROR for f in findings):
+                raise AtrilError("algún parche no encaja: revísalo en Ajustes.")
+
+        self.app.run(
+            "Aplicando parches...",
+            run,
+            lambda _: self.refresh(),
+            title="Aplicar parche",
+        )
 
     def start(self) -> None:
         """Abre Ollama si hace falta, arranca DeepTutor y lo abre en el navegador."""

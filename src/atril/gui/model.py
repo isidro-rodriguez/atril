@@ -228,15 +228,23 @@ def _same_model(wanted: str, installed: str) -> bool:
 
 OVERALL = {
     Level.OK: ("En marcha", "DeepTutor está listo para estudiar."),
-    Level.INFO: ("Parado", "Arranca atril para estudiar con DeepTutor."),
-    Level.WARNING: ("Con avisos", "Funciona, con avisos que conviene revisar."),
-    Level.ERROR: ("Atención", "Falta algo para poder usar DeepTutor."),
+    Level.INFO: ("Parado", "Inicia DeepTutor para estudiar."),
 }
-"""Por nivel: titular y frase del estado general."""
+"""Titular y frase del estado general sin avisos: en marcha o parado."""
+
+
+class Primary(StrEnum):
+    """Botón principal del estado general de Inicio."""
+
+    INSTALL = "instalar"
+    REVIEW = "revisar"
+    PATCH = "parchear"
+    START = "arrancar"
+    STOP = "parar"
 
 
 def overall(facts: Facts) -> tuple[Level, str, str]:
-    """Estado general: nivel, titular y frase (la del aviso, si lo hay).
+    """Estado general: nivel, titular y frase (corta: cabe en una línea).
 
     Examples:
         >>> facts = Facts(False, False, False, True, True, True, (), {}, None, True)
@@ -244,33 +252,45 @@ def overall(facts: Facts) -> tuple[Level, str, str]:
         ('Atención', 'Instala DeepTutor para empezar.')
     """
     if not facts.deeptutor_installed:
-        return (
-            Level.ERROR,
-            OVERALL[Level.ERROR][0],
-            "Instala DeepTutor para empezar.",
-        )
-    missing = [name for key, (name, _) in TOOLS.items() if not facts.tools.get(key)]
-    if missing:
-        return (
-            Level.ERROR,
-            OVERALL[Level.ERROR][0],
-            f"Falta {', '.join(missing)}: instálalo abajo.",
-        )
-    # ``pending`` son los parches: frase corta (cabe en una línea en Inicio).
-    if any(f.level is Level.ERROR for f in facts.pending):
-        return (
-            Level.WARNING,
-            OVERALL[Level.WARNING][0],
-            "Un parche ya no encaja con DeepTutor: revísalo en Ajustes.",
-        )
-    if any(f.level is Level.WARNING for f in facts.pending):
-        return (
-            Level.WARNING,
-            OVERALL[Level.WARNING][0],
-            "Hay parches pendientes: se aplican al arrancar.",
-        )
+        return Level.ERROR, "Atención", "Instala DeepTutor para empezar."
+    if any(not facts.tools.get(key) for key in TOOLS):
+        # Las herramientas que faltan ya se ven abajo, en sus baldosas.
+        return Level.ERROR, "Atención", "Falta herramienta por instalar."
+    if _patch_level(facts) is Level.ERROR:
+        return Level.WARNING, "Con avisos", "Parche no encaja con DeepTutor."
+    if _patch_level(facts) is Level.WARNING:
+        return Level.WARNING, "Con avisos", "Parche pendiente."
     level = Level.OK if facts.deeptutor_running else Level.INFO
     return level, *OVERALL[level]
+
+
+def primary(facts: Facts) -> Primary:
+    """Qué hace el botón principal: lo que resuelve el estado general.
+
+    Un parche que no encaja lleva a Ajustes y uno pendiente se aplica (sin
+    arrancar). Si no, instala, arranca o para DeepTutor.
+
+    Examples:
+        >>> facts = Facts(True, False, False, True, True, True, (), {}, None, True)
+        >>> primary(facts)
+        <Primary.START: 'arrancar'>
+    """
+    if not facts.deeptutor_installed:
+        return Primary.INSTALL
+    if _patch_level(facts) is Level.ERROR:
+        return Primary.REVIEW
+    if _patch_level(facts) is Level.WARNING:
+        return Primary.PATCH
+    return Primary.STOP if facts.backend_up or facts.frontend_up else Primary.START
+
+
+def _patch_level(facts: Facts) -> Level | None:
+    """Peor nivel de los parches (error si alguno no encaja), o ``None``."""
+    levels = {finding.level for finding in facts.pending}
+    for level in (Level.ERROR, Level.WARNING):
+        if level in levels:
+            return level
+    return None
 
 
 def service_states(facts: Facts) -> dict[str, tuple[Level, str]]:

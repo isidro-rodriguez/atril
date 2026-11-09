@@ -52,6 +52,8 @@ ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     "play": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
     "square": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
     "download": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "wrench": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "sliders-horizontal": (18, (("boton", NAV),)),
     "book-copy": (40, (("dato", NAV),)),
     "file-stack": (40, (("dato", NAV),)),
     "archive": (40, (("dato", NAV),)),
@@ -96,6 +98,7 @@ def main(lucide: Path, fontsource: Path) -> None:
     brands()
     fonts(fontsource)
     card()
+    buttons()
     shutil.copy(lucide.parent / "LICENSE", OUT / "iconos" / "LICENSE-lucide.txt")
     print(f"Recursos generados en {OUT}")
 
@@ -189,6 +192,32 @@ def fonts(fontsource: Path) -> None:
         font.flavor = None
         font.save(OUT / "fuentes" / filename)
     shutil.copy(fontsource.parent / "LICENSE", OUT / "fuentes" / "OFL.txt")
+
+
+WARNING_BUTTON = {
+    # Botón naranja del logotipo (``#f5a623``) para los avisos de Inicio.
+    "boton-aviso": ((245, 166, 35, 255), (224, 150, 28, 255)),
+    "boton-aviso-hover": ((247, 181, 74, 255), (224, 150, 28, 255)),
+    "boton-aviso-pulsado": ((224, 150, 28, 255), (201, 133, 20, 255)),
+    "boton-aviso-desactivado": ((248, 217, 164, 255), (248, 217, 164, 255)),
+}
+"""Relleno y borde de cada estado del botón de aviso (9-slice, radio 4)."""
+
+
+def buttons() -> None:
+    """Botón de aviso en 9-slice, pequeño: su tamaño propio es el mínimo del botón."""
+    for name, (fill, line) in WARNING_BUTTON.items():
+        size = 4 * 2 + 10
+        image = Image.new("RGBA", (size * 4, size * 4), (0, 0, 0, 0))
+        ImageDraw.Draw(image).rounded_rectangle(
+            (0, 0, size * 4 - 1, size * 4 - 1),
+            radius=16,
+            fill=fill,
+            outline=line,
+            width=4,
+        )
+        small = image.resize((size, size), Image.Resampling.LANCZOS)
+        small.save(OUT / f"{name}.png", optimize=True)
 
 
 def card() -> None:

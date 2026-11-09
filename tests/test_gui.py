@@ -174,11 +174,22 @@ def test_tool_cards_offer_one_action_each() -> None:
 
 
 def test_overall_and_footer_states() -> None:
+    from atril.checks import error
+    from atril.gui.model import Primary, primary
+
     assert overall(_facts())[:2] == (Level.INFO, "Parado")
     assert overall(_facts(backend_up=True, frontend_up=True))[0] is Level.OK
     assert overall(_facts(deeptutor_installed=False))[0] is Level.ERROR
     pending = _facts(pending=[warning("paginas-citas: pendiente")])
-    assert overall(pending)[2] == "Hay parches pendientes: se aplican al arrancar."
+    assert overall(pending)[2] == "Parche pendiente."
+    assert primary(pending) is Primary.PATCH
+    broken = _facts(pending=[warning("a: pendiente"), error("b: ha cambiado")])
+    assert overall(broken)[2] == "Parche no encaja con DeepTutor."
+    assert primary(broken) is Primary.REVIEW
+    assert primary(_facts(deeptutor_installed=False)) is Primary.INSTALL
+    assert primary(_facts(backend_up=True)) is Primary.STOP
+    no_git = _facts(tools={**_facts().tools, "git": False})
+    assert overall(no_git)[2] == "Falta herramienta por instalar."
     assert service_states(_facts()) == {
         "DeepTutor": (Level.INFO, "Parado"),
         "Ollama": (Level.OK, "En marcha"),
