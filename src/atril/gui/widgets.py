@@ -139,6 +139,18 @@ class Footer(tk.Frame):
             color=style.MUTED,
         ).grid(row=0, column=4, sticky="e")
 
+    def warn(self, text: str) -> None:
+        """Aviso discreto y permanente (p. ej. no se puede guardar la actividad)."""
+        warning = style.label(
+            self,
+            f"  {text}",
+            background=style.SIDEBAR,
+            font=style.SMALL,
+            color=style.LEVEL_COLORS[Level.WARNING],
+            image=style.icon(self, style.LEVEL_ICONS[Level.WARNING], 18),
+        )
+        warning.grid(row=0, column=2, sticky="w")
+
     def set_service(self, name: str, level: Level, text: str) -> None:
         """Estado de un servicio: icono de nivel y palabra."""
         self._services[name].configure(

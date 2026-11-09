@@ -102,6 +102,7 @@ class App(tk.Tk):
         self._deeptutor_up = False
         self._expected_change = False
         self._hinted = False
+        self._warned = False
         self.title("Atril")
         _fit_scale(self)
         style.apply(self)
@@ -205,7 +206,7 @@ class App(tk.Tk):
         """Deja un aviso suelto en la actividad (sin operación detrás)."""
         event = self.activity.start(message)
         event.finish(level, "")
-        self.activity.save(event)
+        self._save(event)
         self._activity_changed()
 
     def set_facts(self, facts: Facts) -> None:
@@ -590,8 +591,15 @@ class App(tk.Tk):
         self._expected_change = True  # DeepTutor puede pararse por la operación
         self._loaded.clear()  # la operación puede haber cambiado cualquier dato
         self._status_at = 0.0  # y el estado de los servicios
-        self.activity.save(event)
+        self._save(event)
         self._activity_changed()
+
+    def _save(self, event: Event) -> None:
+        """Guarda el evento y, si el historial no se puede guardar, avisa una vez."""
+        self.activity.save(event)
+        if self.activity.error and not self._warned:
+            self._warned = True
+            self._footer.warn(self.activity.error)
 
     def _activity_changed(self) -> None:
         """Repinta Actividad si está a la vista."""

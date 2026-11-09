@@ -19,11 +19,11 @@ from atril.gui.model import (
     actions_needed,
     choose_syllabus,
     fold,
+    kb_counts,
     load_all,
     size_label,
 )
 from atril.gui.widgets import TableSorter
-from atril.knowledge import PlanState
 from atril.ops import Reporter
 from atril.ops import knowledge as knowledge_ops
 from atril.ops import syllabus as syllabus_ops
@@ -143,16 +143,24 @@ class SyllabiView(tk.Frame):
             row=0, column=4
         )
 
-        columns = ("kb", "fuentes", "indexadas", "pendientes", "deeptutor")
+        columns = (
+            "kb",
+            "fuentes",
+            "indexadas",
+            "pendientes",
+            "sin_fichero",
+            "deeptutor",
+        )
         self._kbs = ttk.Treeview(card, columns=columns, show="headings", height=5)
         for column, (title, width, stretch) in zip(
             columns,
             (
-                ("Base de conocimiento", 220, True),
-                ("Fuentes", 90, False),
-                ("Indexadas", 100, False),
-                ("Pendientes", 110, False),
-                ("Último indexado", 150, False),
+                ("Base de conocimiento", 190, True),
+                ("Fuentes", 80, False),
+                ("Indexadas", 95, False),
+                ("Por indexar", 105, False),
+                ("Sin fichero", 105, False),
+                ("Último indexado", 140, False),
             ),
             strict=True,
         ):
@@ -206,7 +214,8 @@ class SyllabiView(tk.Frame):
             self._pending.configure(text="")
             return
         self._title.configure(text=data.syllabus.name)
-        total = sum(len(status.items) for status in data.statuses)
+        counts = [kb_counts([i.state for i in s.items]) for s in data.statuses]
+        total = sum(c.sources for c in counts)
         self._subtitle.configure(
             text=_count(
                 len(data.statuses), "base de conocimiento", "bases de conocimiento"
@@ -214,19 +223,19 @@ class SyllabiView(tk.Frame):
             + " · "
             + _count(total, "fuente", "fuentes")
         )
-        for status in data.statuses:
-            pending = status.count(PlanState.NEW) + status.count(PlanState.CHANGED)
+        for status, count in zip(data.statuses, counts, strict=True):
             run = status.run
             last = RUN_LABELS.get(run.state, run.state) if run else "Sin indexar"
             row = (
                 status.kb.id,
-                len(status.items),
-                status.count(PlanState.INDEXED),
-                pending,
+                count.sources,
+                count.indexed,
+                count.pending,
+                count.missing,
                 last.capitalize(),
             )
             item = self._kbs.insert("", "end", values=style.cells(*row))
-            self._sorter.add(item, (fold(row[0]), *row[1:4], fold(row[4])))
+            self._sorter.add(item, (fold(row[0]), *row[1:5], fold(row[5])))
         self._sorter.apply()
         new, stale = actions_needed(data.statuses)
         hints = [finding.message for finding in data.pending]

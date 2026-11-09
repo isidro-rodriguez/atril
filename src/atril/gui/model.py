@@ -549,3 +549,36 @@ def tray_tooltip(*, deeptutor_up: bool, status: str) -> str:
     detail = status or ("DeepTutor en marcha" if deeptutor_up else "DeepTutor parado")
     text = f"Atril: {detail}"
     return text if len(text) <= TOOLTIP_LIMIT else text[: TOOLTIP_LIMIT - 3] + "..."
+
+
+@dataclass(frozen=True, slots=True)
+class KbCounts:
+    """Recuentos de una KB en Temarios: ``sources`` = indexed + pending + missing."""
+
+    sources: int
+    """Fuentes del temario en la KB (las retiradas ya no cuentan)."""
+    indexed: int
+    pending: int
+    """Por indexar: nuevas o cambiadas (estas, con Reindexar)."""
+    missing: int
+    """Declaradas, pero sin fichero en disco."""
+    removed: int
+    """Retiradas del temario que siguen en la KB (hay que reindexar)."""
+
+
+def kb_counts(states: list[PlanState]) -> KbCounts:
+    """Recuentos coherentes a partir del estado de cada fuente de una KB.
+
+    Examples:
+        >>> S = PlanState
+        >>> kb_counts([S.INDEXED, S.NEW, S.CHANGED, S.MISSING, S.REMOVED])
+        KbCounts(sources=4, indexed=1, pending=2, missing=1, removed=1)
+    """
+    count = states.count
+    return KbCounts(
+        sources=len(states) - count(PlanState.REMOVED),
+        indexed=count(PlanState.INDEXED),
+        pending=count(PlanState.NEW) + count(PlanState.CHANGED),
+        missing=count(PlanState.MISSING),
+        removed=count(PlanState.REMOVED),
+    )

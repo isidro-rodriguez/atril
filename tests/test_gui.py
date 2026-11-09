@@ -1,6 +1,8 @@
 import dataclasses
 import threading
 
+import pytest
+
 from atril.checks import Level, ok, warning
 from atril.deeptutor import Assistant
 from atril.errors import AtrilError
@@ -254,3 +256,26 @@ def test_tray_lifecycle() -> None:
         assert created.pending() == []
     finally:
         created.stop()
+
+
+def test_activity_save_failure_is_reported_once(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from atril.gui import activity as activity_module
+
+    log = tmp_path / "diagnostico.log"
+    monkeypatch.setattr(activity_module, "DIAGNOSTIC_LOG", log)
+    blocked = tmp_path / "fichero"
+    blocked.write_text("", encoding="utf-8")
+    history = activity_module.ActivityLog(
+        blocked / "actividad.jsonl"
+    )  # padre = fichero
+
+    for _ in range(2):
+        event = history.start("Hacer backup")
+        event.finish()
+        history.save(event)  # no lanza: la operación sigue
+
+    assert history.error is not None and "No se puede guardar" in history.error
+    assert len(log.read_text(encoding="utf-8").splitlines()) == 1  # una sola vez
+    assert len(history.events) == 2  # siguen en memoria

@@ -117,7 +117,11 @@ class HistoryView(tk.Frame):
             return
         event = self._events[selected[0]]
         lines = [(Level(value), message) for value, message in event.detail]
-        self._write(lines or [(event.level, event.summary or event.title)])
+        # El resumen completo va primero: en la tabla puede quedar cortado.
+        summary = event.summary or event.title
+        if not lines or lines[-1][1] != summary or len(lines) > 1:
+            lines.insert(0, (event.level, summary))
+        self._write(lines)
 
     def _write(self, lines: list[tuple[Level, str]]) -> None:
         """Sustituye el detalle por ``lines`` con su símbolo de nivel."""

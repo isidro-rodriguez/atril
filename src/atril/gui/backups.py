@@ -9,19 +9,36 @@ from acodo.utils import parse_size
 
 from atril.checks import Level, info, ok, warning
 from atril.gui import style
+from atril.gui.activity import when_label
 from atril.gui.desktop import open_path
 from atril.gui.dialogs import ask_yes_no, show_message
 from atril.gui.model import archive_label, fold
 from atril.gui.widgets import TableSorter
 from atril.ops import Reporter
 from atril.ops import backup as backup_ops
-from atril.ops.backup import FolderReport, OtherRootError, Restored, RestorePlan
+from atril.ops.backup import (
+    FolderReport,
+    OtherRootError,
+    Restored,
+    RestorePlan,
+    Verification,
+)
 
 if TYPE_CHECKING:
     from atril.gui.app import App
 
 PENDING = "Sin comprobar"
-"""Estado de verificación hasta pulsar «Comprobar»."""
+"""Estado de una copia que nunca se ha verificado (o que cambió después)."""
+
+
+def verification_label(found: Verification | None) -> tuple[str, Level]:
+    """Texto y nivel de la verificación de una copia para la tabla."""
+    if found is None:
+        return PENDING, Level.INFO
+    when = when_label(found.when)
+    if found.ok:
+        return f"Verificada · {when}", Level.OK
+    return f"Con errores · {when}", Level.ERROR
 
 
 class BackupsView(tk.Frame):
@@ -32,7 +49,7 @@ class BackupsView(tk.Frame):
         super().__init__(parent, background=style.PAGE)
         self.app = app
         self._paths: dict[str, Path] = {}
-        self._verified: dict[Path, tuple[str, Level]] = {}
+        self._verified: dict[Path, Verification] = {}
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
@@ -113,7 +130,10 @@ class BackupsView(tk.Frame):
         station = self.app.station
         return self.app.run(
             "Buscando backups...",
-            lambda reporter: backup_ops.listing(station, reporter),
+            lambda reporter: (
+                backup_ops.listing(station, reporter),
+                backup_ops.verifications(station),
+            ),
             self._show,
             quiet=True,
             on_error=self._unreachable,
@@ -127,8 +147,9 @@ class BackupsView(tk.Frame):
             text=_sentence(str(exc)), foreground=style.LEVEL_COLORS[Level.WARNING]
         )
 
-    def _show(self, reports: list[FolderReport]) -> None:
+    def _show(self, found: tuple[list[FolderReport], dict[Path, Verification]]) -> None:
         """Pinta las copias, de la más reciente a la más antigua."""
+        reports, self._verified = found
         self._table.delete(*self._table.get_children())
         self._sorter.clear()
         self._paths.clear()
@@ -140,7 +161,7 @@ class BackupsView(tk.Frame):
                 )
                 self._sorter.add(item, ("", 0, fold(folder), ""))
             for archive in reversed(report.archives):
-                state, level = self._verified.get(archive.path, (PENDING, Level.INFO))
+                state, level = verification_label(self._verified.get(archive.path))
                 values = style.cells(
                     archive_label(archive.stamp),
                     parse_size(archive.size),
@@ -150,7 +171,7 @@ class BackupsView(tk.Frame):
                 item = self._table.insert("", "end", values=values, tags=(level.value,))
                 self._paths[item] = archive.path
                 self._sorter.add(
-                    item, (archive.stamp, archive.size, fold(folder), fold(state))
+                    item, (archive.stamp, archive.size, fold(folder), level.value)
                 )
         self._sorter.apply()
         self._note.configure(
@@ -170,9 +191,8 @@ class BackupsView(tk.Frame):
             reporter.show([ok(f"Backup completado correctamente ({size}).")])
             return created.archive
 
-        def done(archive: Path) -> None:
-            self._verified[archive] = ("Verificada", Level.OK)  # se verifica al crear
-            self.refresh()
+        def done(_: Path) -> None:
+            self.refresh()  # la verificación al crear ya está registrada
 
         self.app.run("Haciendo el backup...", run, done, title="Hacer backup")
 
@@ -180,25 +200,17 @@ class BackupsView(tk.Frame):
         """Verifica la copia más reciente de cada destino."""
         station = self.app.station
 
-        def run(reporter: Reporter) -> list[FolderReport]:
+        def run(
+            reporter: Reporter,
+        ) -> tuple[list[FolderReport], dict[Path, Verification]]:
             reports = backup_ops.check(station, reporter)
             for report in reports:
                 reporter.show(report.findings)
-            return reports
+            return reports, backup_ops.verifications(station)
 
-        def done(reports: list[FolderReport]) -> None:
-            for report in reports:
-                if report.archives:
-                    verified = report.findings[0]
-                    ok_level = verified.level is Level.OK
-                    self._verified[report.archives[-1].path] = (
-                        ("Verificada", Level.OK)
-                        if ok_level
-                        else ("Dañada", Level.ERROR)
-                    )
-            self._show(reports)
-
-        self.app.run("Verificando backups...", run, done, title="Comprobar backups")
+        self.app.run(
+            "Verificando backups...", run, self._show, title="Comprobar backups"
+        )
 
     def restore(self) -> None:
         """Restaura la copia elegida (o la más reciente), tras confirmarlo."""

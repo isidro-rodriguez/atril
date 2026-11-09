@@ -1,9 +1,12 @@
 """Copias de seguridad: crear, comprobar y restaurar la estación."""
 
+import contextlib
+import json
 import shutil
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from atril import backup
@@ -18,6 +21,15 @@ from atril.ops import Reporter, service
 
 RESTART_TIMEOUT = 900
 """Segundos de espera al volver a arrancar DeepTutor tras la copia."""
+
+
+@dataclass(frozen=True, slots=True)
+class Verification:
+    """Última verificación de una copia que no ha cambiado desde entonces."""
+
+    ok: bool
+    when: str
+    """Fecha y hora ISO de la verificación."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,8 +142,14 @@ def create(
                 )
             )
         else:
-            findings.append(verify_finding(result.archive))
-            findings += [copy_to(result.archive, folder) for folder in folders[1:]]
+            verified = verify_finding(result.archive)
+            record_verification(station, result.archive, verified.level is Level.OK)
+            findings.append(verified)
+            for folder in folders[1:]:
+                copied = copy_to(result.archive, folder)
+                if copied.level is Level.OK:
+                    record_verification(station, folder / result.archive.name, True)
+                findings.append(copied)
         if result.redacted:
             findings.append(
                 info(
@@ -174,6 +192,7 @@ def check(station: Station, reporter: Reporter) -> list[FolderReport]:
         else:
             with reporter.busy(f"Verificando {found[-1].path.name}..."):
                 findings = [verify_finding(found[-1].path)]
+            record_verification(station, found[-1].path, findings[0].level is Level.OK)
             findings.append(backup.latest_finding(found[-1]))
         if broken := backup.incomplete_archives(folder):
             findings.append(
@@ -265,6 +284,61 @@ def _require_stopped(station: Station) -> None:
     dt = DeepTutor(station)
     if dt.installed and (dt.backend_up() or dt.frontend_up()):
         raise AtrilError("DeepTutor está en marcha; páralo antes de restaurar.")
+
+
+def verifications(station: Station) -> dict[Path, Verification]:
+    """Verificaciones registradas de copias que siguen igual (tamaño y fecha).
+
+    Una copia modificada o sustituida desde que se verificó no aparece: su estado
+    ya no se puede garantizar. El registro es informativo: si está dañado, se
+    ignora (y se rehace en la siguiente verificación).
+    """
+    found = {}
+    for key, entry in _load_verifications(station).items():
+        path = Path(key)
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        if (entry.get("tamano"), entry.get("modificado")) == (
+            stat.st_size,
+            stat.st_mtime_ns,
+        ):
+            found[path] = Verification(bool(entry.get("ok")), str(entry.get("fecha")))
+    return found
+
+
+def record_verification(station: Station, archive: Path, ok: bool) -> None:
+    """Anota el resultado de verificar ``archive`` (sin fallar si no se puede)."""
+    entries = _load_verifications(station)
+    try:
+        stat = archive.stat()
+    except OSError:
+        return
+    entries[str(archive)] = {
+        "ok": ok,
+        "fecha": datetime.now().isoformat(timespec="seconds"),
+        "tamano": stat.st_size,
+        "modificado": stat.st_mtime_ns,
+    }
+    entries = {key: value for key, value in entries.items() if Path(key).exists()}
+    path = station.verifications_file
+    with contextlib.suppress(OSError):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = {"version": 1, "copias": dict(sorted(entries.items()))}
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _load_verifications(station: Station) -> dict[str, dict]:
+    """Entradas del registro de verificaciones (vacío si falta o está dañado)."""
+    try:
+        data = json.loads(station.verifications_file.read_text(encoding="utf-8"))
+        entries = data["copias"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    if not isinstance(entries, dict):
+        return {}
+    return {k: v for k, v in entries.items() if isinstance(v, dict)}
 
 
 def verify_finding(archive: Path) -> Finding:

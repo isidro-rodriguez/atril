@@ -175,6 +175,11 @@ class Station:
         return self.data_dir / "atril" / "ventana.json"
 
     @property
+    def verifications_file(self) -> Path:
+        """Resultado de la última verificación de cada copia de seguridad."""
+        return self.data_dir / "atril" / "verificaciones.json"
+
+    @property
     def ollama_state_file(self) -> Path:
         """Ollama arrancado por atril (PID y hora): solo ese se puede parar."""
         return self.data_dir / "atril" / "ollama.json"

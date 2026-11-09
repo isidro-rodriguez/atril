@@ -2,14 +2,15 @@
 
 Cada operación que lanza la ventana (copia, indexado, arranque...) es un
 :class:`Event` con título, resumen y nivel; las comprobaciones que produce quedan
-como detalle técnico. El panel lateral muestra el resumen y «Ver todo» el
-detalle. Se guarda en ``data/atril/actividad.jsonl`` (una línea por evento
-terminado) para conservar el historial entre sesiones. Sin Tk: se prueba sin
-pantalla.
+como detalle técnico. El apartado Actividad (una vista completa, con su tabla y
+el detalle de la operación elegida) muestra el historial. Se guarda en
+``data/atril/actividad.jsonl`` (una línea por evento terminado) para
+conservarlo entre sesiones. Sin Tk: se prueba sin pantalla.
 """
 
 import contextlib
 import json
+import tempfile
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
@@ -19,6 +20,9 @@ from atril.checks import Finding, Level
 
 MAX_EVENTS = 500
 """Eventos que se conservan en el fichero."""
+
+DIAGNOSTIC_LOG = Path(tempfile.gettempdir()) / "atril-diagnostico.log"
+"""Dónde se anota que no se pudo guardar la actividad (fuera de la estación)."""
 
 _SEVERITY = {Level.OK: 0, Level.INFO: 1, Level.WARNING: 2, Level.ERROR: 3}
 
@@ -108,6 +112,8 @@ class ActivityLog:
     def __init__(self, path: Path | None) -> None:
         """Carga el historial de ``path`` (sin fichero: solo en memoria)."""
         self.path = path
+        self.error: str | None = None
+        """Por qué no se pudo guardar el historial (la primera vez que falla)."""
         self.events: list[Event] = []
         if path is not None:
             self.events = list(reversed(_load(path)))
@@ -124,7 +130,7 @@ class ActivityLog:
             return
         record = asdict(event)
         record["level"] = event.level.value
-        with contextlib.suppress(OSError):
+        try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as out:
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -133,6 +139,25 @@ class ActivityLog:
                 self.path.write_text(
                     "\n".join(lines[-MAX_EVENTS:]) + "\n", encoding="utf-8"
                 )
+        except OSError as exc:
+            self._failed(exc)
+
+    def _failed(self, exc: OSError) -> None:
+        """Deja constancia de que no se pudo guardar, sin usar el propio historial.
+
+        La operación sigue (el evento queda en memoria). Se anota en
+        :data:`DIAGNOSTIC_LOG`, fuera de la estación, y :attr:`error` permite a
+        la ventana avisar una vez. Si tampoco se puede escribir ahí, se calla:
+        nunca se reintenta en bucle.
+        """
+        first = self.error is None
+        self.error = f"No se puede guardar la actividad ({exc})."
+        if not first:
+            return
+        with contextlib.suppress(OSError):
+            stamp = datetime.now().isoformat(timespec="seconds")
+            with DIAGNOSTIC_LOG.open("a", encoding="utf-8") as out:
+                out.write(f"{stamp} {self.path}: {exc}\n")
 
 
 def _load(path: Path) -> list[Event]:

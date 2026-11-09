@@ -263,6 +263,26 @@ def test_check_command(station: Station, idle: None) -> None:
     assert "verificada" in result.output
 
 
+def test_verifications_survive_restart_and_expire_when_archive_changes(
+    station: Station, idle: None
+) -> None:
+    _invoke(station)  # la copia se verifica al crearla
+    [archive] = backup.archives(_folder(station))
+
+    recorded = ops_backup.verifications(station)  # se lee del fichero, no de memoria
+    assert recorded[archive.path].ok
+
+    ops_backup.record_verification(station, archive.path, False)
+    assert not ops_backup.verifications(station)[archive.path].ok
+
+    with archive.path.open("ab") as out:  # la copia cambia: ya no se garantiza
+        out.write(b"x")
+    assert archive.path not in ops_backup.verifications(station)
+
+    station.verifications_file.write_text("no es json", encoding="utf-8")
+    assert ops_backup.verifications(station) == {}  # dañado: se ignora
+
+
 def test_restore_command(station: Station, idle: None) -> None:
     _invoke(station)
     write(station.data_dir / "user" / "settings.json", '{"tema": "oscuro"}')
