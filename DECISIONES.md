@@ -24,13 +24,14 @@ El código de atril vive en su repo (`D:\Desarrollo\Repositorios\atril`), nunca 
 - Indexado documento a documento, con registro propio (`fuentes\indexado.json`) y reanudación; quitar o cambiar documentos exige reindexar (DT no purga vectores y guarda una versión nueva con el mismo nombre como `nombre (2).pdf`; el reindexado se fuerza enviando `embedding_model` = selección activa). `kb indexar` solo añade fuentes nuevas; `kb reindexar` quita versiones anteriores y retiradas por la API, añade las nuevas y reindexa.
 - ~~Backup con restic~~ (sustituido en 0.15.0 por copias zip/tar.xz, ver abajo): disco externo (conectado solo durante la copia) + Google Drive vía rclone, carpeta por defecto `Atril/`. Retención 7 diarias / 4 semanales / 12 mensuales. Git bundle de los repos dentro del snapshot. Parar DT antes de copiar (SQLite). Restaurar en la misma ruta (rutas absolutas en `kb_config.json`).
 - Interfaz: CLI Typer para uso avanzado y servidores; GUI tkinter para quien no usa la consola (ver «Interfaz gráfica»). Sin TUI.
-- README esquemático; detalle en `CLAUDE.md` y `docs/`.
+- README esquemático; detalle en `CLAUDE.md` y en la web (`docs/`, Zensical).
 - Entrega del código: commits directos a `main` del repo en GitHub.
 
 ## Esquemas (cerrados en fase 0)
 
-Referencia completa, reglas y cambios respecto al borrador en [`esquemas.md`](esquemas.md);
-ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
+Referencia completa en la web ([`atril.toml`](https://isidro-rodriguez.github.io/atril/documentacion/atril-toml/) y
+[`temario.toml`](https://isidro-rodriguez.github.io/atril/documentacion/temario-toml/)); ejemplos, validados por las pruebas, en
+`docs/documentacion/ejemplos/`. Cambios respecto al borrador al final de esta sección. Resumen de decisiones:
 
 - La raíz de la estación es la carpeta de `atril.toml` (sin clave `raiz`); se localiza con
   `--estacion`, `ATRIL_ESTACION` o buscando hacia arriba desde la carpeta actual.
@@ -39,6 +40,17 @@ ejemplos en [`ejemplos/`](ejemplos/). Resumen de decisiones:
   instalación previa.
 - Fuente `pdf` sin `url` = fuente manual (ISO, PIOT/PGO…); `comprobar` exige `url`.
 - Cada fuente en exactamente una KB; id de KB únicos en toda la estación.
+
+
+### Cambios de los esquemas respecto al borrador
+
+| Cambio | Motivo |
+|---|---|
+| Fuera `[estacion] raiz` | Se deduce de la ubicación de `atril.toml`; evita incoherencias |
+| Nuevos `[ollama] url`, `contexto` | Lección: el contexto de Ollama debe coincidir con DT |
+| Nueva tabla `[indexado]` | Lección: DT usa `text_only` por defecto; chunks 1024/150 |
+| Nuevos `titulo`, `archivo`, `descripcion`, `evaluacion` | Fuentes manuales (ISO, PIOT/PGO) y `atril kb evaluar` |
+| `comprobar` por defecto `nunca` | Explícito; solo fuentes con `url` |
 
 ## Comandos (en español)
 
@@ -293,3 +305,13 @@ Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una colum
 - Docling no informa progreso por página; DT por defecto usa parser `text_only` y no descarga modelos de Docling (hay que activarlo).
 - La KB se activa por chat (icono de base de datos); asignarla al espacio solo limita la lista.
 - Lo que está dentro del espacio de trabajo lo lee el agente (contaminó respuestas con ficheros de evaluación).
+
+## Web (0.35.0)
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Sitio | Zensical (`zensical.toml`, `docs/`, `docs_templates/`), con la estructura de pyMedia, publicado en GitHub Pages por `docs.yml`: https://isidro-rodriguez.github.io/atril/ | Seguir con `docs/*.md` sueltos |
+| Tema | La paleta de la ventana (`style.py`): fondo `#e9eff8`, contenido en tarjeta blanca redondeada, acento `#0f5ec9`, Inter; modo oscuro con la misma idea | |
+| Contenido | Portada y Guía para alumnos sin conocimientos técnicos; Documentación avanzada (conceptos, CLI, `atril.toml` y `temario.toml` con los ejemplos incluidos por `--8<--`, indexado, copias, instalador); Desarrollo | |
+| Capturas | Generadas con la ventana real y una estación de ejemplo: alumna de 2.º de Bachillerato de Ciencias, un temario por asignatura (Física, el que más fuentes tiene, como activo) | Capturas a mano |
+| Documentos retirados de `docs/` | `esquemas.md` pasa a las páginas de configuración; `ejemplos/` a `docs/documentacion/ejemplos/`; este fichero, a `DECISIONES.md` en la raíz | |

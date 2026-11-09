@@ -4,7 +4,9 @@ from pathlib import Path
 
 from atril.patches import PATCHES
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "docs" / "ejemplos"
+EXAMPLES = (
+    Path(__file__).resolve().parent.parent / "docs" / "documentacion" / "ejemplos"
+)
 
 MINIMAL_STATION = """
 [deeptutor]

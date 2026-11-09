@@ -1,0 +1,72 @@
+# .github/workflows/docs.yml
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths: &docs-paths
+      - "docs/**"
+      - "docs_templates/**"
+      - "zensical.toml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    branches: [main]
+    paths: *docs-paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Documentación (Zensical)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.13"
+
+      - name: Sincronizar dependencias
+        run: uv sync --locked
+
+      - name: Construir documentación con Zensical
+        run: uv run zensical build
+
+      # Solo se publica desde main; en las pull requests basta con que compile.
+      - name: Subir el sitio como artefacto de Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    name: Publicar en GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Desplegar
+        id: deployment
+        uses: actions/deploy-pages@v5

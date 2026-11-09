@@ -3,6 +3,7 @@
 Ventana y CLI para gestionar una instalación local de
 [DeepTutor](https://github.com/HKUDS/DeepTutor) y sus temarios: fuentes, bases de conocimiento
 (KB), evaluación y backup. Pensado para Windows; la CLI funciona también en Linux y macOS.
+Guía para empezar y documentación completa en la [web](https://isidro-rodriguez.github.io/atril/).
 
 ## 🚀 Guía rápida
 
@@ -97,7 +98,7 @@ Las copias son ficheros `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`) en las carpeta
 instalar nada más. Las claves de API de DeepTutor se copian vacías: tras restaurar hay que
 volver a escribirlas.
 
-Configuración: [`docs/esquemas.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/esquemas.md) · ejemplos en [`docs/ejemplos/`](https://github.com/isidro-rodriguez/atril/blob/main/docs/ejemplos/).
+Configuración, con ejemplos: [`atril.toml`](https://isidro-rodriguez.github.io/atril/documentacion/atril-toml/) · [`temario.toml`](https://isidro-rodriguez.github.io/atril/documentacion/temario-toml/).
 
 ## 🛠️ Desarrollo
 
@@ -116,13 +117,13 @@ uv run ty check
 uv run pytest
 ```
 
-Con [Poe the Poet](https://poethepoet.natn.io/): `poe check` · `poe fix`.
+Con [Poe the Poet](https://poethepoet.natn.io/): `poe check` · `poe fix` · `poe serve` (la web).
 
 ## Enlaces
 
-- Decisiones de diseño: [`docs/decisiones.md`](https://github.com/isidro-rodriguez/atril/blob/main/docs/decisiones.md)
-- Plantilla base: <https://github.com/isidro-rodriguez/acodo-template>
-- Acodo: <https://github.com/isidro-rodriguez/acodo>
+- Web y documentación: <https://isidro-rodriguez.github.io/atril/>
+- Repositorio: <https://github.com/isidro-rodriguez/atril>
+- PyPI: <https://pypi.org/project/atril/>
 
 ## Licencia
 

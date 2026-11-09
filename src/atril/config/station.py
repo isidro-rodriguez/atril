@@ -136,7 +136,7 @@ class Station:
         if self.ollama is None:
             raise ConfigError(
                 f"{self.root / STATION_FILE}: falta [ollama]. Para indexar fuentes "
-                "hace falta Ollama con un modelo de embedding (ver docs/esquemas.md)."
+                "hace falta Ollama con un modelo de embedding (ver la web de atril)."
             )
         return self.ollama
 
@@ -220,7 +220,8 @@ class Station:
 
 
 STATION_TEMPLATE = """\
-# atril.toml: configuración de la estación (referencia: docs/esquemas.md de atril).
+# atril.toml: configuración de la estación.
+# Referencia: https://isidro-rodriguez.github.io/atril/documentacion/atril-toml/
 
 [deeptutor]
 # rama = "dev"

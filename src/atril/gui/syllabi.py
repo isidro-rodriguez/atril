@@ -208,7 +208,11 @@ class SyllabiView(tk.Frame):
         self._title.configure(text=data.syllabus.name)
         total = sum(len(status.items) for status in data.statuses)
         self._subtitle.configure(
-            text=f"{len(data.statuses)} bases de conocimiento · {total} fuentes"
+            text=_count(
+                len(data.statuses), "base de conocimiento", "bases de conocimiento"
+            )
+            + " · "
+            + _count(total, "fuente", "fuentes")
         )
         for status in data.statuses:
             pending = status.count(PlanState.NEW) + status.count(PlanState.CHANGED)
@@ -365,3 +369,8 @@ class SyllabiView(tk.Frame):
         """Abre la carpeta del temario elegido (o la de temarios)."""
         data = self._data.get(self.app.syllabus_id or "")
         open_path(data.syllabus.root if data else self.app.station.syllabi_dir)
+
+
+def _count(number: int, one: str, many: str) -> str:
+    """«1 fuente», «3 fuentes»."""
+    return f"{number} {one if number == 1 else many}"

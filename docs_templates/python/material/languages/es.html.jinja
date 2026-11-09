@@ -1,0 +1,61 @@
+{#- Macro para las traducciones al español. -#}
+
+{% block logs scoped %}
+  {#- Logging block.
+
+  This block can be used to log debug messages, deprecation messages, warnings, etc.
+  -#}
+{% endblock logs %}
+
+{% macro t(key) %}{{ {
+  "ATTRIBUTE": "ATRIBUTO",
+  "Attributes": "Atributos",
+  "Attributes:": "Atributos:",
+  "BOUND:": "LÍMITE:",
+  "Bound or Constraints": "Límite o restricciones",
+  "Classes": "Clases",
+  "Classes:": "Clases:",
+  "Class Type Parameters:": "Parámetros de tipo de la clase:",
+  "CLASS TYPE PARAMETER": "PARÁMETRO DE TIPO DE LA CLASE",
+  "CLASS": "CLASE",
+  "CONSTRAINTS:": "RESTRICCIONES:",
+  "DEFAULT:": "POR DEFECTO:",
+  "Default": "Por defecto",
+  "default:": "por defecto:",
+  "DESCRIPTION": "DESCRIPCIÓN",
+  "Description": "Descripción",
+  "Examples:": "Ejemplos:",
+  "Functions": "Funciones",
+  "Functions:": "Funciones:",
+  "FUNCTION": "FUNCIÓN",
+  "Init Type Parameters:": "Parámetros de tipo del constructor:",
+  "INIT TYPE PARAMETER": "PARÁMETRO DE TIPO DEL CONSTRUCTOR",
+  "Methods:": "Métodos:",
+  "METHOD": "MÉTODO",
+  "Modules": "Módulos",
+  "Modules:": "Módulos:",
+  "MODULE": "MÓDULO",
+  "Name": "Nombre",
+  "Other Parameters:": "Otros parámetros:",
+  "PARAMETER": "PARÁMETRO",
+  "Parameters:": "Parámetros:",
+  "RAISES": "LANZA",
+  "Raises:": "Lanza:",
+  "RECEIVES": "RECIBE",
+  "Receives:": "Recibe:",
+  "required": "obligatorio",
+  "RETURNS": "DEVUELVE",
+  "Returns:": "Devuelve:",
+  "Source code in": "Código fuente en",
+  "TYPE:": "TIPO:",
+  "Type": "Tipo",
+  "Type Aliases": "Alias de tipo",
+  "Type Aliases:": "Alias de tipo:",
+  "TYPE ALIAS": "ALIAS DE TIPO",
+  "Type Parameters:": "Parámetros de tipo:",
+  "TYPE PARAMETER": "PARÁMETRO DE TIPO",
+  "WARNS": "AVISA",
+  "Warns:": "Avisa:",
+  "YIELDS": "PRODUCE",
+  "Yields:": "Produce:",
+}[key] }}{% endmacro %}

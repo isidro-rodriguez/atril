@@ -42,7 +42,7 @@ class BackupsView(tk.Frame):
         card.rowconfigure(3, weight=1)
         style.label(
             card,
-            "Backups de temarios, bases de conocimientos y ajustes.",
+            "Backups de temarios, bases de conocimiento y ajustes.",
             color=style.MUTED,
             wraplength=760,
         ).grid(row=1, column=0, sticky="w")
@@ -80,8 +80,8 @@ class BackupsView(tk.Frame):
             columns,
             (
                 ("Fecha", 170, "w"),
-                ("Tamaño", 100, "w"),
-                ("Destino", 280, "w"),
+                ("Tamaño", 120, "w"),
+                ("Destino", 260, "w"),
                 ("Verificación", 150, "w"),
             ),
             strict=True,

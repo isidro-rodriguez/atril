@@ -5,6 +5,29 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.35.0] - 2026-11-09
+
+### Added
+
+- Web de atril en <https://isidro-rodriguez.github.io/atril/>, hecha con Zensical y publicada
+  en GitHub Pages: portada y guía para quien no tiene conocimientos técnicos, documentación
+  avanzada (conceptos, línea de comandos, `atril.toml` y `temario.toml` con sus ejemplos,
+  indexado, copias, instalador) y guía de desarrollo. Es la forma más sencilla de dar a conocer
+  y distribuir atril. Tema con la paleta de la ventana y capturas reales.
+- `poe serve`: vista previa de la web.
+
+### Changed
+
+- `docs/esquemas.md` pasa a las páginas de configuración de la web, los ejemplos a
+  `docs/documentacion/ejemplos/` y las decisiones de diseño a `DECISIONES.md`. Los mensajes que
+  remitían a `docs/esquemas.md` remiten ahora a la web.
+- README: los enlaces llevan a la web, al repositorio y a PyPI.
+
+### Fixed
+
+- Temarios decía «1 bases de conocimiento» y Backups, «bases de conocimientos».
+- Backups: la columna Tamaño cortaba la unidad («MiB»).
+
 ## [0.34.0] - 2026-11-09
 
 ### Fixed

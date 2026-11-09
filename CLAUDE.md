@@ -17,7 +17,8 @@
 
 ```bash
 .
-├── .github/                # CI (ci.yaml), PyPI publishing (publish.yml) and Dependabot
+├── .github/                # CI (ci.yaml), PyPI publishing (publish.yml), website (docs.yml)
+│                           #   and Dependabot
 ├── .local/                 # Private local files (backups), not tracked by git
 ├── .pre-commit-config.yaml # pre-commit/pre-push hooks (ruff, ty, pytest)
 ├── CLAUDE.md               # This file
@@ -30,10 +31,12 @@
 ├── instalador/atril.iss    # Windows installer (Inno Setup), built by publish.yml
 ├── scripts/recursos/       # Dev-only generator of gui/recursos (logo SVG, tool logos in
 │                           #   marcas/, icons, fonts, card)
-├── docs/
-│   ├── decisiones.md       # Design decisions (source of truth for scope and phases)
-│   ├── esquemas.md         # atril.toml and temario.toml reference
-│   └── ejemplos/           # Example config files, validated by the tests
+├── DECISIONES.md           # Design decisions (source of truth for scope and phases)
+├── zensical.toml           # Website (Zensical), published to GitHub Pages by docs.yml
+├── docs_templates/         # Website template overrides (favicons, manifest)
+├── docs/                   # Website sources: index, guia/ (students), documentacion/
+│   │                       #   (advanced), desarrollo/; assets/ (atril.css theme, captures)
+│   └── documentacion/ejemplos/  # Example atril.toml/temario.toml, validated by the tests
 ├── src/atril/
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup,
 │   │                       #   gui)
@@ -76,7 +79,7 @@
 
 ## atril rules (load-bearing)
 
-Read `docs/decisiones.md` before any non-trivial change. Key points:
+Read `DECISIONES.md` before any non-trivial change. Key points:
 
 - **DeepTutor never enters atril's `uv.lock`.** Control it through its CLI
   (`app/.venv/Scripts/deeptutor.exe`) and its API (`localhost:8001`) via `subprocess` and
@@ -98,7 +101,10 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   `load_syllabus` in a temporary copy, then replace through `.nuevo`.
 - Configuration errors raise `atril.config.ConfigError` with a Spanish message naming the file,
   table and key. Commands catch it, print it in red and exit with code 1.
-- Every schema change updates `docs/esquemas.md`, `docs/ejemplos/` and the tests.
+- Every schema change updates `docs/documentacion/atril-toml.md` or `temario-toml.md`,
+  `docs/documentacion/ejemplos/` and the tests. Website: Spanish, friendly in `index.md` and
+  `guia/`, technical in `documentacion/`; GUI captures come from the real window with a
+  sample station (`uv run zensical build` must pass). Keep it in sync with the GUI and CLI.
 - **CLI output uses Rich**, never `print`/`typer.echo`: the shared `console`/`err_console` from
   `commands._common`, `show()` for findings, `success()`/`fail()`, `console.status()` spinners for
   waits, `rich.table.Table` for listings and `Panel` for log excerpts. Always `escape()` external
@@ -274,7 +280,7 @@ with plain `uv run`.
 
 ## Agent workflow
 
-1. Before changing, read `README.md`, `pyproject.toml`, `CLAUDE.md`, `docs/decisiones.md`,
+1. Before changing, read `README.md`, `pyproject.toml`, `CLAUDE.md`, `DECISIONES.md`,
    and related tests.
 2. Make the smallest necessary change. Do not refactor unrelated code.
 3. If you need a new dependency, justify it. If stdlib solves it, do not add it.

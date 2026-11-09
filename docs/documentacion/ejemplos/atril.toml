@@ -1,4 +1,4 @@
-# atril.toml — configuración de la estación (D:\Desarrollo\DeepTutor\atril.toml).
+# atril.toml — configuración de la estación (por ejemplo, D:\Estudio\atril.toml).
 # La raíz de la estación es la carpeta que contiene este fichero y el DEEPTUTOR_HOME;
 # su estructura es fija: app\ (DeepTutor), data\ (datos de DT) y temarios\<id>\.
 

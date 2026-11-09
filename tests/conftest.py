@@ -20,7 +20,7 @@ def _offline(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def station_dir(tmp_path: Path) -> Path:
-    """Estación con los ficheros de ``docs/ejemplos`` (temario ``normativa``).
+    """Estación con los ejemplos de ``docs/documentacion`` (temario ``normativa``).
 
     Va en una subcarpeta para que ``tmp_path`` pueda hacer de disco externo.
     """

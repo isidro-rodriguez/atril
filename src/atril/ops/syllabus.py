@@ -167,7 +167,11 @@ def add_source(
 def _new_syllabus(name: str, syllabus_id: str) -> str:
     """Texto de ``temario.toml`` para un temario nuevo."""
     doc = tomlkit.document()
-    doc.add(tomlkit.comment("temario.toml (referencia: docs/esquemas.md de atril)."))
+    doc.add(
+        tomlkit.comment(
+            "temario.toml (referencia: https://isidro-rodriguez.github.io/atril/documentacion/temario-toml/)."
+        )
+    )
     head = tomlkit.table()
     head["nombre"] = name
     doc["temario"] = head
