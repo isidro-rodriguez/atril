@@ -5,6 +5,7 @@ navegador; Parar solo detiene DeepTutor. Cada herramienta tiene una sola acción
 (instalar, arrancar o parar). Ollama solo se para si lo abrió atril.
 """
 
+import contextlib
 import shutil
 import subprocess
 import tkinter as tk
@@ -16,24 +17,27 @@ from typing import TYPE_CHECKING
 
 from atril import backup, ollama
 from atril.checks import Level, ok
+from atril.config import ConfigError, load_syllabi
 from atril.config.station import Station
 from atril.deeptutor import Assistant, DeepTutor, active_assistant
 from atril.errors import AtrilError
 from atril.gui import style
-from atril.gui.activity import when_label
 from atril.gui.dialogs import ask_yes_no
 from atril.gui.model import (
     ORDER,
     WEBSITES,
     Action,
     Facts,
+    Summary,
     ToolCard,
     archive_label,
     overall,
+    summary_line,
     tool_cards,
 )
 from atril.gui.widgets import ToolTile
 from atril.install import run_command, tool
+from atril.knowledge import Ledger, ledger_path
 from atril.ops import Reporter, service
 from atril.ops import installation as installation_ops
 from atril.processes import no_window
@@ -59,19 +63,36 @@ class HomeData:
     """Lo que necesita Inicio, leído en segundo plano."""
 
     facts: Facts
-    last_backup: str | None
-    """Fecha del último backup completo, ya en texto."""
+    summary: Summary
 
 
 def load_home(station: Station) -> HomeData:
-    """Estado de servicios y herramientas y fecha del último backup."""
+    """Estado de servicios y herramientas y el resumen de la estación."""
     stamps = [
         archive.stamp
         for folder in station.backup.destinations
         if backup.is_reachable(folder)
         for archive in backup.archives(folder)
     ]
-    return HomeData(load_facts(station), archive_label(max(stamps)) if stamps else None)
+    syllabi_count = sources = indexed = 0
+    with contextlib.suppress(ConfigError, OSError):
+        syllabi, _ = load_syllabi(station.syllabi_dir)
+        for syllabus in syllabi:
+            syllabi_count += 1
+            sources += len(syllabus.sources)
+            with contextlib.suppress(AtrilError, OSError):
+                ledger = Ledger(ledger_path(syllabus))
+                current = {source.id for source in syllabus.sources}
+                indexed += len(
+                    {key for kb in ledger.kbs.values() for key in kb.sources} & current
+                )
+    summary = Summary(
+        syllabi_count,
+        sources,
+        indexed,
+        archive_label(max(stamps)) if stamps else None,
+    )
+    return HomeData(load_facts(station), summary)
 
 
 def load_facts(station: Station) -> Facts:
@@ -137,78 +158,48 @@ class HomeView(tk.Frame):
         self._build_tools().grid(row=1, column=0, sticky="ew", pady=(14, 0))
 
     def _build_status(self) -> ttk.Frame:
-        """Estado general: icono y titular grandes, frase, botones y últimas fechas.
+        """Estado general: icono y titular grandes, frase, resumen y el botón.
 
-        Es el bloque principal de la ventana (fondo destacado): ocupa el alto que
-        dejan las herramientas.
+        Es el bloque principal de la ventana: ocupa el alto que dejan las
+        herramientas, con el botón abajo a la derecha.
         """
-        block = style.hero(self)
-        block.columnconfigure(0, weight=1)
-        block.rowconfigure(0, weight=1)
-        block.rowconfigure(5, weight=1)
-        background = style.HERO
-        style.label(
-            block,
-            "Estado general",
-            background=background,
-            font=style.STRONG,
-            color=style.MUTED,
-        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
-        self._headline = style.label(
-            block, "Comprobando…", background=background, font=style.DISPLAY
-        )
-        self._headline.configure(compound="left")
-        self._headline.grid(row=2, column=0, sticky="w")
+        card = style.card(self, "Estado general")
+        card.columnconfigure(1, weight=1)
+        card.rowconfigure(1, weight=1)
+        card.rowconfigure(5, weight=1)
+        self._icon = tk.Label(card, background=style.CARD)
+        self._icon.grid(row=2, column=0, rowspan=2, sticky="w", padx=(0, 22))
+        self._headline = style.label(card, "Comprobando…", font=style.HEADLINE)
+        self._headline.grid(row=2, column=1, sticky="sw")
         self._sentence = style.label(
-            block,
+            card,
             "",
-            background=background,
             font=style.LEAD,
             color=style.MUTED,
-            wraplength=round(480 * style.scale(self)),
+            wraplength=round(660 * style.scale(self)),
         )
-        self._sentence.grid(row=3, column=0, sticky="w", pady=(8, 0))
-
-        buttons = tk.Frame(block, background=background)
-        buttons.grid(row=4, column=0, sticky="w", pady=(22, 0))
+        self._sentence.grid(row=3, column=1, sticky="nw", pady=(2, 0))
+        # Resumen en la línea del título, a la derecha: no quita alto al estado.
+        self._summary = style.label(card, "", color=style.MUTED)
+        self._summary.grid(row=0, column=1, sticky="e", pady=(0, 10))
+        buttons = tk.Frame(card, background=style.CARD)
+        buttons.grid(row=6, column=0, columnspan=2, sticky="se")
+        self._open = ttk.Button(
+            buttons, text="Abrir en el navegador", command=self.open_browser
+        )
+        self._open.grid(row=0, column=0, sticky="e", padx=(0, 10), ipady=30)
+        self._open.grid_remove()
         self._toggle = self.app.action(
             ttk.Button(
                 buttons,
                 text="Arrancar",
                 style="Accent.TButton",
                 command=self.toggle,
-                width=20,
+                width=18,
             )
         )
-        self._toggle.grid(row=0, column=0, sticky="w", ipady=8)
-        self._open = ttk.Button(
-            buttons, text="Abrir en el navegador", command=self.open_browser
-        )
-        self._open.grid(row=0, column=1, sticky="w", padx=(10, 0), ipady=8)
-        self._open.grid_remove()
-
-        side = tk.Frame(block, background=background)
-        side.grid(row=1, column=1, rowspan=4, sticky="ne", padx=(24, 0))
-        self._last_activity = self._fact(side, 0, "Última actividad", "Sin actividad")
-        self._last_backup = self._fact(side, 1, "Último backup", "Comprobando…")
-        return block
-
-    def _fact(self, parent: tk.Frame, row: int, title: str, value: str) -> tk.Label:
-        """Recuadro blanco con un dato del estado; devuelve la etiqueta del valor."""
-        factor = style.scale(self)
-        box = ttk.Frame(
-            parent,
-            style="HeroTile.Atril.TFrame",
-            padding=(round(14 * factor), round(10 * factor)),
-            width=round(250 * factor),
-        )
-        box.grid(row=row, column=0, sticky="ew", pady=(0 if row == 0 else 10, 0))
-        style.label(box, title, font=style.SMALL, color=style.MUTED).grid(
-            row=0, column=0, sticky="w"
-        )
-        value_label = style.label(box, value, font=style.STRONG)
-        value_label.grid(row=1, column=0, sticky="w")
-        return value_label
+        self._toggle.grid(row=0, column=1, sticky="e", ipady=30)
+        return card
 
     def _build_tools(self) -> ttk.Frame:
         """Herramientas en baldosas de una fila: dos por fila, todas iguales."""
@@ -243,29 +234,17 @@ class HomeView(tk.Frame):
             self._show,
             quiet=True,
         )
-        self.shown()
         return started
-
-    def shown(self) -> None:
-        """Última actividad (está en memoria: se pinta cada vez)."""
-        events = [e for e in self.app.activity.events if not e.running]
-        if events:
-            title = events[0].title
-            title = title if len(title) <= 32 else f"{title[:31]}…"
-            self._last_activity.configure(
-                text=f"{title} · {when_label(events[0].when)}"
-            )
 
     def _show(self, data: HomeData) -> None:
         """Pinta el estado general, el botón y las herramientas."""
         facts = data.facts
         self._facts = facts
-        self._last_backup.configure(text=data.last_backup or "Ninguno")
+        self._summary.configure(text=summary_line(data.summary))
         self.app.set_facts(facts)
         level, headline, sentence = overall(facts)
-        self._headline.configure(
-            text=f"  {headline}", image=style.icon(self, style.LEVEL_ICONS[level], 44)
-        )
+        self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 88))
+        self._headline.configure(text=headline)
         self._sentence.configure(text=sentence)
         running = facts.backend_up or facts.frontend_up
         text = "Parar" if running else "Arrancar"

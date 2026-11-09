@@ -487,6 +487,7 @@ class App(tk.Tk):
             view.grid(row=0, column=0, sticky="nsew")
             view.grid_remove()
             self.views[name] = view
+        self._sidebar.add_links()
         self._footer = Footer(self)
         self._footer.grid(row=1, column=0, columnspan=2, sticky="ew")
 
@@ -597,9 +598,6 @@ class App(tk.Tk):
         view = self.views["Actividad"]
         if isinstance(view, HistoryView) and view.winfo_ismapped():
             view.refresh()
-        home = self.views["Inicio"]
-        if isinstance(home, HomeView):
-            home.shown()
 
     def _show_error(self, exc: Exception) -> None:
         """Muestra un error (las cancelaciones, solo en la actividad)."""

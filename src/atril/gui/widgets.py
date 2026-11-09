@@ -5,6 +5,7 @@ ventana. La lógica de presentación sin Tk está en :mod:`atril.gui.model`.
 """
 
 import tkinter as tk
+import webbrowser
 from collections.abc import Callable
 from tkinter import ttk
 
@@ -15,6 +16,13 @@ from atril.gui.model import Action, SortKey, ToolCard, sort_order
 
 SIDEBAR_WIDTH = 200
 """Anchura de la navegación a 100 % (se escala con la pantalla)."""
+
+LINKS = (
+    ("book-text", "https://isidro-rodriguez.github.io/atril/"),
+    ("github", "https://github.com/isidro-rodriguez/atril"),
+    ("pypi", "https://pypi.org/project/atril/"),
+)
+"""Iconos del pie de la navegación: la web, el repositorio y PyPI."""
 
 
 class Sidebar(tk.Frame):
@@ -56,6 +64,35 @@ class Sidebar(tk.Frame):
         for widget in (item, text, marker):
             widget.bind("<Button-1>", lambda _, n=name: self._on_select(n))
         self._items[name] = (item, text, icon)
+
+    def add_links(self) -> None:
+        """Iconos de la web, el repositorio y PyPI al pie de la navegación."""
+        self.rowconfigure(98, weight=1)
+        row = tk.Frame(self, background=style.SIDEBAR)
+        row.grid(row=99, column=0, pady=(0, 14))
+        for column, (icon, url) in enumerate(LINKS):
+            link = tk.Label(
+                row,
+                image=style.icon(self, f"{icon}-enlace", 20),
+                background=style.SIDEBAR,
+                cursor="hand2",
+                padx=8,
+                pady=4,
+            )
+            link.grid(row=0, column=column, padx=4)
+            link.bind("<Button-1>", lambda _, u=url: webbrowser.open(u))
+            link.bind(
+                "<Enter>",
+                lambda _, w=link, i=icon: w.configure(
+                    image=style.icon(self, f"{i}-enlace-sel", 20)
+                ),
+            )
+            link.bind(
+                "<Leave>",
+                lambda _, w=link, i=icon: w.configure(
+                    image=style.icon(self, f"{i}-enlace", 20)
+                ),
+            )
 
     def select(self, name: str) -> None:
         """Marca el apartado activo (fondo azul claro e indicador lateral)."""

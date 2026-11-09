@@ -36,8 +36,6 @@ NAVY = "#14254a"
 """Títulos (alias de :data:`TEXT`)."""
 MUTED = "#5b6b85"
 """Texto secundario."""
-HERO = "#f4f8fe"
-"""Fondo del «Estado general» de Inicio: el bloque principal de la ventana."""
 FIELD = "#fafafa"
 """Fondo de las tablas de sv-ttk y de los recuadros de texto."""
 TEXT_SELECTION = "#e7e7e7"
@@ -83,6 +81,7 @@ NAV = "AtrilNav"
 SUBTITLE = "AtrilSubtitle"
 TITLE = "AtrilTitle"
 LEAD = "AtrilLead"
+HEADLINE = "AtrilHeadline"
 DISPLAY = "AtrilDisplay"
 CAPTION = SMALL
 """Fuentes con nombre de atril (ver :func:`_fonts`)."""
@@ -128,7 +127,6 @@ def apply(root: tk.Tk) -> None:
     for name, element in (
         ("tarjeta", "Atril.Card.bg"),
         ("campo", "Atril.Field.bg"),
-        ("destacado", "Atril.Hero.bg"),
     ):
         image = tk.PhotoImage(
             master=root,
@@ -145,11 +143,6 @@ def apply(root: tk.Tk) -> None:
     # Recuadro con el fondo de las tablas para textos largos (detalle de Actividad).
     style.layout("Field.Atril.TFrame", [("Atril.Field.bg", {"sticky": "nsew"})])
     style.configure("Field.Atril.TFrame", background=CARD)
-    # Bloque destacado de Inicio y sus recuadros blancos (esquinas sobre HERO).
-    style.layout("Hero.Atril.TFrame", [("Atril.Hero.bg", {"sticky": "nsew"})])
-    style.configure("Hero.Atril.TFrame", background=PAGE)
-    style.layout("HeroTile.Atril.TFrame", [("Atril.Card.bg", {"sticky": "nsew"})])
-    style.configure("HeroTile.Atril.TFrame", background=HERO)
     for widget in ("TButton", "Accent.TButton", "TCheckbutton", "TEntry", "TCombobox"):
         style.configure(widget, font=BODY)
     style.configure("Treeview", font=BODY, rowheight=round(28 * scale(root)))
@@ -181,7 +174,8 @@ def _fonts(root: tk.Tk) -> None:
         (SMALL, 9, False),
         (STRONG, 10, True),
         (NAV, 11, False),
-        (LEAD, 12, False),
+        (LEAD, 24, False),
+        (HEADLINE, 60, True),
         (SUBTITLE, 14, True),
         (TITLE, 18, True),
         (DISPLAY, 30, True),
@@ -347,19 +341,6 @@ def tile(
         parent,
         style="Field.Atril.TFrame" if field else "Tile.Atril.TFrame",
         padding=(round(padding[0] * factor), round(padding[1] * factor)),
-    )
-
-
-def hero(parent: tk.Misc) -> ttk.Frame:
-    """Bloque destacado (fondo :data:`HERO`, borde azul claro y esquinas redondeadas).
-
-    Es el elemento principal de Inicio: más aire que una tarjeta normal.
-    """
-    factor = scale(parent)
-    return ttk.Frame(
-        parent,
-        style="Hero.Atril.TFrame",
-        padding=(round(28 * factor), round(22 * factor)),
     )
 
 
