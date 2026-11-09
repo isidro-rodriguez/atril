@@ -20,6 +20,8 @@ class PatchState(StrEnum):
     CHANGED = "código cambiado"
     """El texto original y el parcheado no aparecen una sola vez: hay que revisarlo."""
     NO_FILE = "sin fichero"
+    UPSTREAM = "incluido en DeepTutor"
+    """DeepTutor ya trae el arreglo (``upstream``): no hay nada que aplicar."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +33,8 @@ class Patch:
     file: str
     old: str
     new: str
+    upstream: str | None = None
+    """Texto que delata que DeepTutor ya trae el arreglo por su cuenta."""
 
     def state(self, app_dir: Path) -> PatchState:
         """Estado del parche en el checkout ``app_dir``."""
@@ -45,6 +49,8 @@ class Patch:
             return PatchState.APPLIED
         if (old, new) == (1, 0):
             return PatchState.PENDING
+        if (old, new) == (0, 0) and self.upstream and self.upstream in text:
+            return PatchState.UPSTREAM
         return PatchState.CHANGED
 
     def apply(self, app_dir: Path) -> PatchState:
@@ -52,7 +58,7 @@ class Patch:
 
         Returns:
             El estado final: ``APPLIED`` si ya lo estaba o se ha aplicado; si no,
-            ``CHANGED`` o ``NO_FILE`` (no se toca nada).
+            ``UPSTREAM``, ``CHANGED`` o ``NO_FILE`` (no se toca nada).
         """
         state = self.state(app_dir)
         if state is PatchState.PENDING:
@@ -66,7 +72,7 @@ class Patch:
 
         Returns:
             El estado final: ``PENDING`` si se ha deshecho o ya lo estaba; si no,
-            ``CHANGED`` o ``NO_FILE`` (no se toca nada).
+            ``UPSTREAM``, ``CHANGED`` o ``NO_FILE`` (no se toca nada).
         """
         state = self.state(app_dir)
         if state is PatchState.APPLIED:
@@ -102,6 +108,8 @@ PATCHES: dict[str, Patch] = {
             old="| subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]",
             new="| subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]"
             "  # atril: sin ventana",
+            # DeepTutor 1.7.2 lo arregló igual (issue #2421).
+            upstream="DETACHED_PROCESS lets that child allocate a visible console",
         ),
     )
 }

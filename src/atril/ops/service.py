@@ -186,6 +186,8 @@ def patch_finding(name: str, state: PatchState) -> Finding:
             )
         case PatchState.NO_FILE:
             return error(f"{name}: no existe {PATCHES[name].file} en app/.")
+        case PatchState.UPSTREAM:
+            return ok(f"{name}: DeepTutor ya lo incluye, no hace falta aplicarlo.")
 
 
 def apply_pending_patches(station: Station) -> list[Finding]:

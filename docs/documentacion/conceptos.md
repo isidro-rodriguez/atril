@@ -74,10 +74,12 @@ Pequeñas correcciones de atril sobre el código de DeepTutor, que se eligen en
 | Parche | Qué corrige |
 |---|---|
 | `paginas-citas` | Las citas muestran la página aunque el PDF no tenga etiquetas de página. |
-| `arranque-sin-ventana` | En Windows, arrancar DeepTutor no abre una consola vacía. |
+| `arranque-sin-ventana` | En Windows, arrancar DeepTutor no abre una consola vacía. DeepTutor 1.7.2 ya lo trae. |
 
-Un parche solo se aplica si el código original está intacto. Si DeepTutor cambia ese código,
-atril lo dice y no fuerza nada. Al arrancar, atril aplica los parches pendientes.
+Un parche solo se aplica si el código original está intacto. Si DeepTutor ya incluye el
+arreglo, atril lo reconoce y no hace nada (puedes quitarlo de la lista). Si DeepTutor cambia
+ese código de otra forma, atril lo dice y no fuerza nada. Al arrancar, atril aplica los
+parches pendientes.
 
 ## Ollama
 

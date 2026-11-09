@@ -205,8 +205,10 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   normalized paths (`processes._normalize`, which resolves `.`/`..`), never as substrings: `D:\DeepTutorBackup` is not inside
   `D:\DeepTutor`. Never touch other processes.
 - Patches are idempotent text replacements registered in `atril.patches.PATCHES`. Only two states
-  are clean: original once and patched absent (pending), or the reverse (applied); anything else
-  means DeepTutor changed and is an error, never forced.
+  are clean: original once and patched absent (pending), or the reverse (applied); a patch with
+  an `upstream` marker is also clean when neither text is there but the marker is (DeepTutor
+  ships the fix: `UPSTREAM`, nothing to do). Anything else means DeepTutor changed and is an
+  error, never forced.
 - Tests never wait for real time or call real services: fake `time.sleep`/`time.monotonic`,
   `ollama.get_status`, `DeepTutor` methods and `install.run_command`/`install.capture`.
 - `deeptutor doctor` does not accept `--home`; pass it explicitly only to `init`, `config`,

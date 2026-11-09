@@ -5,6 +5,14 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.38.3] - 2026-11-09
+
+### Fixed
+
+- Con DeepTutor 1.7.2, el parche `arranque-sin-ventana` salía como error («el código de
+  DeepTutor ha cambiado») y la instalación terminaba con errores. DeepTutor ya incluye ese
+  arreglo (#2421): atril lo reconoce como «DeepTutor ya lo incluye» y no toca el fichero.
+
 ## [0.38.2] - 2026-11-09
 
 ### Fixed

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from support import write
 
+from atril.checks import Level
 from atril.patches import PATCHES, Patch, PatchState
 
 PATCH = Patch("demo", "Demo", "pkg/mod.py", "old()", "new()")
@@ -80,3 +81,27 @@ def test_no_window_patch_on_launcher_snippet(tmp_path: Path) -> None:
     text = (tmp_path / patch.file).read_bytes().decode()
     assert "CREATE_NO_WINDOW" in text and "DETACHED_PROCESS" not in text
     assert text.count("\r\n") == 5
+
+
+def test_no_window_patch_is_upstream_in_deeptutor_1_7_2(tmp_path: Path) -> None:
+    from atril.ops.service import patch_finding
+
+    patch = PATCHES["arranque-sin-ventana"]
+    snippet = (  # el arreglo de DeepTutor 1.7.2 (#2421), sin el texto del parche
+        "    if sys.platform == 'win32':\n"
+        "        # A venv redirector's interpreter child must inherit a hidden\n"
+        "        # DETACHED_PROCESS lets that child allocate a visible console\n"
+        '        kwargs["creationflags"] = (\n'
+        "            subprocess.CREATE_NEW_PROCESS_GROUP\n"
+        "            | subprocess.CREATE_NO_WINDOW\n"
+        "        )\n"
+    )
+    path = tmp_path / patch.file
+    path.parent.mkdir(parents=True)
+    path.write_text(snippet, encoding="utf-8")
+
+    assert patch.state(tmp_path) is PatchState.UPSTREAM
+    assert patch.apply(tmp_path) is PatchState.UPSTREAM
+    assert patch.revert(tmp_path) is PatchState.UPSTREAM
+    assert path.read_text(encoding="utf-8") == snippet  # no se toca
+    assert patch_finding(patch.name, PatchState.UPSTREAM).level is Level.OK
