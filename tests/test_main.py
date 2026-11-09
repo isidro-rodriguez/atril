@@ -123,3 +123,26 @@ def test_without_terminal_does_not_ask(
 
     assert result.exit_code == 1
     assert "ATRIL_ESTACION" in result.output
+
+
+def test_gui_opens_window_detached(monkeypatch: pytest.MonkeyPatch) -> None:
+    from atril.commands import gui
+
+    calls: list[tuple[list[str], dict]] = []
+    monkeypatch.setattr(
+        gui.subprocess, "Popen", lambda args, **kw: calls.append((args, kw))
+    )
+
+    result = runner.invoke(app, ["gui"])
+
+    assert result.exit_code == 0, result.output
+    assert "Ventana de atril abierta." in result.output
+    [(args, options)] = calls
+    assert args[1:] == ["-c", "from atril.gui import main; main()"]
+    assert options["stdin"] is subprocess.DEVNULL
+    if sys.platform == "win32":
+        assert options["creationflags"] & 0x8  # DETACHED_PROCESS
+        assert Path(args[0]).name.lower() in {"pythonw.exe", "python.exe"}
+    else:
+        assert options["start_new_session"]
+        assert options["creationflags"] == 0

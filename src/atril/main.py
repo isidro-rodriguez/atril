@@ -5,7 +5,15 @@ from typing import Annotated
 import typer
 
 from atril import __version__
-from atril.commands import backup, config, deeptutor, install, knowledge, syllabus
+from atril.commands import (
+    backup,
+    config,
+    deeptutor,
+    gui,
+    install,
+    knowledge,
+    syllabus,
+)
 from atril.commands._common import console
 
 app = typer.Typer(
@@ -47,6 +55,7 @@ _DEEPTUTOR = "DeepTutor"
 _SYLLABI = "Temarios"
 
 app.command("validar", rich_help_panel=_CONFIG)(config.validate)
+app.command("gui", rich_help_panel="Ventana")(gui.open_gui)
 app.command("instalar", rich_help_panel=_DEEPTUTOR)(install.install_command)
 app.command("actualizar", rich_help_panel=_DEEPTUTOR)(install.update_command)
 app.command("arrancar", rich_help_panel=_DEEPTUTOR)(deeptutor.start)

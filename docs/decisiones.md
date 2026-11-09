@@ -116,7 +116,7 @@ El estudio se hace en la web de DeepTutor; la GUI arranca, mantiene y alimenta l
 | Tema | Decisión | Descartado |
 |---|---|---|
 | Tecnología | tkinter + ttk con el tema `sv-ttk` (aspecto Windows 11) | Qt, web embebida, Textual |
-| Paquete | Uno solo, `atril`: `atril` (CLI) y `atril-gui` (`[project.gui-scripts]`, sin consola) | Paquete aparte |
+| Paquete | Uno solo, `atril`: `atril` (CLI) y `atril-gui` (`[project.gui-scripts]`, sin consola). Desde 0.30.0, `atril gui` lanza la ventana como proceso aparte con `pythonw` y devuelve la consola (un *console script* dejaría la consola ocupada y, al cerrarla, mataría la ventana) | Paquete aparte; solo `atril gui` |
 | Núcleo | Nuevo `atril/ops/`: casos de uso sin Rich ni Typer que devuelven resultados o `Finding`, aceptan `progress(done, total, texto)` y un `threading.Event` de cancelación. `commands/` solo traduce argumentos, pinta y fija el código de salida; `gui/` igual con widgets. Los módulos actuales del núcleo no cambian | Capas `domain/`/`infrastructure/`; GUI que llame a la CLI por subprocess |
 | Errores | `AtrilError` (y subclases existentes) con mensaje en español; la CLI hace `fail()`, la GUI muestra un diálogo con detalle técnico | `typer.Exit` dentro de la lógica |
 | Confirmaciones | Las pide la interfaz antes de llamar a `ops`; nunca dentro de `ops` | |

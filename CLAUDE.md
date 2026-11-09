@@ -35,7 +35,8 @@
 │   ├── esquemas.md         # atril.toml and temario.toml reference
 │   └── ejemplos/           # Example config files, validated by the tests
 ├── src/atril/
-│   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup)
+│   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup,
+│   │                       #   gui)
 │   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus,
 │   │                       #   sources, knowledge, installation)
 │   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), widgets, style,
@@ -364,15 +365,18 @@ Before any `git push` with code changes:
    - **MAJOR**: breaking changes to public API.
    - **MINOR**: new backward-compatible functionality.
    - **PATCH**: bug fixes, internal refactors, docs affecting published package.
-2. **Update `CHANGELOG.md`** (Keep a Changelog):
+2. **Review `README.md`** (it is the PyPI page): check that commands, options, the GUI
+   description and installation steps still match the release; update it in the same release
+   if anything changed.
+3. **Update `CHANGELOG.md`** (Keep a Changelog):
    - Entries under `## [Unreleased]` while working, or promote to `## [X.Y.Z] - YYYY-MM-DD` on
      bump.
    - Group under `### Added`, `### Changed`, `### Fixed`, `### Removed`, `### Deprecated`,
      `### Security`.
    - Write in Spanish, imperative or past tense, explaining the _why_.
-3. **Lockfile consistency**: if bump changes dep constraints, update `pyproject.toml`, run
+4. **Lockfile consistency**: if bump changes dep constraints, update `pyproject.toml`, run
    `uv sync`, commit updated `uv.lock`.
-4. **Atomic release commit** before push:
+5. **Atomic release commit** before push:
    - `chore: bump versión a X.Y.Z`
    - `docs: actualiza CHANGELOG para X.Y.Z`
      Or a single combined commit if change and release are inseparable.
