@@ -30,7 +30,7 @@ Ayuda de cada comando: `atril <comando> --help`.
 
 | Apartado | Qué hace |
 |---|---|
-| Inicio | Estado general de DeepTutor; abrirlo, arrancarlo o pararlo. Herramientas e instalación |
+| Inicio | Estado general de DeepTutor con el botón que lo resuelve (abrir, arrancar, parar, aplicar parche); temarios, fuentes y último backup. Herramientas e instalación |
 | Temarios | Temario activo y sus KB (fuentes indexadas, por indexar y sin fichero); crear, indexar, reindexar y borrar |
 | Biblioteca | Fuentes del temario activo; añadir, descargar y buscar versiones nuevas |
 | Backups | Copias de cada destino y su verificación; hacer, comprobar y restaurar |

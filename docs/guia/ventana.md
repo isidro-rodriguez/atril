@@ -6,11 +6,24 @@ esta web, el repositorio en GitHub y la página en PyPI.
 
 ## Inicio
 
-**Estado general** ocupa la mayor parte: un icono y una palabra grande («En marcha»,
-«Parado», «Atención»…), una frase con lo siguiente que hacer y, abajo a la derecha,
-los botones para abrir DeepTutor en el navegador y arrancarlo o pararlo. Debajo, cada
-herramienta con su estado y, si hace falta, un botón para instalarla o arrancarla. Pulsar un
-logotipo abre la web de esa herramienta.
+**Estado general** ocupa la mayor parte. Arriba, un icono y una palabra grande con una
+frase corta, y a la derecha el botón que resuelve ese estado:
+
+| Estado | Frase | Botón |
+|---|---|---|
+| En marcha | DeepTutor está listo para estudiar. | Abrir en el navegador y Parar DeepTutor |
+| Parado | Inicia DeepTutor para estudiar. | Arrancar DeepTutor |
+| Con avisos | Parche pendiente. | Aplicar parche (lo aplica sin arrancar) |
+| Con avisos | Parche no encaja con DeepTutor. | Revisar en Ajustes |
+| Atención | Falta herramienta por instalar. | Arrancar, desactivado hasta instalarla |
+| Atención | Instala DeepTutor para empezar. | Instalar DeepTutor |
+
+Abajo, tres datos que llevan a su apartado al pulsarlos: los **temarios** (cuántos y cuál está
+activo), las **fuentes** (cuántas y si falta indexar o descargar alguna) y el **último backup**
+(cuándo y si está verificado; se avisa si tiene más de una semana).
+
+Debajo, cada herramienta con su estado y, si hace falta, un botón para instalarla o
+arrancarla. Pulsar un logotipo abre la web de esa herramienta.
 
 ![Inicio](../assets/images/capturas/inicio.png){ .at-shot }
 

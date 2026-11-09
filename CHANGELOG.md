@@ -5,6 +5,22 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.37.0] - 2026-11-09
+
+### Added
+
+- Inicio muestra, bajo el estado general, los temarios, las fuentes y el último backup; cada
+  dato lleva a su apartado.
+- «Aplicar parche» (aplica los pendientes sin arrancar) y «Revisar en Ajustes» (si un parche
+  ya no encaja), en naranja: el botón principal siempre resuelve el estado que se ve.
+
+### Changed
+
+- Estado general más grande, con frases cortas en una sola línea y botones más altos.
+- Si falta una herramienta, no se puede arrancar DeepTutor (tampoco desde el área de
+  notificación): Git y uv no hacen falta para arrancar, pero sí para actualizar.
+- Las capturas de la web muestran Física con varias bases de conocimiento.
+
 ## [0.36.0] - 2026-11-09
 
 ### Added

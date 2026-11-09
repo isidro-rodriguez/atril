@@ -43,21 +43,64 @@ NOW = dt.datetime(2026, 11, 9, 18, 30)
 SHOTS = ("inicio", "temarios", "biblioteca", "backups", "actividad", "ajustes-atril")
 """Ficheros que genera (y que la web usa)."""
 
+PHYSICS = {
+    # KB: (vinculante, descripción, patrones de id, documentos)
+    "fisica-teoria": (
+        True,
+        "Apuntes de clase y formulario",
+        ["tema-*", "formulario-*"],
+        [
+            "Tema 1 - Campo gravitatorio",
+            "Tema 2 - Campo eléctrico",
+            "Tema 3 - Campo magnético",
+            "Tema 4 - Inducción electromagnética",
+            "Tema 5 - Movimiento ondulatorio",
+            "Tema 6 - Óptica geométrica",
+            "Tema 7 - Física relativista",
+            "Tema 8 - Física cuántica",
+            "Tema 9 - Física nuclear",
+            "Formulario de Física",
+        ],
+    ),
+    "fisica-problemas": (
+        True,
+        "Exámenes y problemas resueltos",
+        ["problemas-*", "examenes-*", "olimpiada-*"],
+        [
+            "Problemas resueltos PAU 2023",
+            "Problemas resueltos PAU 2024",
+            "Problemas resueltos PAU 2025",
+            "Exámenes del instituto 2025-2026",
+            "Olimpiada de Física 2024 - fase local",
+            "Olimpiada de Física 2025 - fase local",
+        ],
+    ),
+    "fisica-divulgacion": (
+        False,
+        "Lecturas para ampliar (no entran en el examen)",
+        ["divulgacion-*"],
+        [
+            "Divulgación - Breve historia de la gravedad",
+            "Divulgación - Relatividad sin fórmulas",
+            "Divulgación - Qué es un cuanto",
+            "Divulgación - Ondas gravitacionales",
+            "Divulgación - Física de partículas",
+        ],
+    ),
+    "fisica-normativa": (
+        True,
+        "Currículo y criterios de la PAU",
+        ["real-decreto-*", "criterios-*"],
+        ["Criterios de corrección PAU de Física"],
+    ),
+}
+"""KB de Física: la de una alumna entusiasta, con fuentes variadas."""
+
+PENDING = {"fisica-divulgacion": 2}
+"""Fuentes sin indexar al final de cada KB (las demás, indexadas)."""
+
 SUBJECTS = {
-    "Física": [
-        "Tema 1 - Campo gravitatorio",
-        "Tema 2 - Campo eléctrico",
-        "Tema 3 - Campo magnético",
-        "Tema 4 - Inducción electromagnética",
-        "Tema 5 - Movimiento ondulatorio",
-        "Tema 6 - Óptica geométrica",
-        "Tema 7 - Física relativista",
-        "Tema 8 - Física cuántica",
-        "Tema 9 - Física nuclear",
-        "Formulario de Física",
-        "Problemas resueltos PAU 2024",
-        "Problemas resueltos PAU 2025",
-    ],
+    "Física": [],
     "Matemáticas II": [
         "Tema 1 - Matrices",
         "Tema 2 - Determinantes",
@@ -208,24 +251,29 @@ def prepare() -> Path:
     downloads.mkdir()
     for index, (name, documents) in enumerate(SUBJECTS.items()):
         syllabus = syllabus_ops.create(station, name)
-        for document in documents:
-            pdf = downloads / f"{document}.pdf"
-            seed = hashlib.sha256(f"{name}/{document}".encode()).digest()
-            pdf.write_bytes(b"%PDF-1.7 " + seed * 64)  # contenido fijo
-            syllabus_ops.add_source(
-                load_syllabus(syllabus.root), str(pdf), title=document
-            )
+        groups = {None: documents}
         if name == "Física":
-            syllabus_ops.add_source(
+            _physics_kbs(syllabus.root)
+            groups = {kb: docs for kb, (*_, docs) in PHYSICS.items()}
+        for kb_id, group in groups.items():
+            for document in group:
+                pdf = downloads / f"{document}.pdf"
+                seed = hashlib.sha256(f"{name}/{document}".encode()).digest()
+                pdf.write_bytes(b"%PDF-1.7 " + seed * 64)  # contenido fijo
+                syllabus_ops.add_source(
+                    load_syllabus(syllabus.root), str(pdf), title=document, kb_id=kb_id
+                )
+        if name == "Física":
+            syllabus_ops.add_source(  # declarada, aún sin descargar
                 load_syllabus(syllabus.root),
                 "https://www.boe.es/buscar/pdf/2022/BOE-A-2022-6008-consolidado.pdf",
                 title="Real Decreto 243/2022 (currículo de Bachillerato)",
+                kb_id="fisica-normativa",
             )
         _index(
             station,
             load_syllabus(syllabus.root),
             index,
-            skip=2 if name == "Física" else 0,
         )
     shutil.rmtree(downloads)
     _backups(station, copies)
@@ -236,14 +284,26 @@ def prepare() -> Path:
     return root
 
 
-def _index(station, syllabus, order: int, skip: int) -> None:
-    """Marca como indexadas todas las fuentes salvo las ``skip`` últimas."""
+def _physics_kbs(root: Path) -> None:
+    """Sustituye la KB única del temario nuevo por las de :data:`PHYSICS`."""
+    text = (root / "temario.toml").read_text(encoding="utf-8")
+    text = text[: text.index("[[kb]]")]
+    for kb_id, (binding, description, patterns, _) in PHYSICS.items():
+        text += (
+            f"[[kb]]\nid = {kb_id!r}\nvinculante = {str(binding).lower()}\n"
+            f"fuentes = {patterns!r}\ndescripcion = {description!r}\n\n"
+        )
+    (root / "temario.toml").write_text(text.replace("'", '"'), encoding="utf-8")
+
+
+def _index(station, syllabus, order: int) -> None:
+    """Marca como indexadas todas las fuentes salvo las de :data:`PENDING`."""
     from atril.knowledge import IndexedSource, Ledger, content_digest, ledger_path
 
     ledger = Ledger(ledger_path(syllabus))
     for kb in syllabus.knowledge_bases:
         sources = syllabus.sources_of(kb)
-        for source in sources[: len(sources) - skip]:
+        for source in sources[: len(sources) - PENDING.get(kb.id, 0)]:
             path = syllabus.source_path(source)
             if path is None or not path.exists():
                 continue
@@ -372,7 +432,7 @@ def capture(window, out: Path) -> list[Path]:
     plan = [
         ("inicio", "Inicio", None),
         ("temarios", "Temarios", None),
-        ("biblioteca", "Biblioteca", None),
+        ("biblioteca", "Biblioteca", "por base"),
         ("backups", "Backups", None),
         ("actividad", "Actividad", "primera"),
         ("ajustes-atril", "Ajustes", "Atril"),
@@ -413,6 +473,8 @@ def capture(window, out: Path) -> list[Path]:
         if extra == "primera":
             table = window.views["Actividad"]._list
             table.selection_set(table.get_children()[0])
+        elif extra == "por base":  # que se vean las cuatro KB de Física
+            window.views["Biblioteca"]._sorter.sort(1)
         elif extra is not None:
             window.views["Ajustes"].show_tab(extra)
         window.after(700, lambda: (shoot(name), step(index + 1)))

@@ -327,3 +327,13 @@ Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una colum
 | Verificaciones | `data/atril/verificaciones.json` guarda el resultado de cada comprobación con el tamaño y la fecha de modificación de la copia: deja de valer si la copia cambia. Estados Verificada, Con errores y Sin comprobar | Solo en memoria (se perdía al cerrar) |
 | Actividad | El detalle muestra el resultado completo. Si no se puede guardar, el pie lo avisa una vez y el error va a `atril-diagnostico.log` en la carpeta temporal | Ignorar el error |
 | Ventana | Sigue fija de 1024×700 | Redimensionable |
+
+## Inicio (0.37.0)
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Estado general | Icono (104 px) y estado (52 pt) con una frase de una línea, botones apilados a la derecha y, tras una línea, tres datos clicables: temarios, fuentes y último backup (antigua a los 7 días) | Último backup y actividad como tarjetas aparte |
+| Frases | Cortas y concretas: «Falta herramienta por instalar.», «Parche pendiente.», «Parche no encaja con DeepTutor.», «Inicia DeepTutor para estudiar.». El titular de error es «Atención» (cabe a 52 pt) | Listar las herramientas que faltan (ya se ven en sus baldosas) |
+| Botón principal | Resuelve el estado (`model.primary`): instalar, revisar en Ajustes y aplicar parche (naranja del logotipo, texto marino), arrancar o parar | Arrancar con un parche pendiente o que no encaja |
+| Herramientas que faltan | Se exigen todas (Git y uv hacen falta para actualizar): Arrancar queda desactivado (`App.block`, que sobrevive a otras operaciones) y el área de notificación avisa | Dejar arrancar si solo faltan Git o uv |
+| Capturas | Física con cuatro KB (teoría, problemas, divulgación y normativa) y la Biblioteca ordenada por base | Una sola KB por temario |
