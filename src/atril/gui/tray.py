@@ -14,6 +14,7 @@ import contextlib
 import queue
 import sys
 import threading
+import time
 from importlib import resources
 
 from atril.checks import Level
@@ -24,6 +25,8 @@ WINDOW_CLASS = "AtrilTrayWindow"
 
 MUTEX = "AtrilGui"
 """Mutex de la ventana: el instalador (``AppMutex``) pide cerrar atril si existe."""
+SETUP_MUTEX = "AtrilSetup"
+"""Mutex del instalador (``SetupMutex``): existe mientras se instala atril."""
 
 _CALLBACK = 0x8001  # WM_APP + 1: clics en el icono
 _SHOW = 0x8002  # WM_APP + 2: una segunda instancia pide mostrar la ventana
@@ -142,6 +145,29 @@ def release_mutex() -> None:
         if sys.platform == "win32" and handle:
             _kernel32.CloseHandle(handle)
 
+
+def setup_running() -> bool:
+    """El instalador de atril está en marcha (su mutex existe)."""
+    if sys.platform != "win32":
+        return False
+    handle = _kernel32.OpenMutexW(_SYNCHRONIZE, False, SETUP_MUTEX)
+    if not handle:
+        return False
+    _kernel32.CloseHandle(handle)
+    return True
+
+
+def wait_for_setup(timeout: float = 180.0) -> bool:
+    """Espera a que termine el instalador; ``False`` si sigue al acabar el plazo."""
+    deadline = time.monotonic() + timeout
+    while setup_running():
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.5)
+    return True
+
+
+_SYNCHRONIZE = 0x00100000
 
 _mutexes: list[int] = []
 """Mutex creados (se conservan mientras vive el proceso)."""
@@ -278,6 +304,8 @@ if sys.platform == "win32":
     _shell32.Shell_NotifyIconW.restype = wintypes.BOOL
     _kernel32.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
     _kernel32.CreateMutexW.restype = wintypes.HANDLE
+    _kernel32.OpenMutexW.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR)
+    _kernel32.OpenMutexW.restype = wintypes.HANDLE
     _kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
     _kernel32.CloseHandle.restype = wintypes.BOOL
     _kernel32.GetModuleHandleW.argtypes = (wintypes.LPCWSTR,)

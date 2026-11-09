@@ -182,6 +182,10 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   atril==X.Y.Z` with every uv folder inside the program folder (one tool dir per version,
   `herramientas\<version>`, so an update never deletes the venv in use; old ones are removed after); uninstalling deletes only that
   folder and its PATH entry, never the station. The GUI holds the `AtrilGui` mutex (`AppMutex`).
+  Setup holds `AtrilSetup` (`SetupMutex`): the GUI does not open while it exists, and setup
+  reopens it only in `DeinitializeSetup` (never from `[Run]`, processed before uv installs)
+  with `--tras-instalar`, which waits for that mutex. No Restart Manager
+  (`CloseApplications=no`).
 - Self-update (`ops.updates`): the GUI checks GitHub's latest release at startup (quiet, unless
   `[atril] buscar_actualizaciones = false`). Only an installer install (`installer_folder`) is
   updated in place: download, verify the release's SHA-256 `digest`, `tray.release_mutex()`,

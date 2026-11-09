@@ -624,7 +624,7 @@ STALE_BACKUP_DAYS = 7
 
 
 def syllabi_stat(data: list[SyllabusData], active: str | None) -> HomeStat:
-    """Temarios: cuántos hay y cuál está activo.
+    """Temarios: cuántos hay y cuál está activo («8 · Física»).
 
     Examples:
         >>> syllabi_stat([], None).text
@@ -634,12 +634,11 @@ def syllabi_stat(data: list[SyllabusData], active: str | None) -> HomeStat:
         return HomeStat("Temarios", Level.INFO, "Ninguno todavía", "Temarios")
     names = {item.syllabus.id: item.syllabus.name for item in data}
     name = names.get(active or "", data[0].syllabus.name)
-    count = f"{len(data)} temario" + ("s" if len(data) != 1 else "")
-    return HomeStat("Temarios", Level.OK, f"{count} · activo: {name}", "Temarios")
+    return HomeStat("Temarios", Level.OK, f"{len(data)} · {name}", "Temarios")
 
 
 def sources_stat(data: list[SyllabusData]) -> HomeStat:
-    """Fuentes de todos los temarios y lo que les falta.
+    """Fuentes de todos los temarios y lo que les falta («52 · 2 por indexar»).
 
     Examples:
         >>> sources_stat([]).text
@@ -659,19 +658,17 @@ def sources_stat(data: list[SyllabusData]) -> HomeStat:
         return HomeStat(
             "Fuentes",
             Level.WARNING,
-            f"{total} fuentes · {missing} sin fichero",
+            f"{total} · {missing} sin fichero",
             "Biblioteca",
         )
     if pending:
         return HomeStat(
             "Fuentes",
             Level.WARNING,
-            f"{total} fuentes · {pending} por indexar",
+            f"{total} · {pending} por indexar",
             "Temarios",
         )
-    return HomeStat(
-        "Fuentes", Level.OK, f"{total} fuentes · todas indexadas", "Biblioteca"
-    )
+    return HomeStat("Fuentes", Level.OK, f"{total} · todas indexadas", "Biblioteca")
 
 
 def backup_stat(

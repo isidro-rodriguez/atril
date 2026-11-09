@@ -755,8 +755,22 @@ def _prepare_windows() -> None:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("atril.gui")
 
 
+AFTER_SETUP = "--tras-instalar"
+"""Argumento con el que el instalador abre la ventana al terminar."""
+
+
 def run() -> None:
-    """Abre la ventana principal (tras la primera ejecución, si hace falta)."""
+    """Abre la ventana principal (tras la primera ejecución, si hace falta).
+
+    Mientras se instala atril no se abre: usaría (y retendría) los ficheros que el
+    instalador está sustituyendo. El instalador la abre al terminar, con
+    :data:`AFTER_SETUP`, y entonces espera a que su proceso haya acabado del todo.
+    """
+    if AFTER_SETUP in sys.argv[1:]:
+        if not tray.wait_for_setup():
+            return
+    elif tray.setup_running():
+        return  # la abrirá el instalador al terminar
     if tray.signal_running():
         return  # ya hay un atril abierto: se muestra ese
     tray.hold_mutex()

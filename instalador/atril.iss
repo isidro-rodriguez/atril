@@ -31,6 +31,14 @@ ChangesEnvironment=yes
 ; La ventana de atril crea este mutex: instalar o desinstalar con atril abierto
 ; pide cerrarlo primero (sus ficheros estarían en uso).
 AppMutex=AtrilGui
+; Mientras exista este mutex, la ventana no se abre (usaría los ficheros que uv
+; está sustituyendo) y la que abre el instalador al final espera a que desaparezca.
+SetupMutex=AtrilSetup
+; Sin el gestor de reinicio de Windows: podía cerrar la ventana y volver a abrirla
+; a mitad de la instalación, con la versión anterior. Ya se espera a la ventana
+; (/esperar) y se abre al terminar (DeinitializeSetup).
+CloseApplications=no
+RestartApplications=no
 ; Sin RedirectionGuard: Inno Setup lo activa por defecto y sus procesos hijos lo
 ; heredan (también los de ExecAsOriginalUser sin elevación), y uv no puede usar el
 ; enlace (junction) de versión menor de Python que crea (os error 448). Protege a
@@ -66,10 +74,12 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\bin\atril-gui.exe"; \
   IconFilename: "{app}\atril.ico"; AppUserModelID: "atril.gui"; Tasks: escritorio
 
 [Run]
-Filename: "{app}\bin\atril-gui.exe"; Description: "Abrir Atril"; \
-  Flags: nowait postinstall skipifsilent
-; Actualización desde la ventana (/SILENT /abrir=si): la vuelve a abrir al acabar.
-Filename: "{app}\bin\atril-gui.exe"; Flags: nowait; Check: ReopenAfterUpdate
+; --tras-instalar: la ventana espera a que el instalador se cierre del todo.
+Filename: "{app}\bin\atril-gui.exe"; Parameters: "--tras-instalar"; \
+  Description: "Abrir Atril"; Flags: nowait postinstall skipifsilent
+; La actualización desde la ventana (/SILENT /abrir=si) la vuelve a abrir en
+; DeinitializeSetup, no aquí: Inno Setup procesa [Run] antes de ssPostInstall,
+; es decir, antes de que uv instale la versión nueva (abría la anterior).
 
 [UninstallDelete]
 ; Lo que instaló uv (atril, su entorno y Python); la estación está fuera.
@@ -169,9 +179,23 @@ begin
   end;
 end;
 
+var
+  { Ventana que abrir al cerrar el instalador; vacía si no hay que abrir nada. }
+  ReopenPath: String;
+
 function ReopenAfterUpdate(): Boolean;
 begin
   Result := WizardSilent and (ExpandConstant('{param:abrir|no}') = 'si');
+end;
+
+{ Al cerrar el instalador, ya con la versión nueva instalada del todo (y solo si
+  la instalación terminó bien), abre la ventana si lo pidió la actualización. }
+procedure DeinitializeSetup();
+var
+  Code: Integer;
+begin
+  if ReopenPath <> '' then
+    Exec(ReopenPath, '--tras-instalar', '', SW_SHOWNORMAL, ewNoWait, Code);
 end;
 
 function PathEntry(): String;
@@ -223,6 +247,8 @@ begin
         + ExpandConstant('{app}\instalacion.log'));
     RemoveOldTools();
     AddToPath();
+    if ReopenAfterUpdate() then
+      ReopenPath := ExpandConstant('{app}\bin\atril-gui.exe');
   end;
 end;
 

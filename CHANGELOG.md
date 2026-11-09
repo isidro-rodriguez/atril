@@ -5,6 +5,21 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.37.1] - 2026-11-09
+
+### Fixed
+
+- Al actualizar desde la ventana, el instalador volvía a abrir atril antes de instalar la
+  versión nueva: salía la anterior, avisaba otra vez de la actualización y retenía sus
+  ficheros (probable causa de los fallos de actualización anteriores). Ahora la abre al
+  cerrarse del todo, y la ventana no se abre mientras haya una instalación en marcha.
+- Los datos de Inicio (temarios, fuentes y último backup) se recortan con «…» antes de
+  llegar al divisor, con nombres de temario largos.
+
+### Changed
+
+- Los datos de Inicio vuelven al formato corto: «8 · Física», «52 · 1 sin fichero».
+
 ## [0.37.0] - 2026-11-09
 
 ### Added

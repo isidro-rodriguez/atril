@@ -62,8 +62,8 @@ PRIMARY_BUTTONS = {
 }
 """Texto, icono y estilo del botón principal del estado general."""
 
-STAT_WIDTH = 190
-"""Ancho máximo (a 100 %) del texto de cada dato del estado general."""
+STAT_PADDING_EM = 2
+"""Hueco mínimo (en em) entre el texto de un dato y el divisor siguiente."""
 
 CLAUDE_CODE_URL = "https://docs.claude.com/en/docs/claude-code/setup"
 """Instrucciones oficiales para instalar Claude Code."""
@@ -226,6 +226,8 @@ class HomeView(tk.Frame):
             row=4, column=0, sticky="ew", pady=(round(10 * factor), round(16 * factor))
         )
         stats = tk.Frame(card, background=style.CARD)
+        self._stats_frame = stats
+        stats.bind("<Configure>", self._fit_stats)  # recorta al cambiar el ancho
         stats.grid(row=5, column=0, sticky="ew")
         self._stats: list[tuple[tk.Label, tk.Canvas, tk.Label]] = []
         for index, name in enumerate(STAT_ICONS):
@@ -267,6 +269,25 @@ class HomeView(tk.Frame):
         for widget in (box, image, title, dot, text):
             widget.bind("<Button-1>", lambda _event: self._go(index))
         return title, dot, text
+
+    def _fit_stats(self, _event: object = None) -> None:
+        """Pone los textos de los datos, recortados con «…» al ancho de su columna.
+
+        Se repite cuando cambia el ancho (la primera vez aún no se conoce).
+        """
+        parent = self._stats_frame
+        for index, ((title, _, label), stat) in enumerate(
+            zip(self._stats, self._shown_stats, strict=False)
+        ):
+            bbox = parent.grid_bbox(column=2 * index, row=0)
+            if bbox is None:
+                return
+            x, _, width, _ = bbox
+            end = x + width - round(STAT_PADDING_EM * _em(label))
+            box = label.master
+            for widget, text in ((title, stat.title), (label, stat.text)):
+                room = end - box.winfo_x() - widget.winfo_x()
+                widget.configure(text=_fit(widget, text, room) if width > 1 else text)
 
     def _go(self, index: int) -> None:
         """Lleva al apartado del dato pulsado."""
@@ -340,10 +361,10 @@ class HomeView(tk.Frame):
         else:
             self._open.grid_remove()
         self._shown_stats = data.stats
-        for (title, dot, label), stat in zip(self._stats, data.stats, strict=True):
-            title.configure(text=stat.title)
+        for (_, dot, _), stat in zip(self._stats, data.stats, strict=True):
             dot.itemconfigure(1, fill=style.LEVEL_COLORS[stat.level])
-            label.configure(text=_one_line(label, stat.text, STAT_WIDTH))
+        self._fit_stats()
+        self.after_idle(self._fit_stats)  # ya con el ancho de cada columna
         for tile, card in zip(self._tiles, tool_cards(facts), strict=True):
             tile.show(card, website=card.key in WEBSITES)
 
@@ -559,12 +580,24 @@ class HomeView(tk.Frame):
 def _one_line(label: tk.Label, text: str, width: int = SENTENCE_WIDTH) -> str:
     """``text`` abreviado con «…» para que quepa en una línea de ``label``.
 
-    El ancho disponible es el de la columna del texto en Inicio.
+    ``width`` es el ancho disponible a 100 % (la columna del texto en Inicio).
     """
-    width = round(width * style.scale(label))
+    return _fit(label, text, round(width * style.scale(label)))
+
+
+def _fit(label: tk.Label, text: str, pixels: int) -> str:
+    """``text`` abreviado con «…» para que mida como mucho ``pixels``."""
     font = tkfont.nametofont(str(label.cget("font")), root=label)
-    if font.measure(text) <= width:
+    if font.measure(text) <= pixels:
         return text
-    while text and font.measure(f"{text}…") > width:
+    while text and font.measure(f"{text}…") > pixels:
         text = text[:-1]
-    return f"{text.rstrip(' ,.:')}…"
+    return f"{text.rstrip(' ,.:·')}…"
+
+
+def _em(label: tk.Label) -> float:
+    """1 em de la fuente de ``label`` en píxeles (su tamaño)."""
+    size = tkfont.nametofont(str(label.cget("font")), root=label).actual("size")
+    if size < 0:  # tamaño en píxeles
+        return float(-size)
+    return size * float(label.tk.call("tk", "scaling"))
