@@ -11,8 +11,10 @@ proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 - Instalador: en Windows 11, uv fallaba al instalar Python («punto de montaje no confiable»,
   os error 448). Inno Setup activa RedirectionGuard, que heredan sus procesos hijos e impide
-  recorrer el enlace de versión menor que crea uv. Ahora uv se lanza como el usuario original,
-  sin esa protección. El instalador de 0.29.0 se ha reconstruido con el arreglo.
+  recorrer el enlace de versión menor que crea uv. Se desactiva (`RedirectionGuard=no`): el
+  instalador corre como el propio usuario, sin elevar, así que no protege ninguna frontera de
+  privilegios. Lanzar uv como el usuario original no bastaba. El instalador de 0.29.0 se ha
+  reconstruido con el arreglo.
 
 ## [0.29.0] - 2026-11-09
 

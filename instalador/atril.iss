@@ -31,6 +31,12 @@ ChangesEnvironment=yes
 ; La ventana de atril crea este mutex: instalar o desinstalar con atril abierto
 ; pide cerrarlo primero (sus ficheros estarían en uso).
 AppMutex=AtrilGui
+; Sin RedirectionGuard: Inno Setup lo activa por defecto y sus procesos hijos lo
+; heredan (también los de ExecAsOriginalUser sin elevación), y uv no puede usar el
+; enlace (junction) de versión menor de Python que crea (os error 448). Protege a
+; procesos elevados de enlaces de usuarios sin privilegios: aquí Setup corre como
+; el propio usuario, sin elevar, así que no hay frontera de privilegios que guardar.
+RedirectionGuard=no
 SetupIconFile=..\src\atril\gui\recursos\atril.ico
 UninstallDisplayIcon={app}\atril.ico
 UninstallDisplayName={#AppName}
@@ -72,8 +78,7 @@ Type: files; Name: "{app}\instalacion.log"
 
 [Code]
 { Variables de uv: todo dentro de la carpeta del programa, sin caché ni Python
-  del sistema. Se pasan en la propia línea de cmd porque uv no hereda el entorno
-  de Setup (ver InstallAtril). }
+  del sistema. }
 function UvEnvironment(): String;
 var
   App: String;
@@ -88,9 +93,7 @@ begin
 end;
 
 { Instala (o actualiza) atril con uv; la salida queda en instalacion.log.
-  Se lanza como el usuario original: los procesos hijos de Setup heredan
-  RedirectionGuard, que en Windows 11 impide a uv recorrer el enlace (junction)
-  que crea para la versión menor de Python (os error 448). }
+  Va por cmd para poner las variables de uv y redirigir la salida. }
 function InstallAtril(): Boolean;
 var
   Code: Integer;
@@ -99,7 +102,7 @@ begin
   Command := '/S /C "' + UvEnvironment() + '"' + ExpandConstant('{app}\uv.exe')
     + '" tool install --force --python {#PythonVersion} "atril=={#AppVersion}" > "'
     + ExpandConstant('{app}\instalacion.log') + '" 2>&1"';
-  Result := ExecAsOriginalUser(ExpandConstant('{cmd}'), Command,
+  Result := Exec(ExpandConstant('{cmd}'), Command,
     ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
 end;
 
