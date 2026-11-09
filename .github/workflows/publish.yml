@@ -138,16 +138,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC ha fallado" }
 
       - name: Esperar a que PyPI sirva la versión
-        # El índice simple (el que usa uv) tarda más que la API JSON en actualizarse.
+        # Se pregunta al propio uv: la API JSON y el índice HTML de PyPI pueden servir
+        # ya la versión cuando la variante JSON del índice que pide uv aún no.
         run: |
-          for ($i = 0; $i -lt 60; $i++) {
-            try {
-              $index = Invoke-WebRequest "https://pypi.org/simple/atril/" -UseBasicParsing -Headers @{ 'Cache-Control' = 'no-cache' }
-              if ($index.Content -match [regex]::Escape("atril-$env:VERSION-py3-none-any.whl")) { exit 0 }
-            } catch { }
-            Start-Sleep -Seconds 10
+          for ($i = 0; $i -lt 40; $i++) {
+            & uv-bin\uv.exe tool run --no-cache --isolated --from "atril==$env:VERSION" atril --version
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Start-Sleep -Seconds 15
           }
-          throw "El índice de PyPI no sirve atril $env:VERSION"
+          throw "uv no encuentra atril $env:VERSION en PyPI"
 
       - name: Probar instalación y desinstalación
         run: |
