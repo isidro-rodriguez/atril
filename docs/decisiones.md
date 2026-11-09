@@ -230,7 +230,7 @@ Sustituye lo anterior donde choque.
 | Ventanas emergentes | Centradas, sin barra de título y con la ventana oscurecida (velo semitransparente en Windows); todos los mensajes las usan |
 | Tablas | Margen de 1 em en las cabeceras; las celdas se sangran para alinearse con ellas |
 | Textos | Sin comandos ni opciones de la consola; una prueba lo comprueba en todos los módulos salvo `commands/` |
-| Ajustes | Todas las claves de `atril.toml` en pestañas: DeepTutor (asistente, búsqueda), Indexado (Ollama, ritmo), Backups, Avanzado (lo que obliga a reinstalar o reindexar) y Herramientas (instalar o reparar, actualizar, aplicar ajustes, diagnóstico, validar, copiar informe, volver a un commit, registros). Al guardar se dice qué hace falta (`ops.settings.effects`) y se ofrece aplicarlo |
+| Ajustes | Todas las claves de `atril.toml` en pestañas (desde 0.33.0: DeepTutor, Atril con actualizaciones, backups e indexado, Avanzado y Herramientas; antes: DeepTutor (asistente, búsqueda), Indexado (Ollama, ritmo), Backups, Avanzado (lo que obliga a reinstalar o reindexar) y Herramientas (instalar o reparar, actualizar, aplicar ajustes, diagnóstico, validar, copiar informe, volver a un commit, registros)). Al guardar se dice qué hace falta (`ops.settings.effects`) y se ofrece aplicarlo |
 | Lecturas | Las lecturas de fondo no bloquean botones ni dejan rastro en Actividad; sus errores se muestran en el propio apartado (p. ej., un destino de backups desconectado) |
 | Retoques (0.25.0) | Inicio recupera última actividad y último backup. Herramientas de dos en dos y en este orden: DeepTutor y Ollama, Python y uv, Node.js y npm, Git y Asistente; el logotipo abre la web de cada una (con su logotipo oficial, salvo el asistente). El Asistente comprueba el modelo activo en DeepTutor (Claude Code instalado, modelo de Ollama descargado o clave presente en la nube) sin leer la clave. Ajustes con una descripción de una línea por clave, 0,5 em entre claves y Avanzado en una columna desplazable por partes. Sin punto y coma en los textos |
 | Tablas ordenables (0.26.0) | Pulsar la cabecera ordena ascendente y, otra vez, descendente, con una flecha de Lucide en la cabecera (Inter no tiene flechas). Los empates, por la primera columna ascendente (alfabética, o por fecha en Backups y Actividad). Se conserva el orden al refrescar |
@@ -253,6 +253,10 @@ Sustituye lo anterior donde choque.
 ### Parches al arrancar (0.28.1)
 
 `arrancar` aplica los parches pendientes (código original intacto) antes de lanzar DeepTutor, que está parado. Antes solo avisaba, y unos parches deshechos (actualización interrumpida) volvían a abrir la consola en cada arranque. Un parche con el código cambiado sigue siendo un error y no se fuerza.
+
+### Ajustes (0.33.0)
+
+Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una columna desplazable, Actualizaciones, Backups e Indexado (al final, con la casilla de Ollama al principio de su parte), en lugar de tres pestañas cortas.
 
 ### Instalador (0.29.0)
 

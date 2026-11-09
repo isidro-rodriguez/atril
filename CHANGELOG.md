@@ -5,6 +5,14 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.33.0] - 2026-11-09
+
+### Changed
+
+- Ajustes: las pestañas Backups e Indexado pasan a la pestaña Atril, junto a Actualizaciones,
+  con Indexado al final. Quedan cuatro pestañas (DeepTutor, Atril, Avanzado y Herramientas)
+  en lugar de tres pestañas casi vacías.
+
 ## [0.32.3] - 2026-11-09
 
 ### Fixed

@@ -1,10 +1,10 @@
 """Apartado Ajustes: todo ``atril.toml`` en pestañas y las herramientas de DeepTutor.
 
-Pestañas: DeepTutor (asistente y búsqueda), Indexado (Ollama y ritmo), Backups,
-Atril (actualizaciones), Avanzado (lo que obliga a reinstalar o reindexar) y
-Herramientas (instalar, actualizar, aplicar, diagnosticar). Guardar valida el
-fichero entero antes de escribirlo y después dice qué hace falta para que el
-cambio surta efecto.
+Pestañas: DeepTutor (asistente y búsqueda), Atril (actualizaciones, backups y,
+al final, Ollama y el ritmo del indexado), Avanzado (lo que obliga a reinstalar o
+reindexar) y Herramientas (instalar, actualizar, aplicar, diagnosticar). Guardar
+valida el fichero entero antes de escribirlo y después dice qué hace falta para
+que el cambio surta efecto.
 """
 
 import tkinter as tk
@@ -71,6 +71,9 @@ def _ollama(station: Station, attribute: str, key: str) -> Value:
     return getattr(station.ollama, attribute)
 
 
+INDEXING = "Indexado"
+"""Parte de la pestaña Atril con Ollama y el ritmo del indexado."""
+
 Section = tuple[str | None, tuple[Field, ...]]
 """Título (o ``None``) y claves de una parte de una pestaña."""
 
@@ -106,9 +109,52 @@ TABS: dict[str, tuple[Section, ...]] = {
             ),
         ),
     ),
-    "Indexado": (
+    "Atril": (
         (
-            None,
+            "Actualizaciones",
+            (
+                Field(
+                    "atril",
+                    "buscar_actualizaciones",
+                    "Buscar al abrir",
+                    "bool",
+                    lambda s: s.atril.check_updates,
+                    "Busca una versión nueva de atril cada vez que se abre la ventana.",
+                ),
+            ),
+        ),
+        (
+            "Backups",
+            (
+                Field(
+                    "backup",
+                    "destinos",
+                    "Destinos",
+                    "folders",
+                    lambda s: [str(p) for p in s.backup.destinations],
+                    "Carpetas fuera de la estación. Un disco desconectado se salta.",
+                ),
+                Field(
+                    "backup",
+                    "formato",
+                    "Formato",
+                    "choice",
+                    lambda s: s.backup.archive_format,
+                    "zip es más rápido. tar.xz ocupa menos.",
+                    ARCHIVE_FORMATS,
+                ),
+                Field(
+                    "backup",
+                    "conservar",
+                    "Conservar",
+                    "int",
+                    lambda s: s.backup.keep,
+                    "Backups por destino. Los más antiguos se borran.",
+                ),
+            ),
+        ),
+        (
+            INDEXING,
             (
                 Field(
                     "ollama",
@@ -149,53 +195,6 @@ TABS: dict[str, tuple[Section, ...]] = {
                     "bool",
                     lambda s: s.indexing.download_models,
                     "Deja que el lector de PDF descargue sus modelos la primera vez.",
-                ),
-            ),
-        ),
-    ),
-    "Backups": (
-        (
-            None,
-            (
-                Field(
-                    "backup",
-                    "destinos",
-                    "Destinos",
-                    "folders",
-                    lambda s: [str(p) for p in s.backup.destinations],
-                    "Carpetas fuera de la estación. Un disco desconectado se salta.",
-                ),
-                Field(
-                    "backup",
-                    "formato",
-                    "Formato",
-                    "choice",
-                    lambda s: s.backup.archive_format,
-                    "zip es más rápido. tar.xz ocupa menos.",
-                    ARCHIVE_FORMATS,
-                ),
-                Field(
-                    "backup",
-                    "conservar",
-                    "Conservar",
-                    "int",
-                    lambda s: s.backup.keep,
-                    "Backups por destino. Los más antiguos se borran.",
-                ),
-            ),
-        ),
-    ),
-    "Atril": (
-        (
-            None,
-            (
-                Field(
-                    "atril",
-                    "buscar_actualizaciones",
-                    "Actualizaciones",
-                    "bool",
-                    lambda s: s.atril.check_updates,
-                    "Busca una versión nueva de atril al abrir la ventana.",
                 ),
             ),
         ),
@@ -383,10 +382,9 @@ class SettingsView(tk.Frame):
         self._pages: dict[str, tk.Frame] = {}
         for name, sections in TABS.items():
             tab = self._page(name)
-            body = self._scrolled(tab) if name == "Avanzado" else tab
+            long = name in {"Atril", "Avanzado"}
+            body = self._scrolled(tab) if long else tab
             row = 0
-            if name == "Indexado":
-                row = self._ollama_switch(body)
             if name == "Avanzado":
                 row = self._advanced_warning(body)
             for title, fields in sections:
@@ -448,6 +446,8 @@ class SettingsView(tk.Frame):
                 pady=(GAP * 2 if row else 0, GAP),
             )
             row += 1
+        if title == INDEXING:
+            row = self._ollama_switch(parent, row)
         for field in fields:
             style.label(parent, field.label, font=style.STRONG).grid(
                 row=row, column=0, sticky="nw", padx=(0, 16), pady=(4, 0)
@@ -461,18 +461,18 @@ class SettingsView(tk.Frame):
             row += 2
         return row
 
-    def _ollama_switch(self, parent: tk.Frame) -> int:
+    def _ollama_switch(self, parent: tk.Frame, row: int) -> int:
         """Casilla para usar Ollama y su explicación; devuelve la fila siguiente."""
         ttk.Checkbutton(
             parent, text="Usar Ollama para indexar fuentes", variable=self._use_ollama
-        ).grid(row=0, column=0, columnspan=2, sticky="w")
+        ).grid(row=row, column=0, columnspan=2, sticky="w")
         style.label(
             parent,
             "Sin Ollama, DeepTutor funciona pero no se indexa nada.",
             color=style.MUTED,
             font=style.SMALL,
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, GAP * 2))
-        return 2
+        ).grid(row=row + 1, column=0, columnspan=2, sticky="w", pady=(2, GAP * 2))
+        return row + 2
 
     def _advanced_warning(self, parent: tk.Frame) -> int:
         """Aviso de Avanzado; devuelve la fila siguiente."""
@@ -519,7 +519,13 @@ class SettingsView(tk.Frame):
     def _ollama_changed(self) -> None:
         """Sin Ollama, sus claves y las del indexado quedan desactivadas."""
         enabled = self._use_ollama.get()
-        indexing = {(f.table, f.key) for _, fs in TABS["Indexado"] for f in fs}
+        indexing = {
+            (f.table, f.key)
+            for _, sections in TABS.items()
+            for title, fs in sections
+            if title == INDEXING
+            for f in fs
+        }
         for key, control in self._controls.items():
             if key in indexing or key[0] == "ollama":
                 _set_enabled(control, enabled)
