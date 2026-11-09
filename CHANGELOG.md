@@ -5,6 +5,14 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.32.2] - 2026-11-09
+
+### Fixed
+
+- Con atril instalado con el instalador, si la release nueva aún no tenía su instalador (se
+  publica unos minutos después), la ventana decía que la copia no se había instalado con él.
+  Ahora no pregunta nada y lo ofrecerá la próxima vez.
+
 ## [0.32.1] - 2026-11-09
 
 ### Changed

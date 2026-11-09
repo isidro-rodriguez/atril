@@ -391,7 +391,9 @@ class App(tk.Tk):
             f"Hay una versión nueva de atril, la {release.version} "
             f"(tienes la {__version__})."
         )
-        if updates.installer_folder() and release.installer_url:
+        if updates.installer_folder():
+            if release.installer_url is None:
+                return  # el instalador se publica unos minutos después: otro día
             if ask_yes_no(
                 self,
                 "Versión nueva",
