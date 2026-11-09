@@ -1,6 +1,6 @@
 [project]
 name = "atril"
-version = "0.38.0"
+version = "0.38.1"
 description = "Gestiona una instalación local de DeepTutor y sus temarios"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -39,6 +39,7 @@ atril-gui = "atril.gui:main"
 
 [dependency-groups]
 dev = [
+  "pillow>=13.0.0",
   "pre-commit>=4.7.0",
   "pytest>=9.1.1",
   "pytest-cov>=7.1.0",

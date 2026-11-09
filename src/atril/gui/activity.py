@@ -161,15 +161,19 @@ class ActivityLog:
 
 
 def _load(path: Path) -> list[Event]:
-    """Eventos del fichero; las líneas que no se entienden se ignoran."""
+    """Eventos del fichero; las líneas que no se entienden se ignoran.
+
+    Se decodifica línea a línea: unos bytes que no son UTF-8 (un corte a medio
+    escribir, un disco dañado) solo invalidan su línea, no el historial entero.
+    """
     events = []
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = path.read_bytes().splitlines()
     except OSError:
         return []
     for line in lines[-MAX_EVENTS:]:
         try:
-            data = json.loads(line)
+            data = json.loads(line.decode("utf-8"))
             events.append(
                 Event(
                     title=str(data["title"]),

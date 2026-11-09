@@ -1,21 +1,14 @@
 # .github/workflows/docs.yml
 name: Docs
 
-# La web se publica con cada versión de atril: publish.yml llama a este workflow
-# con el tag recién creado, y las capturas se generan con el código de ese tag.
-# A mano solo se puede rehacer la de un tag ya publicado (mismo proceso, nada
-# guardado de antes). Las capturas nunca se versionan ni se reutilizan.
+# La web se publica solo con cada versión de atril: publish.yml llama a este
+# workflow con el tag recién creado, y las capturas se generan con el código de
+# ese tag. No hay ejecución manual. Las capturas nunca se versionan ni se reutilizan.
 on:
   workflow_call:
     inputs:
       tag:
         description: Tag de la versión publicada (vX.Y.Z)
-        required: true
-        type: string
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Tag de una versión publicada (vX.Y.Z)
         required: true
         type: string
 

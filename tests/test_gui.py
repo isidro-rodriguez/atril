@@ -294,3 +294,20 @@ def test_activity_save_failure_is_reported_once(
     assert history.error is not None and "No se puede guardar" in history.error
     assert len(log.read_text(encoding="utf-8").splitlines()) == 1  # una sola vez
     assert len(history.events) == 2  # siguen en memoria
+
+
+def test_activity_with_corrupt_bytes_keeps_readable_events(tmp_path) -> None:
+    from atril.gui.activity import ActivityLog
+
+    path = tmp_path / "actividad.jsonl"
+    first = ActivityLog(path)
+    for title in ("Arrancar", "Hacer backup"):
+        event = first.start(title)
+        event.finish()
+        first.save(event)
+    good = path.read_bytes().splitlines()
+    # Una línea con bytes que no son UTF-8 entre dos válidas, y un corte al final.
+    path.write_bytes(good[0] + b"\n\xff\xfe{roto\xf3}\n" + good[1] + b"\n\xe1\x80")
+
+    history = ActivityLog(path)  # no lanza: la ventana puede abrir
+    assert [event.title for event in history.events] == ["Hacer backup", "Arrancar"]

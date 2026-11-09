@@ -5,6 +5,21 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.38.1] - 2026-11-09
+
+### Fixed
+
+- Un historial de actividad con bytes que no son UTF-8 (un corte al escribir, un disco
+  dañado) impedía abrir la ventana: ahora solo se ignoran las líneas ilegibles y se conservan
+  las demás.
+
+### Changed
+
+- La web ya no se puede publicar a mano: solo con cada versión, desde su tag, para que nunca
+  se regenere la de una versión antigua.
+- Pruebas acotadas del generador de capturas: validación de las seis imágenes, rechazo de
+  imágenes incompletas o inválidas, aislamiento de carpetas y fallo sin sustituir las capturas.
+
 ## [0.38.0] - 2026-11-09
 
 ### Added

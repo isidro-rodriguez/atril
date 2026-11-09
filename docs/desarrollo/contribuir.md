@@ -18,7 +18,7 @@ uv run pre-commit install      # hooks de pre-commit y pre-push (recomendado)
 | Grupo | Paquetes |
 |---|---|
 | Ejecución | `acodo`, `typer`, `psutil`, `tomlkit`, `sv-ttk` |
-| Desarrollo | `ruff`, `ty`, `pytest`, `pytest-cov`, `pre-commit`, `zensical` |
+| Desarrollo | `ruff`, `ty`, `pytest`, `pytest-cov`, `pre-commit`, `zensical`, `pillow` (pruebas del generador de capturas) |
 
 ## Calidad
 
@@ -62,8 +62,7 @@ uv run zensical build   # genera el sitio en site/
 
 El sitio se publica en GitHub Pages **con cada versión**: al crear la release, `publish.yml`
 llama a `docs.yml` con su tag, y la web se construye con el código de ese tag. Un cambio que
-solo toca `docs/` se ve en la web con la siguiente versión. A mano (`workflow_dispatch`) solo se
-puede rehacer la web de un tag ya publicado.
+solo toca `docs/` se ve en la web con la siguiente versión: no hay publicación manual.
 
 ### Capturas
 
@@ -78,7 +77,10 @@ manual), en tres pasos separados:
 3. Espera a que cada apartado haya cargado (como mucho 60 s), lo captura y valida todas las
    imágenes (las seis, PNG de 1024×700 y un tamaño mínimo) antes de entregarlas.
 
-Cualquier fallo termina con código de error, y entonces no se publica la web. Fuera de la CI
+Cualquier fallo termina con código de error, y entonces no se publica la web. Su ejecución
+real en cada publicación es la prueba de integración; `tests/test_capturas.py` solo cubre la
+validación de las imágenes, el aislamiento de carpetas y que un fallo no sustituya las
+capturas. Fuera de la CI
 usa una carpeta temporal; sirve para revisar el aspecto antes de `zensical serve`:
 
 ```bash
