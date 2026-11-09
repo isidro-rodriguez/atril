@@ -108,6 +108,14 @@ class BackupConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class AtrilConfig:
+    """Tabla ``[atril]`` (opcional): comportamiento del propio atril."""
+
+    check_updates: bool = True
+    """Buscar una versión nueva de atril al abrir la ventana."""
+
+
+@dataclass(frozen=True, slots=True)
 class Station:
     """Configuración completa de una estación."""
 
@@ -117,6 +125,7 @@ class Station:
     """``None`` sin Ollama: DeepTutor funciona, pero no se indexan fuentes."""
     indexing: IndexingConfig
     backup: BackupConfig
+    atril: AtrilConfig = AtrilConfig()
 
     def require_ollama(self) -> OllamaConfig:
         """Configuración de Ollama, necesaria para indexar y evaluar.
@@ -280,6 +289,7 @@ def _station(data: dict[str, Any], path: Path, root: Path) -> Station:
         ollama=_ollama(top.get_table("ollama")) if top.has("ollama") else None,
         indexing=_indexing(top.get_table("indexado", required=False)),
         backup=_backup(top.get_table("backup"), root.resolve()),
+        atril=_atril(top.get_table("atril", required=False)),
     )
     top.close()
     return station
@@ -372,6 +382,15 @@ def _indexing(table: Table) -> IndexingConfig:
         )
     if config.chunk_overlap >= config.chunk_size:
         raise table.error("'solape' debe ser menor que 'chunk'.")
+    table.close()
+    return config
+
+
+def _atril(table: Table) -> AtrilConfig:
+    """Tabla ``[atril]`` (opcional)."""
+    config = AtrilConfig(
+        check_updates=table.get_bool("buscar_actualizaciones", True),
+    )
     table.close()
     return config
 

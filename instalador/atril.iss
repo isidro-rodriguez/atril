@@ -68,6 +68,8 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\bin\atril-gui.exe"; \
 [Run]
 Filename: "{app}\bin\atril-gui.exe"; Description: "Abrir Atril"; \
   Flags: nowait postinstall skipifsilent
+; Actualización desde la ventana (/SILENT /abrir=si): la vuelve a abrir al acabar.
+Filename: "{app}\bin\atril-gui.exe"; Flags: nowait; Check: ReopenAfterUpdate
 
 [UninstallDelete]
 ; Lo que instaló uv (atril, su entorno y Python); la estación está fuera.
@@ -104,6 +106,11 @@ begin
     + ExpandConstant('{app}\instalacion.log') + '" 2>&1"';
   Result := Exec(ExpandConstant('{cmd}'), Command,
     ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+end;
+
+function ReopenAfterUpdate(): Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:abrir|no}') = 'si');
 end;
 
 function PathEntry(): String;

@@ -35,3 +35,6 @@ pausa_embedding = 0   # ms mínimos entre peticiones de embedding; deja respirar
 destinos = ['E:\backups-atril', 'G:\Mi unidad\Backups\atril']
 formato = "zip"   # "zip" (deflate 9) o "tar.xz" (xz 9: más compacto, bastante más lento)
 conservar = 7     # copias que se guardan en cada destino; las más antiguas se borran
+
+[atril]            # tabla opcional
+buscar_actualizaciones = true  # al abrir la ventana, avisa si hay una versión nueva

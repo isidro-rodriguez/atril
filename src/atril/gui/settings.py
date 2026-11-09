@@ -1,9 +1,10 @@
 """Apartado Ajustes: todo ``atril.toml`` en pestañas y las herramientas de DeepTutor.
 
 Pestañas: DeepTutor (asistente y búsqueda), Indexado (Ollama y ritmo), Backups,
-Avanzado (lo que obliga a reinstalar o reindexar) y Herramientas (instalar,
-actualizar, aplicar, diagnosticar). Guardar valida el fichero entero antes de
-escribirlo y después dice qué hace falta para que el cambio surta efecto.
+Atril (actualizaciones), Avanzado (lo que obliga a reinstalar o reindexar) y
+Herramientas (instalar, actualizar, aplicar, diagnosticar). Guardar valida el
+fichero entero antes de escribirlo y después dice qué hace falta para que el
+cambio surta efecto.
 """
 
 import tkinter as tk
@@ -180,6 +181,21 @@ TABS: dict[str, tuple[Section, ...]] = {
                     "int",
                     lambda s: s.backup.keep,
                     "Backups por destino. Los más antiguos se borran.",
+                ),
+            ),
+        ),
+    ),
+    "Atril": (
+        (
+            None,
+            (
+                Field(
+                    "atril",
+                    "buscar_actualizaciones",
+                    "Actualizaciones",
+                    "bool",
+                    lambda s: s.atril.check_updates,
+                    "Busca una versión nueva de atril al abrir la ventana.",
                 ),
             ),
         ),

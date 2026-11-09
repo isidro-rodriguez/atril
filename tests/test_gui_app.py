@@ -52,6 +52,9 @@ SCRIPT = textwrap.dedent(
     from atril import ollama
 
     ollama.get_status = lambda url, timeout=3.0: ollama.OllamaStatus(False)
+    from atril.ops import updates
+
+    updates.check = lambda current="": None  # sin consultar GitHub
     syllabus_ops.create(station, "Física")
     syllabus_ops.create(station, "Historia")
 

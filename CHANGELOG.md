@@ -5,6 +5,17 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.31.0] - 2026-11-09
+
+### Added
+
+- Al abrir la ventana, atril busca una versión nueva en GitHub. Si se instaló con el instalador
+  de Windows, ofrece actualizar: descarga el nuevo instalador, comprueba su suma SHA-256, se
+  cierra, se instala sin preguntas y vuelve a abrirse. Si se instaló de otra forma, ofrece ver
+  las novedades. Sin conexión no dice nada.
+- Clave `[atril] buscar_actualizaciones` (por defecto `true`) y pestaña Atril en Ajustes para
+  desactivar esa búsqueda.
+
 ## [0.30.0] - 2026-11-09
 
 ### Added

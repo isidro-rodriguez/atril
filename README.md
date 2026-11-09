@@ -41,6 +41,10 @@ con un menú para mostrarla, abrir DeepTutor, arrancarlo o pararlo, hacer un bac
 («Salir» para DeepTutor y el Ollama que abrió atril). Sin DeepTutor en marcha, se cierra del
 todo. Abrir `atril-gui` de nuevo muestra la ventana existente.
 
+Al abrirse, la ventana busca una versión nueva de atril. Si lo instalaste con el instalador, se
+actualiza sola tras confirmarlo. Se desactiva en Ajustes > Atril
+(`[atril] buscar_actualizaciones = false`).
+
 ### Configuración
 
 ```bash

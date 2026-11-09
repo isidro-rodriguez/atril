@@ -38,7 +38,7 @@
 │   ├── commands/           # CLI commands (config, deeptutor, install, syllabus, knowledge, backup,
 │   │                       #   gui)
 │   ├── ops/                # Use cases shared by CLI and GUI (service, backup, station, syllabus,
-│   │                       #   sources, knowledge, installation)
+│   │                       #   sources, knowledge, installation, settings, updates)
 │   ├── gui/                # tkinter + sv-ttk GUI (`atril-gui`): app (shell), widgets, style,
 │   │                       #   model, activity, worker, dialogs, desktop, tray and one module per
 │   │                       #   section (home, syllabi, library, backups, history,
@@ -167,6 +167,11 @@ Read `docs/decisiones.md` before any non-trivial change. Key points:
   a pinned `uv.exe` (update `UV_VERSION`/`UV_SHA256` together) and runs `uv tool install
   atril==X.Y.Z` with every uv folder inside the program folder; uninstalling deletes only that
   folder and its PATH entry, never the station. The GUI holds the `AtrilGui` mutex (`AppMutex`).
+- Self-update (`ops.updates`): the GUI checks GitHub's latest release at startup (quiet, unless
+  `[atril] buscar_actualizaciones = false`). Only an installer install (`installer_folder`) is
+  updated in place: download, verify the release's SHA-256 `digest`, `tray.release_mutex()`,
+  launch the installer with `/SILENT /abrir=si` and quit; any other install only links the
+  release page.
 - Every `subprocess` call passes `creationflags=processes.no_window()`: without a console (GUI,
   `pythonw`) Windows would open an empty console window per child.
 - Commands report through `atril.checks.Finding` (ok/info/aviso/error) and `commands._common.show`;

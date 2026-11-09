@@ -48,6 +48,7 @@ embedding). `atril kb indexar` vuelve a aplicar `[indexado]` antes de empezar. S
 | `[backup]` | `destinos` | lista de rutas absolutas | **obligatorio** | Carpetas para las copias; fuera de la estación. Un disco desconectado se salta |
 | | `formato` | `zip` · `tar.xz` | `"zip"` | `zip` (deflate 9) o `tar.xz` (xz 9: más compacto, bastante más lento) |
 | | `conservar` | entero ≥ 1 | `7` | Copias que se guardan en cada destino; las más antiguas se borran |
+| `[atril]` (opcional) | `buscar_actualizaciones` | booleano | `true` | Al abrir la ventana, consulta la última release en GitHub y ofrece actualizar (con el instalador de Windows) o ver las novedades |
 
 Cada copia es `atril-AAAAMMDD-HHMMSS.zip` (o `.tar.xz`; `-2`, `-3`... si coincide el segundo)
 con `atril.toml`, `data\` (sin `data\atril\logs\`) y `temarios\`, más `atril-backup.json`: ruta

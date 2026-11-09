@@ -36,6 +36,7 @@ EDITABLE = {
         "pausa_embedding",
     ),
     "backup": ("destinos", "formato", "conservar"),
+    "atril": ("buscar_actualizaciones",),
 }
 """Claves que se pueden cambiar desde la ventana, por tabla (todas las del esquema)."""
 

@@ -135,6 +135,14 @@ def hold_mutex() -> None:
         _mutexes.append(_kernel32.CreateMutexW(None, False, MUTEX))
 
 
+def release_mutex() -> None:
+    """Libera el mutex (antes de lanzar el instalador, que lo comprueba)."""
+    while _mutexes:
+        handle = _mutexes.pop()
+        if sys.platform == "win32" and handle:
+            _kernel32.CloseHandle(handle)
+
+
 _mutexes: list[int] = []
 """Mutex creados (se conservan mientras vive el proceso)."""
 
@@ -270,6 +278,8 @@ if sys.platform == "win32":
     _shell32.Shell_NotifyIconW.restype = wintypes.BOOL
     _kernel32.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
     _kernel32.CreateMutexW.restype = wintypes.HANDLE
+    _kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    _kernel32.CloseHandle.restype = wintypes.BOOL
     _kernel32.GetModuleHandleW.argtypes = (wintypes.LPCWSTR,)
     _kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 

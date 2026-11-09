@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from atril import __version__
 from atril.checks import Finding, Level
 from atril.config import ConfigError, load_station
 from atril.config.station import STATION_FILE, Station, init_station
@@ -42,7 +43,7 @@ from atril.gui.settings import SettingsView
 from atril.gui.syllabi import SyllabiView
 from atril.gui.widgets import Footer, Sidebar
 from atril.gui.worker import Worker
-from atril.ops import Reporter, service
+from atril.ops import Reporter, service, updates
 from atril.ops.station import persist_station, saved_station
 
 POLL_MS = 100
@@ -50,6 +51,9 @@ POLL_MS = 100
 
 WIDTH, HEIGHT = 1024, 700
 """Tamaño fijo de la ventana a 100 % (se escala con la pantalla)."""
+
+UPDATE_DELAY_MS = 1500
+"""Espera tras abrir antes de buscar una versión nueva (no retrasa el arranque)."""
 
 STATUS_TTL = 60.0
 """Segundos que vale el estado de los servicios antes de volver a consultarlo."""
@@ -111,6 +115,8 @@ class App(tk.Tk):
         """Icono del área de notificación (``None`` fuera de Windows)."""
         self.after(POLL_MS, self._poll)
         self.show_view("Inicio")
+        if station.atril.check_updates:
+            self.after(UPDATE_DELAY_MS, self._check_updates)
 
     # --- servicios para los apartados -----------------------------------------
 
@@ -366,6 +372,62 @@ class App(tk.Tk):
             service.shutdown(station, reporter)
 
         self.run("Parando los servicios...", stop, self._quit, title="Salir")
+
+    def _check_updates(self) -> None:
+        """Busca en segundo plano una versión nueva de atril (sin rastro si falla)."""
+        if not self.run(
+            "Buscando una versión nueva...",
+            lambda _: updates.check(),
+            self._offer_update,
+            quiet=True,
+        ):
+            self.after(UPDATE_DELAY_MS, self._check_updates)  # había otra lectura
+
+    def _offer_update(self, release: updates.Release | None) -> None:
+        """Pregunta si actualizar (o, sin instalador, si ver las novedades)."""
+        if release is None or self.closed:
+            return
+        intro = (
+            f"Hay una versión nueva de atril, la {release.version} "
+            f"(tienes la {__version__})."
+        )
+        if updates.installer_folder() and release.installer_url:
+            if ask_yes_no(
+                self,
+                "Versión nueva",
+                f"{intro} Atril se cerrará, se instalará la nueva y se volverá a "
+                "abrir. Si DeepTutor está en marcha, sigue funcionando.",
+                "Actualizar",
+            ):
+                self._update(release)
+            return
+        if ask_yes_no(
+            self,
+            "Versión nueva",
+            f"{intro} Esta copia no se instaló con el instalador de atril: "
+            "actualízala por el mismo medio con que la instalaste.",
+            "Ver novedades",
+        ):
+            webbrowser.open(release.page)
+
+    def _update(self, release: updates.Release) -> None:
+        """Descarga el instalador, lo lanza y cierra la ventana."""
+        cancel = self.worker.cancel
+
+        def download(reporter: Reporter) -> Path:
+            return updates.download_installer(release, reporter, cancel)
+
+        def install(installer: Path) -> None:
+            tray.release_mutex()  # el instalador espera a que no exista
+            updates.launch_installer(installer)
+            self._quit(None)
+
+        self.run(
+            "Descargando la versión nueva...",
+            download,
+            install,
+            title=f"Actualizar atril a {release.version}",
+        )
 
     def _tray_command(self, command: TrayCommand) -> None:
         """Atiende una orden del icono."""
