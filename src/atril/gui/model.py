@@ -8,6 +8,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from pathlib import Path
 
 from atril.checks import Finding, Level
 from atril.config import Syllabus, load_syllabi
@@ -356,6 +357,17 @@ class SourceRow:
     file: str
     state: str
     level: Level
+
+
+def document_path(syllabus: Syllabus, source_id: str) -> Path | None:
+    """Documento local de una fuente del temario, o ``None`` (remota o retirada).
+
+    Puede no existir todavía (sin descargar): lo comprueba quien lo abre.
+    """
+    for source in syllabus.sources:
+        if source.id == source_id:
+            return syllabus.source_path(source)
+    return None
 
 
 def source_rows(data: SyllabusData) -> list[SourceRow]:

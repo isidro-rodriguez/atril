@@ -32,7 +32,7 @@ Ayuda de cada comando: `atril <comando> --help`.
 |---|---|
 | Inicio | Estado general de DeepTutor con el botón que lo resuelve (abrir, arrancar, parar, aplicar parche); temarios, fuentes y último backup. Herramientas e instalación |
 | Temarios | Temario activo y sus KB (fuentes indexadas, por indexar y sin fichero); crear, indexar, reindexar y borrar |
-| Biblioteca | Fuentes del temario activo; añadir, descargar y buscar versiones nuevas |
+| Biblioteca | Fuentes del temario activo (doble clic para abrirlas); añadir, descargar y buscar versiones nuevas |
 | Backups | Copias de cada destino y su verificación; hacer, comprobar y restaurar |
 | Actividad | Historial de operaciones con su detalle técnico |
 | Ajustes | Todas las claves de `atril.toml` y herramientas (actualizar, diagnóstico...) |

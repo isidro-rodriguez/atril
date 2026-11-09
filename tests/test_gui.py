@@ -201,6 +201,7 @@ def test_source_rows_and_actions(station_dir) -> None:
     from atril.gui.model import (
         SyllabusData,
         actions_needed,
+        document_path,
         filter_rows,
         source_rows,
     )
@@ -221,6 +222,9 @@ def test_source_rows_and_actions(station_dir) -> None:
     assert any(row.state == "Sin fichero" for row in rows)
     assert actions_needed(statuses) == (True, [])
     assert filter_rows(rows, "no existe") == []
+    # Doble clic en la Biblioteca: el documento de cada fila.
+    assert document_path(syllabus, first.source_id) == path
+    assert document_path(syllabus, "no-existe") is None
 
 
 def test_close_hides_only_with_tray_and_deeptutor_running() -> None:

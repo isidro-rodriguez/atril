@@ -8,10 +8,11 @@ from atril.checks import Finding, Level, ok
 from atril.config import Syllabus, load_syllabus
 from atril.gui import style
 from atril.gui.desktop import open_path
-from atril.gui.dialogs import ask_choice, ask_text
+from atril.gui.dialogs import ask_choice, ask_text, show_message
 from atril.gui.model import (
     SourceRow,
     SyllabusData,
+    document_path,
     filter_rows,
     fold,
     load_all,
@@ -116,6 +117,8 @@ class LibraryView(tk.Frame):
         style.tag_levels(self._table)
         self._sorter = TableSorter(self._table)
         self._table.grid(row=0, column=0, sticky="nsew")
+        self._table.bind("<Double-1>", self._open_row)
+        self._row_of: dict[str, SourceRow] = {}
         scroll = ttk.Scrollbar(table, command=self._table.yview)
         scroll.grid(row=0, column=1, sticky="ns", padx=(6, 0))
         style.autoscroll(self._table, scroll)
@@ -158,6 +161,7 @@ class LibraryView(tk.Frame):
     def _paint(self) -> None:
         """Pinta las fuentes que cumplen la búsqueda."""
         self._table.delete(*self._table.get_children())
+        self._row_of.clear()
         self._sorter.clear()
         if self._current() is None:
             self._count.configure(text="Crea un temario en Temarios para empezar.")
@@ -170,6 +174,7 @@ class LibraryView(tk.Frame):
                 values=style.cells(row.title, row.kb_id, row.state),
                 tags=(row.level.value,),
             )
+            self._row_of[item] = row
             self._sorter.add(item, (fold(row.title), fold(row.kb_id), fold(row.state)))
         self._sorter.apply()
         self._count.configure(text=f"{len(rows)} de {len(self._rows)} fuentes")
@@ -277,6 +282,25 @@ class LibraryView(tk.Frame):
             lambda _: self.refresh(),
             title="Actualizar fuentes",
         )
+
+    def _open_row(self, event: tk.Event) -> None:
+        """Doble clic en una fila: abre su documento con la aplicación del sistema."""
+        if self._table.identify_region(event.x, event.y) != "cell":
+            return  # cabecera o separador: ordena, no abre
+        row = self._row_of.get(self._table.identify_row(event.y))
+        syllabus = self._current()
+        if row is None or syllabus is None:
+            return
+        path = document_path(syllabus, row.source_id)
+        if path is None or not path.exists():
+            show_message(
+                self,
+                "No se puede abrir",
+                f"«{row.title}» no tiene documento en disco.",
+                Level.INFO,
+            )
+            return
+        open_path(path)
 
     def open_folder(self) -> None:
         """Abre la carpeta de fuentes del temario activo."""

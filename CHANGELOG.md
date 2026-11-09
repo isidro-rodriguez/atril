@@ -5,6 +5,18 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.38.0] - 2026-11-09
+
+### Added
+
+- Biblioteca: doble clic en una fuente abre su documento con la aplicación del sistema, sin
+  tener que buscarlo en la carpeta. Si no está en disco (sin descargar o remota), lo avisa.
+
+### Changed
+
+- La prueba de la ventana muestra los errores del proceso hijo también en Windows (antes se
+  perdían por la codificación de la consola).
+
 ## [0.37.2] - 2026-11-09
 
 ### Changed

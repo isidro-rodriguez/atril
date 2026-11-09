@@ -49,7 +49,8 @@ pendiente.
 ## Biblioteca
 
 Las fuentes (PDF) del temario, con su KB y su estado. Se puede buscar y ordenar pulsando la
-cabecera de cada columna.
+cabecera de cada columna. Con **doble clic** en una fuente se abre su documento con la
+aplicación del sistema (si aún no está descargado, la ventana lo avisa).
 
 ![Biblioteca](../assets/images/capturas/biblioteca.png){ .at-shot }
 

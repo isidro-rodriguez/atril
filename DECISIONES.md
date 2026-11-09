@@ -350,3 +350,4 @@ Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una colum
 | Sincronización | Cada apartado espera a mostrar sus datos y a que no haya trabajo ni eventos pendientes durante varias vueltas, con 60 s como máximo | Esperas fijas |
 | Validación | Las seis capturas, PNG de 1024×700 y un mínimo de 20 KB, en una carpeta temporal antes de sustituir las de salida | Dar por buena una generación incompleta |
 | GDI | `argtypes`/`restype` de cada función, cada resultado comprobado, bitmap deseleccionado antes de leerlo y borrarlo, y liberación en `finally` | |
+| Biblioteca | Doble clic en una fila abre su documento (`model.document_path` + `desktop.open_path`); sin documento en disco, un aviso (0.38.0) | |

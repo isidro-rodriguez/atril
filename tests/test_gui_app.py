@@ -5,6 +5,7 @@ aunque la prueba haya ido bien; en un proceso aparte que termina con
 ``os._exit`` eso no afecta al resto de pruebas.
 """
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -158,6 +159,7 @@ def test_main_window_home_and_syllabi(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},  # errores legibles en Windows
         timeout=60,
         check=False,
     )
