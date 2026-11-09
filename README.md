@@ -45,10 +45,12 @@ Al abrirse, la ventana busca una versión nueva de atril. Si lo instalaste con e
 actualiza sola tras confirmarlo. Se desactiva en Ajustes > Atril
 (`[atril] buscar_actualizaciones = false`), que también decide si `atril estado` lo comprueba.
 
-### Configuración
+### Atril
 
 ```bash
+atril gui                        # abre la ventana y devuelve la consola
 atril validar                    # valida atril.toml y el temario.toml de cada temario
+atril backup ...                 # copias de la estación (ver «Backup» más abajo)
 ```
 
 ### DeepTutor

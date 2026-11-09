@@ -50,12 +50,12 @@ def root(
     ctx.obj = None
 
 
-_CONFIG = "Configuración"
+_ATRIL = "Atril"
 _DEEPTUTOR = "DeepTutor"
 _SYLLABI = "Temarios"
 
-app.command("validar", rich_help_panel=_CONFIG)(config.validate)
-app.command("gui", rich_help_panel="Ventana")(gui.open_gui)
+app.command("gui", rich_help_panel=_ATRIL)(gui.open_gui)
+app.command("validar", rich_help_panel=_ATRIL)(config.validate)
 app.command("instalar", rich_help_panel=_DEEPTUTOR)(install.install_command)
 app.command("actualizar", rich_help_panel=_DEEPTUTOR)(install.update_command)
 app.command("arrancar", rich_help_panel=_DEEPTUTOR)(deeptutor.start)
@@ -65,7 +65,7 @@ app.command("parches", rich_help_panel=_DEEPTUTOR)(deeptutor.patches)
 app.add_typer(syllabus.syllabus_app, name="temario", rich_help_panel=_SYLLABI)
 app.add_typer(syllabus.sources_app, name="fuentes", rich_help_panel=_SYLLABI)
 app.add_typer(knowledge.kb_app, name="kb", rich_help_panel=_SYLLABI)
-app.add_typer(backup.backup_app, name="backup", rich_help_panel="Backup")
+app.add_typer(backup.backup_app, name="backup", rich_help_panel=_ATRIL)
 
 
 def main() -> None:
