@@ -5,14 +5,12 @@ from pathlib import Path
 from tkinter import ttk
 from typing import TYPE_CHECKING
 
-from acodo.utils import parse_size
-
 from atril.checks import Level, info, ok, warning
 from atril.gui import style
 from atril.gui.activity import when_label
 from atril.gui.desktop import open_path
 from atril.gui.dialogs import ask_yes_no, show_message
-from atril.gui.model import archive_label, fold
+from atril.gui.model import archive_label, fold, size_label
 from atril.gui.widgets import TableSorter
 from atril.ops import Reporter
 from atril.ops import backup as backup_ops
@@ -97,9 +95,9 @@ class BackupsView(tk.Frame):
             columns,
             (
                 ("Fecha", 170, "w"),
-                ("Tamaño", 120, "w"),
-                ("Destino", 260, "w"),
-                ("Verificación", 150, "w"),
+                ("Tamaño", 100, "w"),
+                ("Destino", 180, "w"),
+                ("Verificación", 250, "w"),
             ),
             strict=True,
         ):
@@ -164,7 +162,7 @@ class BackupsView(tk.Frame):
                 state, level = verification_label(self._verified.get(archive.path))
                 values = style.cells(
                     archive_label(archive.stamp),
-                    parse_size(archive.size),
+                    size_label(archive.size),
                     folder,
                     state,
                 )
@@ -187,7 +185,7 @@ class BackupsView(tk.Frame):
 
         def run(reporter: Reporter) -> Path:
             created = backup_ops.create(station, reporter, cancel=cancel)
-            size = parse_size(created.size)
+            size = size_label(created.size)
             reporter.show([ok(f"Backup completado correctamente ({size}).")])
             return created.archive
 

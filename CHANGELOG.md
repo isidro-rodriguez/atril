@@ -5,6 +5,33 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.36.0] - 2026-11-09
+
+### Added
+
+- Las capturas de la web se generan en cada construcción con la ventana real del mismo commit
+  (`scripts/capturas.py`, en Windows y con una estación de ejemplo), en lugar de versionarse:
+  ya no pueden quedarse en una versión anterior. La construcción falla si falta alguna o si la
+  versión no coincide.
+- Enlaces a la web, GitHub y PyPI al pie de la barra lateral.
+- Las comprobaciones de backups se recuerdan al cerrar la ventana (Verificada, Con errores o
+  Sin comprobar) y dejan de valer si la copia cambia.
+
+### Changed
+
+- Inicio da todo el protagonismo al estado general: icono y estado grandes, una frase de una
+  línea y los botones abajo a la derecha. Se quitan el último backup y la última actividad,
+  que repetían lo que ya está en sus apartados, y las herramientas son más compactas.
+- Temarios separa las fuentes **por indexar** (se resuelven indexando) de las que están **sin
+  fichero** (hay que descargarlas antes): antes ambas se sumaban en una sola columna.
+- Los tamaños de Backups se muestran en lenguaje llano («124,0 MB»).
+
+### Fixed
+
+- El detalle de Actividad muestra el resultado completo aunque no quepa en la tabla.
+- Si la actividad no se puede guardar, el pie de la ventana lo avisa y el error queda en
+  `atril-diagnostico.log` (carpeta temporal), en vez de perderse sin aviso.
+
 ## [0.35.0] - 2026-11-09
 
 ### Added

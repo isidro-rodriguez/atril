@@ -29,6 +29,7 @@
 ├── README.md               # Minimal project overview
 ├── uv.lock                 # Lockfile, tracked by git
 ├── instalador/atril.iss    # Windows installer (Inno Setup), built by publish.yml
+├── scripts/capturas.py     # Website captures from the real window (run by docs.yml on Windows)
 ├── scripts/recursos/       # Dev-only generator of gui/recursos (logo SVG, tool logos in
 │                           #   marcas/, icons, fonts, card)
 ├── DECISIONES.md           # Design decisions (source of truth for scope and phases)
@@ -104,7 +105,9 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
 - Every schema change updates `docs/documentacion/atril-toml.md` or `temario-toml.md`,
   `docs/documentacion/ejemplos/` and the tests. Website: Spanish, friendly in `index.md` and
   `guia/`, technical in `documentacion/`; GUI captures come from the real window with a
-  sample station (`uv run zensical build` must pass). Keep it in sync with the GUI and CLI.
+  sample station: `scripts/capturas.py` (fixed dates, faked services, Windows example paths)
+  generates them in `docs.yml` on `windows-latest`; they are gitignored, never committed
+  (`uv run zensical build` must pass). Keep it in sync with the GUI and CLI.
 - **CLI output uses Rich**, never `print`/`typer.echo`: the shared `console`/`err_console` from
   `commands._common`, `show()` for findings, `success()`/`fail()`, `console.status()` spinners for
   waits, `rich.table.Table` for listings and `Panel` for log excerpts. Always `escape()` external
@@ -128,7 +131,9 @@ Read `DECISIONES.md` before any non-trivial change. Key points:
   `scripts/recursos/generar.py`, never hand-edit) and never rely on color alone (level icons).
   Glyphs must exist in Inter's latin subset (no ✓, ✗ or arrows). View logic without Tk lives in
   `gui/model.py` and `gui/activity.py` so it is tested without a display; window tests skip when
-  there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`.
+  there is none. Each operation is an activity `Event` saved in `data/atril/actividad.jsonl`;
+  a failed save warns once in the footer and goes to `atril-diagnostico.log` (temp folder).
+  Backup checks persist in `data/atril/verificaciones.json`, valid while size and mtime match.
 - Every box has rounded corners: `style.card` (on the page) and `style.tile` / `Tile.Atril.TFrame`
   (inside a card; `field=True` for text boxes, with the tables' `#fafafa`). No `ttk.Notebook`: tabs are `widgets.TabBar` (navigation style) on a card.
 - GUI layout: fixed 1024x700 window (logical px, scaled with Windows and reduced if the screen is

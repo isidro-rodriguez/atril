@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths: &docs-paths
       - "docs/**"
+      - "src/**"
+      - "scripts/capturas.py"
       - "docs_templates/**"
       - "zensical.toml"
       - "pyproject.toml"
@@ -24,8 +26,39 @@ permissions:
   contents: read
 
 jobs:
+  # Las capturas se hacen con la ventana real del mismo commit, en Windows (su
+  # aspecto y sus rutas), con una estación de ejemplo: nunca se versionan.
+  capturas:
+    name: Capturas de la ventana
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.13"
+
+      - name: Sincronizar dependencias
+        run: uv sync --locked
+
+      - name: Capturar la ventana
+        run: uv run --with pillow python scripts/capturas.py docs/assets/images/capturas
+
+      - name: Guardar las capturas
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: docs/assets/images/capturas/*.png
+          if-no-files-found: error
+
   build:
     name: Documentación (Zensical)
+    needs: capturas
     runs-on: ubuntu-latest
 
     steps:
@@ -41,6 +74,20 @@ jobs:
 
       - name: Sincronizar dependencias
         run: uv sync --locked
+
+      - name: Recuperar las capturas
+        uses: actions/download-artifact@v4
+        with:
+          name: capturas
+          path: docs/assets/images/capturas
+
+      # Una captura que falta o que la página no usa es un error, no una imagen rota.
+      - name: Comprobar las capturas
+        run: |
+          used=$(grep -rhoE 'capturas/[a-z-]+\.png' docs | sort -u | sed 's|capturas/||')
+          for name in $used; do
+            test -f "docs/assets/images/capturas/$name" || { echo "Falta $name"; exit 1; }
+          done
 
       - name: Construir documentación con Zensical
         run: uv run zensical build

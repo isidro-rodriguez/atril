@@ -62,6 +62,21 @@ uv run zensical build   # genera el sitio en site/
 
 El sitio se publica en GitHub Pages con cada cambio en `main` (`.github/workflows/docs.yml`).
 
+### Capturas
+
+Las capturas de la ventana no se versionan: `docs.yml` las genera en Windows con la ventana
+real del mismo commit y la construcción falla si falta alguna o si la versión no coincide con
+la de `pyproject.toml`. Para generarlas en local (antes de `zensical serve`):
+
+```bash
+uv run --with pillow python scripts/capturas.py
+```
+
+El script tiene tres pasos separados: prepara una estación de ejemplo (2.º de Bachillerato,
+fechas fijas), abre la ventana con los servicios simulados y captura cada apartado en
+`docs/assets/images/capturas/`. En Windows usa `D:\Estudio` y `D:\Copias\Atril`, y se niega
+si existen y no las creó él. En Linux usa una carpeta temporal (solo para revisar el aspecto).
+
 ## Versiones y publicación
 
 - Commits en español con [Conventional Commits](https://www.conventionalcommits.org/es/).

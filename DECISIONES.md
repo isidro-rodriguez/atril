@@ -208,7 +208,7 @@ Referencia visual: «Panel educativo Atril en español» (dirección estética, 
 | Servicios | DeepTutor y Ollama (arrancar, parar, estado), herramientas en lenguaje llano, instalar y actualizar DeepTutor |
 | Diagnóstico | Lo técnico: rutas, versiones, `doctor`, parches, logs, historial completo, volver a un commit |
 | Ajustes | Edición guiada de pocas claves de `atril.toml` (copias, ritmo de indexado) con `tomlkit` y validación; sin segunda fuente de configuración |
-| Actividad | Panel derecho plegable; un evento por operación (título, resumen, nivel, hora, detalle) guardado en `data/atril/actividad.jsonl`; «Ver todo» en Diagnóstico |
+| Actividad | ~~Panel derecho plegable; «Ver todo» en Diagnóstico~~ (sustituido en 0.24.0: apartado Actividad completo). Un evento por operación (título, resumen, nivel, hora, detalle) guardado en `data/atril/actividad.jsonl` |
 | Inicio | Estado general, servicios, última copia, accesos rápidos y «Modificados recientemente» (atril no registra el uso de un temario: no se inventa) |
 | Logotipo | SVG propio como fuente maestra; PNG a 1× y 2× generados de él (Tk 8.6 no pinta SVG) |
 | Tipografía | Inter (OFL) incluida en el paquete y registrada solo para atril en Windows (`AddFontResourceExW` privado); Segoe UI si falla |
@@ -315,3 +315,15 @@ Pestañas: DeepTutor, Atril, Avanzado y Herramientas. Atril reúne, en una colum
 | Contenido | Portada y Guía para alumnos sin conocimientos técnicos; Documentación avanzada (conceptos, CLI, `atril.toml` y `temario.toml` con los ejemplos incluidos por `--8<--`, indexado, copias, instalador); Desarrollo | |
 | Capturas | Generadas con la ventana real y una estación de ejemplo: alumna de 2.º de Bachillerato de Ciencias, un temario por asignatura (Física, el que más fuentes tiene, como activo) | Capturas a mano |
 | Documentos retirados de `docs/` | `esquemas.md` pasa a las páginas de configuración; `ejemplos/` a `docs/documentacion/ejemplos/`; este fichero, a `DECISIONES.md` en la raíz | |
+
+## Revisión de GPT (0.36.0)
+
+| Tema | Decisión | Descartado |
+|---|---|---|
+| Capturas | `scripts/capturas.py` en tres pasos (estación de ejemplo con fechas fijas, ventana real con servicios simulados, captura). Las genera `docs.yml` en `windows-latest` con el código del mismo commit, con rutas de Windows de ejemplo (`D:\Estudio`, `D:\Copias\Atril`); no se versionan. Falla si falta una o si la versión no es la de `pyproject.toml` | Capturas versionadas (se quedaban en una versión anterior) |
+| Inicio | Tarjeta blanca «Estado general» dominante: icono y palabra grandes, una frase de una línea (recortada con «…») y los botones Abrir en el navegador y Arrancar/Parar abajo a la derecha. Sin último backup ni última actividad. Herramientas compactas, de dos en dos | Tarjetas de último backup y actividad, resumen en la cabecera |
+| Enlaces | Iconos de la web, GitHub y PyPI al pie de la barra lateral | |
+| Temarios | Columnas Fuentes, Indexadas, Por indexar (nuevas o cambiadas) y Sin fichero (`model.kb_counts`); las retiradas no cuentan como fuentes | Una sola columna «Faltan» que mezclaba ambas |
+| Verificaciones | `data/atril/verificaciones.json` guarda el resultado de cada comprobación con el tamaño y la fecha de modificación de la copia: deja de valer si la copia cambia. Estados Verificada, Con errores y Sin comprobar | Solo en memoria (se perdía al cerrar) |
+| Actividad | El detalle muestra el resultado completo. Si no se puede guardar, el pie lo avisa una vez y el error va a `atril-diagnostico.log` en la carpeta temporal | Ignorar el error |
+| Ventana | Sigue fija de 1024×700 | Redimensionable |

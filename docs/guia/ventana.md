@@ -1,21 +1,26 @@
 # La ventana
 
 La ventana de atril tiene seis apartados a la izquierda y, abajo, el estado de DeepTutor y
-Ollama, la operación en curso y la versión.
+Ollama, la operación en curso y la versión. Al pie de la barra lateral, tres iconos abren
+esta web, el repositorio en GitHub y la página en PyPI.
 
 ## Inicio
 
-El estado general en una frase («En marcha», «Necesita atención»…) y los botones para
-arrancar, parar o abrir DeepTutor en el navegador. Debajo, cada herramienta con su estado y,
-si hace falta, un botón para instalarla o arrancarla. Pulsar un logotipo abre la web de esa
-herramienta.
+**Estado general** ocupa la mayor parte: un icono y una palabra grande («En marcha»,
+«Parado», «Necesita atención»…), una frase con lo siguiente que hacer y, abajo a la derecha,
+los botones para abrir DeepTutor en el navegador y arrancarlo o pararlo. Debajo, cada
+herramienta con su estado y, si hace falta, un botón para instalarla o arrancarla. Pulsar un
+logotipo abre la web de esa herramienta.
 
 ![Inicio](../assets/images/capturas/inicio.png){ .at-shot }
 
 ## Temarios
 
 El temario elegido arriba es el mismo en Temarios y en Biblioteca. Aquí ves sus **bases de
-conocimiento** (KB) con cuántas fuentes tienen, cuántas están indexadas y cuántas faltan.
+conocimiento** (KB) con sus fuentes, cuántas están indexadas, cuántas están **por indexar**
+(nuevas o cambiadas: se resuelven indexando o reindexando) y cuántas están **sin fichero**
+(declaradas pero no descargadas: hay que descargarlas antes). Debajo, el detalle de cada
+pendiente.
 
 | Botón | Qué hace |
 |---|---|
@@ -37,7 +42,9 @@ cabecera de cada columna.
 
 ## Backups
 
-Las copias de cada destino, con su fecha, tamaño y si están verificadas.
+Las copias de cada destino, con su fecha, tamaño y verificación: **Verificada** (con la
+fecha de la última comprobación), **Con errores** o **Sin comprobar**. La verificación se
+recuerda al cerrar la ventana y deja de valer si la copia cambia.
 
 | Botón | Qué hace |
 |---|---|
@@ -54,8 +61,12 @@ Las copias de cada destino, con su fecha, tamaño y si están verificadas.
 
 ## Actividad
 
-Todo lo que ha hecho la ventana, con su resultado. Al elegir una operación, abajo aparece su
-detalle técnico. Si algo falla, aquí está la explicación.
+Todo lo que ha hecho la ventana, con su resultado. Al elegir una operación, abajo aparece el
+resultado completo (aunque en la tabla no quepa) y su detalle técnico. Si algo falla, aquí
+está la explicación.
+
+Si la actividad no se puede guardar (disco lleno, carpeta sin permisos), el pie de la ventana
+lo avisa y el error queda en `atril-diagnostico.log`, en la carpeta temporal de Windows.
 
 ![Actividad](../assets/images/capturas/actividad.png){ .at-shot }
 
