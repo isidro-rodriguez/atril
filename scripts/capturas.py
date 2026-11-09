@@ -339,6 +339,7 @@ def open_window(root: Path):
     updates.check = lambda current="": None
     fixed = functools.partial(activity.when_label, now=NOW)
     history_view.when_label = backups_view.when_label = fixed
+    home.backup_stat = functools.partial(home.backup_stat, now=NOW)
     app_module._fit_scale = lambda window: (
         None
     )  # siempre a 100 %, en cualquier pantalla

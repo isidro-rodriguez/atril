@@ -582,3 +582,97 @@ def kb_counts(states: list[PlanState]) -> KbCounts:
         missing=count(PlanState.MISSING),
         removed=count(PlanState.REMOVED),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class HomeStat:
+    """Un dato del pie del estado general de Inicio, que lleva a su apartado."""
+
+    title: str
+    level: Level
+    text: str
+    view: str
+
+
+STALE_BACKUP_DAYS = 7
+"""Días tras los que la última copia se considera antigua."""
+
+
+def syllabi_stat(data: list[SyllabusData], active: str | None) -> HomeStat:
+    """Temarios: cuántos hay y cuál está activo.
+
+    Examples:
+        >>> syllabi_stat([], None).text
+        'Ninguno todavía'
+    """
+    if not data:
+        return HomeStat("Temarios", Level.INFO, "Ninguno todavía", "Temarios")
+    names = {item.syllabus.id: item.syllabus.name for item in data}
+    name = names.get(active or "", data[0].syllabus.name)
+    return HomeStat("Temarios", Level.OK, f"{len(data)} · {name}", "Temarios")
+
+
+def sources_stat(data: list[SyllabusData]) -> HomeStat:
+    """Fuentes de todos los temarios y lo que les falta.
+
+    Examples:
+        >>> sources_stat([]).text
+        'Ninguna todavía'
+    """
+    counts = [
+        kb_counts([item.state for item in status.items])
+        for syllabus in data
+        for status in syllabus.statuses
+    ]
+    total = sum(c.sources for c in counts)
+    pending = sum(c.pending for c in counts)
+    missing = sum(c.missing for c in counts)
+    if not total:
+        return HomeStat("Fuentes", Level.INFO, "Ninguna todavía", "Biblioteca")
+    if missing:
+        return HomeStat(
+            "Fuentes", Level.WARNING, f"{total} · {missing} sin fichero", "Biblioteca"
+        )
+    if pending:
+        return HomeStat(
+            "Fuentes", Level.WARNING, f"{total} · {pending} por indexar", "Temarios"
+        )
+    return HomeStat("Fuentes", Level.OK, f"{total} · todas indexadas", "Biblioteca")
+
+
+def backup_stat(
+    stamp: str | None, verified: bool | None, now: datetime | None = None
+) -> HomeStat:
+    """Último backup: cuándo y si se ha comprobado.
+
+    Args:
+        stamp: Fecha de la copia más reciente (``AAAAMMDD-HHMMSS``) o ``None``.
+        verified: Resultado de su última comprobación, ``None`` si no se comprobó.
+        now: Momento actual (para las pruebas).
+
+    Examples:
+        >>> backup_stat(None, None).text
+        'Sin copias'
+        >>> when = datetime(2026, 11, 9, 12)
+        >>> backup_stat("20261108-223000", True, when).text
+        'Ayer, 22:30 · verificada'
+        >>> backup_stat("20261020-100000", True, when).level
+        <Level.WARNING: 'aviso'>
+    """
+    from atril.gui.activity import when_label
+
+    if stamp is None:
+        return HomeStat("Último backup", Level.ERROR, "Sin copias", "Backups")
+    moment = datetime.strptime(stamp, "%Y%m%d-%H%M%S")
+    label = when_label(moment.isoformat(), now)
+    if verified is False:
+        return HomeStat(
+            "Último backup", Level.ERROR, f"{label} · con errores", "Backups"
+        )
+    if ((now or datetime.now()) - moment).days > STALE_BACKUP_DAYS:
+        return HomeStat("Último backup", Level.WARNING, f"{label} · antigua", "Backups")
+    if verified is None:
+        return HomeStat(
+            "Último backup", Level.INFO, f"{label} · sin comprobar", "Backups"
+        )
+    return HomeStat("Último backup", Level.OK, f"{label} · verificada", "Backups")

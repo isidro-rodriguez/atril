@@ -47,6 +47,14 @@ ICONS: dict[str, tuple[int, tuple[tuple[str, str], ...]]] = {
     "circle-x": (18, (("error", "#c42b1c"),)),
     "loader-circle": (18, (("info", "#0f5ec9"),)),
     "book-text": (20, (("enlace", NAV), ("enlace-sel", SELECTED))),
+    # Botones del estado general de Inicio (normal y destacado) y sus datos.
+    "globe": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "play": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "square": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "download": (18, (("boton", NAV), ("boton-acento", "#ffffff"))),
+    "book-copy": (40, (("dato", NAV),)),
+    "file-stack": (40, (("dato", NAV),)),
+    "archive": (40, (("dato", NAV),)),
 }
 
 LINKS = ("github", "pypi")

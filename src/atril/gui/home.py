@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from tkinter import ttk
 from typing import TYPE_CHECKING
 
-from atril import ollama
+from atril import backup, ollama
 from atril.checks import Level, ok
 from atril.config.station import Station
 from atril.deeptutor import Assistant, DeepTutor, active_assistant
@@ -27,20 +27,26 @@ from atril.gui.model import (
     WEBSITES,
     Action,
     Facts,
+    HomeStat,
     ToolCard,
+    backup_stat,
+    load_all,
     overall,
+    sources_stat,
+    syllabi_stat,
     tool_cards,
 )
 from atril.gui.widgets import ToolTile
 from atril.install import run_command, tool
 from atril.ops import Reporter, service
+from atril.ops import backup as backup_ops
 from atril.ops import installation as installation_ops
 from atril.processes import no_window
 
 if TYPE_CHECKING:
     from atril.gui.app import App
 
-SENTENCE_WIDTH = 640
+SENTENCE_WIDTH = 400
 """Ancho máximo (a 100 %) de la frase del estado general: una sola línea."""
 
 CLAUDE_CODE_URL = "https://docs.claude.com/en/docs/claude-code/setup"
@@ -61,11 +67,35 @@ class HomeData:
     """Lo que necesita Inicio, leído en segundo plano."""
 
     facts: Facts
+    stats: tuple[HomeStat, ...]
 
 
-def load_home(station: Station) -> HomeData:
-    """Estado de servicios y herramientas."""
-    return HomeData(load_facts(station))
+STAT_ICONS = ("book-copy-dato", "file-stack-dato", "archive-dato")
+"""Iconos de los datos del estado general: temarios, fuentes y último backup."""
+
+
+def load_home(station: Station, active: str | None = None) -> HomeData:
+    """Estado de servicios y herramientas, y los datos de temarios y copias."""
+    syllabi = load_all(station)
+    return HomeData(
+        load_facts(station),
+        (syllabi_stat(syllabi, active), sources_stat(syllabi), _backup_stat(station)),
+    )
+
+
+def _backup_stat(station: Station) -> HomeStat:
+    """Copia más reciente de los destinos accesibles y su última comprobación."""
+    found = [
+        archive
+        for folder in station.backup.destinations
+        if backup.is_reachable(folder)
+        for archive in backup.archives(folder)
+    ]
+    if not found:
+        return backup_stat(None, None)
+    latest = max(found, key=lambda archive: archive.stamp)
+    verification = backup_ops.verifications(station).get(latest.path)
+    return backup_stat(latest.stamp, verification.ok if verification else None)
 
 
 def load_facts(station: Station) -> Facts:
@@ -125,50 +155,102 @@ class HomeView(tk.Frame):
         super().__init__(parent, background=style.PAGE)
         self.app = app
         self._facts: Facts | None = None
+        self._shown_stats: tuple[HomeStat, ...] = ()
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self._build_status().grid(row=0, column=0, sticky="nsew")
         self._build_tools().grid(row=1, column=0, sticky="ew", pady=(14, 0))
 
     def _build_status(self) -> ttk.Frame:
-        """Estado general: icono y titular grandes, una frase y el botón.
+        """Estado general: icono, estado y botones arriba, y tres datos abajo.
 
         Es el bloque principal de la ventana: ocupa el alto que dejan las
-        herramientas, con el botón abajo a la derecha.
+        herramientas, con el estado centrado en el hueco sobre los datos.
         """
+        factor = style.scale(self)
         card = style.card(self, "Estado general")
-        card.columnconfigure(1, weight=1)
+        card.columnconfigure(0, weight=1)
         card.rowconfigure(1, weight=1)
-        card.rowconfigure(5, weight=1)
-        self._icon = tk.Label(card, background=style.CARD)
-        self._icon.grid(row=2, column=0, rowspan=2, sticky="w", padx=(0, 22))
-        self._headline = style.label(card, "Comprobando…", font=style.HEADLINE)
-        self._headline.grid(row=2, column=1, sticky="sw")
-        self._sentence = style.label(
-            card,
-            "",
-            font=style.LEAD,
-            color=style.MUTED,
+        card.rowconfigure(3, weight=1)
+        top = tk.Frame(card, background=style.CARD)
+        top.grid(row=2, column=0, sticky="ew")
+        top.columnconfigure(2, weight=1)
+        self._icon = tk.Label(top, background=style.CARD)
+        self._icon.grid(row=0, column=0, rowspan=2, padx=(4, 0))
+        tk.Frame(top, background=style.BORDER, width=max(1, round(factor))).grid(
+            row=0, column=1, rowspan=2, sticky="ns", padx=round(24 * factor)
         )
-        self._sentence.grid(row=3, column=1, sticky="nw", pady=(2, 0))
-        buttons = tk.Frame(card, background=style.CARD)
-        buttons.grid(row=6, column=0, columnspan=2, sticky="se")
+        self._headline = style.label(top, "Comprobando…", font=style.HEADLINE)
+        self._headline.grid(row=0, column=2, sticky="sw")
+        self._sentence = style.label(top, "", font=style.LEAD, color=style.MUTED)
+        self._sentence.grid(row=1, column=2, sticky="nw", pady=(4, 0))
+        buttons = tk.Frame(top, background=style.CARD)
+        buttons.grid(row=0, column=3, rowspan=2, sticky="e", padx=(16, 0))
+        buttons.columnconfigure(0, weight=1)
         self._open = ttk.Button(
-            buttons, text="Abrir en el navegador", command=self.open_browser
+            buttons,
+            text="Abrir en el navegador",
+            compound="left",
+            command=self.open_browser,
         )
-        self._open.grid(row=0, column=0, sticky="e", padx=(0, 10), ipady=30)
+        self._open.grid(row=0, column=0, sticky="ew", ipady=8, pady=(0, 10))
         self._open.grid_remove()
         self._toggle = self.app.action(
             ttk.Button(
                 buttons,
-                text="Arrancar",
+                text="Arrancar DeepTutor",
+                compound="left",
                 style="Accent.TButton",
                 command=self.toggle,
-                width=18,
+                width=22,
             )
         )
-        self._toggle.grid(row=0, column=1, sticky="e", ipady=30)
+        self._toggle.grid(row=1, column=0, sticky="ew", ipady=8)
+        tk.Frame(card, background=style.BORDER, height=max(1, round(factor))).grid(
+            row=4, column=0, sticky="ew", pady=(round(10 * factor), round(16 * factor))
+        )
+        stats = tk.Frame(card, background=style.CARD)
+        stats.grid(row=5, column=0, sticky="ew")
+        self._stats: list[tuple[tk.Label, tk.Canvas, tk.Label]] = []
+        for index, name in enumerate(STAT_ICONS):
+            if index:
+                tk.Frame(
+                    stats, background=style.BORDER, width=max(1, round(factor))
+                ).grid(row=0, column=2 * index - 1, sticky="ns", pady=2)
+            stats.columnconfigure(2 * index, weight=1, uniform="stats")
+            self._stats.append(self._stat(stats, 2 * index, name))
         return card
+
+    def _stat(
+        self, parent: tk.Frame, column: int, name: str
+    ) -> tuple[tk.Label, tk.Canvas, tk.Label]:
+        """Un dato del pie: icono, título y estado con su punto de color."""
+        factor = style.scale(self)
+        box = tk.Frame(parent, background=style.CARD, cursor="hand2")
+        box.grid(row=0, column=column)
+        image = tk.Label(
+            box, image=style.icon(self, name, 40), background=style.CARD, cursor="hand2"
+        )
+        image.grid(row=0, column=0, rowspan=2, padx=(0, round(14 * factor)))
+        title = style.label(box, "", font=style.STRONG)
+        title.grid(row=0, column=1, columnspan=2, sticky="sw")
+        size = round(9 * factor)
+        dot = tk.Canvas(
+            box, width=size, height=size, background=style.CARD, highlightthickness=0
+        )
+        dot.create_oval(0, 0, size - 1, size - 1, fill=style.MUTED, outline="")
+        dot.grid(row=1, column=1, sticky="w", padx=(0, round(6 * factor)))
+        text = style.label(box, "", color=style.MUTED)
+        text.grid(row=1, column=2, sticky="nw")
+        index = column // 2
+        for widget in (box, image, title, dot, text):
+            widget.bind("<Button-1>", lambda _event: self._go(index))
+        return title, dot, text
+
+    def _go(self, index: int) -> None:
+        """Lleva al apartado del dato pulsado."""
+        if self._shown_stats:
+            self.app.show_view(self._shown_stats[index].view)
 
     def _build_tools(self) -> ttk.Frame:
         """Herramientas en baldosas de una fila: dos por fila, todas iguales."""
@@ -197,9 +279,10 @@ class HomeView(tk.Frame):
     def refresh(self) -> bool:
         """Comprueba servicios y herramientas en segundo plano."""
         station = self.app.station
+        active = self.app.syllabus_id
         started = self.app.run(
             "Comprobando...",
-            lambda reporter: load_home(station),
+            lambda reporter: load_home(station, active),
             self._show,
             quiet=True,
         )
@@ -215,18 +298,31 @@ class HomeView(tk.Frame):
         self._headline.configure(text=headline)
         self._sentence.configure(text=_one_line(self._sentence, sentence))
         running = facts.backend_up or facts.frontend_up
-        text = "Parar" if running else "Arrancar"
+        text, symbol = (
+            ("Parar DeepTutor", "square") if running else ("Arrancar DeepTutor", "play")
+        )
         if not facts.deeptutor_installed:
-            text = "Instalar DeepTutor"
+            text, symbol = "Instalar DeepTutor", "download"
+        variant = "boton" if running else "boton-acento"
         self._toggle.configure(
-            text=text, style="TButton" if running else "Accent.TButton"
+            text=text,
+            image=style.icon(self, f"{symbol}-{variant}", 18),
+            style="TButton" if running else "Accent.TButton",
         )
         if facts.deeptutor_running:
             # En marcha, lo principal es abrirlo: el botón destacado es ese.
-            self._open.configure(style="Accent.TButton")
+            self._open.configure(
+                style="Accent.TButton",
+                image=style.icon(self, "globe-boton-acento", 18),
+            )
             self._open.grid()
         else:
             self._open.grid_remove()
+        self._shown_stats = data.stats
+        for (title, dot, label), stat in zip(self._stats, data.stats, strict=True):
+            title.configure(text=stat.title)
+            dot.itemconfigure(1, fill=style.LEVEL_COLORS[stat.level])
+            label.configure(text=stat.text)
         for tile, card in zip(self._tiles, tool_cards(facts), strict=True):
             tile.show(card, website=card.key in WEBSITES)
 
