@@ -609,7 +609,8 @@ def syllabi_stat(data: list[SyllabusData], active: str | None) -> HomeStat:
         return HomeStat("Temarios", Level.INFO, "Ninguno todavía", "Temarios")
     names = {item.syllabus.id: item.syllabus.name for item in data}
     name = names.get(active or "", data[0].syllabus.name)
-    return HomeStat("Temarios", Level.OK, f"{len(data)} · {name}", "Temarios")
+    count = f"{len(data)} temario" + ("s" if len(data) != 1 else "")
+    return HomeStat("Temarios", Level.OK, f"{count} · activo: {name}", "Temarios")
 
 
 def sources_stat(data: list[SyllabusData]) -> HomeStat:
@@ -631,13 +632,21 @@ def sources_stat(data: list[SyllabusData]) -> HomeStat:
         return HomeStat("Fuentes", Level.INFO, "Ninguna todavía", "Biblioteca")
     if missing:
         return HomeStat(
-            "Fuentes", Level.WARNING, f"{total} · {missing} sin fichero", "Biblioteca"
+            "Fuentes",
+            Level.WARNING,
+            f"{total} fuentes · {missing} sin fichero",
+            "Biblioteca",
         )
     if pending:
         return HomeStat(
-            "Fuentes", Level.WARNING, f"{total} · {pending} por indexar", "Temarios"
+            "Fuentes",
+            Level.WARNING,
+            f"{total} fuentes · {pending} por indexar",
+            "Temarios",
         )
-    return HomeStat("Fuentes", Level.OK, f"{total} · todas indexadas", "Biblioteca")
+    return HomeStat(
+        "Fuentes", Level.OK, f"{total} fuentes · todas indexadas", "Biblioteca"
+    )
 
 
 def backup_stat(

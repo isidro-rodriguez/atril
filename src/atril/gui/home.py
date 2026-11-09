@@ -49,6 +49,9 @@ if TYPE_CHECKING:
 SENTENCE_WIDTH = 400
 """Ancho máximo (a 100 %) de la frase del estado general: una sola línea."""
 
+STAT_WIDTH = 190
+"""Ancho máximo (a 100 %) del texto de cada dato del estado general."""
+
 CLAUDE_CODE_URL = "https://docs.claude.com/en/docs/claude-code/setup"
 """Instrucciones oficiales para instalar Claude Code."""
 
@@ -322,7 +325,7 @@ class HomeView(tk.Frame):
         for (title, dot, label), stat in zip(self._stats, data.stats, strict=True):
             title.configure(text=stat.title)
             dot.itemconfigure(1, fill=style.LEVEL_COLORS[stat.level])
-            label.configure(text=stat.text)
+            label.configure(text=_one_line(label, stat.text, STAT_WIDTH))
         for tile, card in zip(self._tiles, tool_cards(facts), strict=True):
             tile.show(card, website=card.key in WEBSITES)
 
@@ -500,12 +503,12 @@ class HomeView(tk.Frame):
         )
 
 
-def _one_line(label: tk.Label, text: str) -> str:
+def _one_line(label: tk.Label, text: str, width: int = SENTENCE_WIDTH) -> str:
     """``text`` abreviado con «…» para que quepa en una línea de ``label``.
 
     El ancho disponible es el de la columna del texto en Inicio.
     """
-    width = round(SENTENCE_WIDTH * style.scale(label))
+    width = round(width * style.scale(label))
     font = tkfont.nametofont(str(label.cget("font")), root=label)
     if font.measure(text) <= width:
         return text
