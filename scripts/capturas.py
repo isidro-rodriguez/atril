@@ -386,12 +386,16 @@ def capture(window, out: Path) -> list[Path]:
             window.update()
 
     def shoot(name: str) -> None:
+        window.geometry(
+            "+0+0"
+        )  # Windows la abre desplazada y la pantalla corta el resto
         settle()
         image = _grab(window)
         expected = (window.winfo_width(), window.winfo_height())
         if image.size != expected or _unpainted(image):
             raise SystemExit(
-                f"Captura «{name}» incompleta ({image.size}, ventana {expected}, "
+                f"Captura «{name}» incompleta ({image.size}, ventana {expected} en "
+                f"{window.winfo_rootx()},{window.winfo_rooty()}, "
                 f"pantalla {window.winfo_screenwidth()}x{window.winfo_screenheight()})."
             )
         target = out / f"{name}.png"
