@@ -256,9 +256,19 @@ def overall(facts: Facts) -> tuple[Level, str, str]:
             OVERALL[Level.ERROR][0],
             f"Falta {', '.join(missing)}: instálalo abajo.",
         )
-    warnings = [f for f in facts.pending if f.level in {Level.WARNING, Level.ERROR}]
-    if warnings:
-        return Level.WARNING, OVERALL[Level.WARNING][0], _sentence(warnings[0].message)
+    # ``pending`` son los parches: frase corta (cabe en una línea en Inicio).
+    if any(f.level is Level.ERROR for f in facts.pending):
+        return (
+            Level.WARNING,
+            OVERALL[Level.WARNING][0],
+            "Un parche ya no encaja con DeepTutor: revísalo en Ajustes.",
+        )
+    if any(f.level is Level.WARNING for f in facts.pending):
+        return (
+            Level.WARNING,
+            OVERALL[Level.WARNING][0],
+            "Hay parches pendientes: se aplican al arrancar.",
+        )
     level = Level.OK if facts.deeptutor_running else Level.INFO
     return level, *OVERALL[level]
 
@@ -270,12 +280,6 @@ def service_states(facts: Facts) -> dict[str, tuple[Level, str]]:
         "DeepTutor": (cards["deeptutor"].level, cards["deeptutor"].state),
         "Ollama": (cards["ollama"].level, cards["ollama"].state),
     }
-
-
-def _sentence(text: str) -> str:
-    """Primera letra en mayúscula y punto final."""
-    text = text[:1].upper() + text[1:]
-    return text if text.endswith(".") else f"{text}."
 
 
 INDEX_LABELS = {
@@ -545,37 +549,3 @@ def tray_tooltip(*, deeptutor_up: bool, status: str) -> str:
     detail = status or ("DeepTutor en marcha" if deeptutor_up else "DeepTutor parado")
     text = f"Atril: {detail}"
     return text if len(text) <= TOOLTIP_LIMIT else text[: TOOLTIP_LIMIT - 3] + "..."
-
-
-@dataclass(frozen=True, slots=True)
-class Summary:
-    """Resumen de la estación para Inicio."""
-
-    syllabi: int
-    sources: int
-    indexed: int
-    """Fuentes con una versión indexada (según ``indexado.json``)."""
-    last_backup: str | None
-    """Fecha del último backup completo, ya en texto."""
-
-
-def summary_line(summary: Summary) -> str:
-    """Una línea con temarios, fuentes indexadas y el último backup.
-
-    Examples:
-        >>> summary_line(Summary(8, 51, 49, "8 nov 2026, 21:10"))
-        '8 temarios · 49 de 51 fuentes indexadas · Último backup: 8 nov 2026, 21:10'
-        >>> summary_line(Summary(1, 1, 0, None))
-        '1 temario · 0 de 1 fuente indexada · Sin backups'
-    """
-    temarios = "temario" if summary.syllabi == 1 else "temarios"
-    fuentes = "fuente indexada" if summary.sources == 1 else "fuentes indexadas"
-    backup = (
-        f"Último backup: {summary.last_backup}"
-        if summary.last_backup
-        else "Sin backups"
-    )
-    return (
-        f"{summary.syllabi} {temarios} · {summary.indexed} de {summary.sources} "
-        f"{fuentes} · {backup}"
-    )

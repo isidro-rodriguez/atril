@@ -176,7 +176,7 @@ def test_overall_and_footer_states() -> None:
     assert overall(_facts(backend_up=True, frontend_up=True))[0] is Level.OK
     assert overall(_facts(deeptutor_installed=False))[0] is Level.ERROR
     pending = _facts(pending=[warning("paginas-citas: pendiente")])
-    assert overall(pending)[2] == "Paginas-citas: pendiente."
+    assert overall(pending)[2] == "Hay parches pendientes: se aplican al arrancar."
     assert service_states(_facts()) == {
         "DeepTutor": (Level.INFO, "Parado"),
         "Ollama": (Level.OK, "En marcha"),

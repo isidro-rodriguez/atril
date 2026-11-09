@@ -179,9 +179,7 @@ def patch_finding(name: str, state: PatchState) -> Finding:
         case PatchState.APPLIED:
             return ok(f"{name}: aplicado.")
         case PatchState.PENDING:
-            return warning(
-                f"{name}: pendiente. Aplica los parches con DeepTutor parado."
-            )
+            return warning(f"{name}: pendiente (se aplica al arrancar DeepTutor).")
         case PatchState.CHANGED:
             return error(
                 f"{name}: el código de DeepTutor ha cambiado; revisa el parche."

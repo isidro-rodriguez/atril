@@ -174,7 +174,7 @@ def _fonts(root: tk.Tk) -> None:
         (SMALL, 9, False),
         (STRONG, 10, True),
         (NAV, 11, False),
-        (LEAD, 24, False),
+        (LEAD, 18, False),
         (HEADLINE, 60, True),
         (SUBTITLE, 14, True),
         (TITLE, 18, True),

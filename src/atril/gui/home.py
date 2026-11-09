@@ -5,19 +5,18 @@ navegador; Parar solo detiene DeepTutor. Cada herramienta tiene una sola acción
 (instalar, arrancar o parar). Ollama solo se para si lo abrió atril.
 """
 
-import contextlib
 import shutil
 import subprocess
 import tkinter as tk
+import tkinter.font as tkfont
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter import ttk
 from typing import TYPE_CHECKING
 
-from atril import backup, ollama
+from atril import ollama
 from atril.checks import Level, ok
-from atril.config import ConfigError, load_syllabi
 from atril.config.station import Station
 from atril.deeptutor import Assistant, DeepTutor, active_assistant
 from atril.errors import AtrilError
@@ -28,22 +27,21 @@ from atril.gui.model import (
     WEBSITES,
     Action,
     Facts,
-    Summary,
     ToolCard,
-    archive_label,
     overall,
-    summary_line,
     tool_cards,
 )
 from atril.gui.widgets import ToolTile
 from atril.install import run_command, tool
-from atril.knowledge import Ledger, ledger_path
 from atril.ops import Reporter, service
 from atril.ops import installation as installation_ops
 from atril.processes import no_window
 
 if TYPE_CHECKING:
     from atril.gui.app import App
+
+SENTENCE_WIDTH = 640
+"""Ancho máximo (a 100 %) de la frase del estado general: una sola línea."""
 
 CLAUDE_CODE_URL = "https://docs.claude.com/en/docs/claude-code/setup"
 """Instrucciones oficiales para instalar Claude Code."""
@@ -63,36 +61,11 @@ class HomeData:
     """Lo que necesita Inicio, leído en segundo plano."""
 
     facts: Facts
-    summary: Summary
 
 
 def load_home(station: Station) -> HomeData:
-    """Estado de servicios y herramientas y el resumen de la estación."""
-    stamps = [
-        archive.stamp
-        for folder in station.backup.destinations
-        if backup.is_reachable(folder)
-        for archive in backup.archives(folder)
-    ]
-    syllabi_count = sources = indexed = 0
-    with contextlib.suppress(ConfigError, OSError):
-        syllabi, _ = load_syllabi(station.syllabi_dir)
-        for syllabus in syllabi:
-            syllabi_count += 1
-            sources += len(syllabus.sources)
-            with contextlib.suppress(AtrilError, OSError):
-                ledger = Ledger(ledger_path(syllabus))
-                current = {source.id for source in syllabus.sources}
-                indexed += len(
-                    {key for kb in ledger.kbs.values() for key in kb.sources} & current
-                )
-    summary = Summary(
-        syllabi_count,
-        sources,
-        indexed,
-        archive_label(max(stamps)) if stamps else None,
-    )
-    return HomeData(load_facts(station), summary)
+    """Estado de servicios y herramientas."""
+    return HomeData(load_facts(station))
 
 
 def load_facts(station: Station) -> Facts:
@@ -158,7 +131,7 @@ class HomeView(tk.Frame):
         self._build_tools().grid(row=1, column=0, sticky="ew", pady=(14, 0))
 
     def _build_status(self) -> ttk.Frame:
-        """Estado general: icono y titular grandes, frase, resumen y el botón.
+        """Estado general: icono y titular grandes, una frase y el botón.
 
         Es el bloque principal de la ventana: ocupa el alto que dejan las
         herramientas, con el botón abajo a la derecha.
@@ -176,12 +149,8 @@ class HomeView(tk.Frame):
             "",
             font=style.LEAD,
             color=style.MUTED,
-            wraplength=round(660 * style.scale(self)),
         )
         self._sentence.grid(row=3, column=1, sticky="nw", pady=(2, 0))
-        # Resumen en la línea del título, a la derecha: no quita alto al estado.
-        self._summary = style.label(card, "", color=style.MUTED)
-        self._summary.grid(row=0, column=1, sticky="e", pady=(0, 10))
         buttons = tk.Frame(card, background=style.CARD)
         buttons.grid(row=6, column=0, columnspan=2, sticky="se")
         self._open = ttk.Button(
@@ -240,12 +209,11 @@ class HomeView(tk.Frame):
         """Pinta el estado general, el botón y las herramientas."""
         facts = data.facts
         self._facts = facts
-        self._summary.configure(text=summary_line(data.summary))
         self.app.set_facts(facts)
         level, headline, sentence = overall(facts)
         self._icon.configure(image=style.icon(self, style.LEVEL_ICONS[level], 88))
         self._headline.configure(text=headline)
-        self._sentence.configure(text=sentence)
+        self._sentence.configure(text=_one_line(self._sentence, sentence))
         running = facts.backend_up or facts.frontend_up
         text = "Parar" if running else "Arrancar"
         if not facts.deeptutor_installed:
@@ -434,3 +402,17 @@ class HomeView(tk.Frame):
             lambda _: self.refresh(),
             title=f"Instalar {label}",
         )
+
+
+def _one_line(label: tk.Label, text: str) -> str:
+    """``text`` abreviado con «…» para que quepa en una línea de ``label``.
+
+    El ancho disponible es el de la columna del texto en Inicio.
+    """
+    width = round(SENTENCE_WIDTH * style.scale(label))
+    font = tkfont.nametofont(str(label.cget("font")), root=label)
+    if font.measure(text) <= width:
+        return text
+    while text and font.measure(f"{text}…") > width:
+        text = text[:-1]
+    return f"{text.rstrip(' ,.:')}…"
