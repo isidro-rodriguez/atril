@@ -80,13 +80,16 @@ Type: files; Name: "{app}\instalacion.log"
 
 [Code]
 { Variables de uv: todo dentro de la carpeta del programa, sin caché ni Python
-  del sistema. }
+  del sistema. Cada versión de atril va en su propia carpeta de herramientas:
+  actualizar no borra el entorno anterior (un fichero suyo puede seguir retenido
+  unos segundos tras cerrar la ventana, p. ej. por el antivirus), solo lo
+  sustituye en bin. Los entornos anteriores se borran después, si se puede. }
 function UvEnvironment(): String;
 var
   App: String;
 begin
   App := ExpandConstant('{app}');
-  Result := 'set "UV_TOOL_DIR=' + App + '\herramientas"&& '
+  Result := 'set "UV_TOOL_DIR=' + App + '\herramientas\{#AppVersion}"&& '
     + 'set "UV_TOOL_BIN_DIR=' + App + '\bin"&& '
     + 'set "UV_PYTHON_INSTALL_DIR=' + App + '\python"&& '
     + 'set "UV_PYTHON_PREFERENCE=only-managed"&& '
@@ -144,6 +147,28 @@ begin
   end;
 end;
 
+{ Borra los entornos de otras versiones (y el de antes de 0.34.0, directamente
+  en herramientas\atril). Lo que siga en uso se queda para la próxima vez. }
+procedure RemoveOldTools();
+var
+  Tools: String;
+  Found: TFindRec;
+begin
+  Tools := ExpandConstant('{app}\herramientas');
+  if not FindFirst(Tools + '\*', Found) then
+    exit;
+  try
+    repeat
+      if ((Found.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0)
+        and (Found.Name <> '.') and (Found.Name <> '..')
+        and (Found.Name <> '{#AppVersion}') then
+        DelTree(Tools + '\' + Found.Name, True, True, True);
+    until not FindNext(Found);
+  finally
+    FindClose(Found);
+  end;
+end;
+
 function ReopenAfterUpdate(): Boolean;
 begin
   Result := WizardSilent and (ExpandConstant('{param:abrir|no}') = 'si');
@@ -196,6 +221,7 @@ begin
       RaiseException('No se ha podido instalar atril. Comprueba la conexión a '
         + 'Internet y vuelve a ejecutar el instalador. Detalle en '
         + ExpandConstant('{app}\instalacion.log'));
+    RemoveOldTools();
     AddToPath();
   end;
 end;

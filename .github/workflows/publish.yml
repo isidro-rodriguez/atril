@@ -163,12 +163,15 @@ jobs:
           if ($path -notlike "*$app\bin*") { throw "bin no está en el PATH del usuario" }
           # Actualización desde la ventana: un Python del entorno sigue vivo (ficheros en
           # uso) y el instalador debe esperar a que termine (/esperar) antes de usar uv.
-          $busy = Start-Process "$app\herramientas\atril\Scripts\python.exe" -ArgumentList '-c', '"import psutil, time; time.sleep(20)"' -PassThru -WindowStyle Hidden
+          # Entorno de una versión anterior (diseño de antes de 0.34.0): se borra al actualizar.
+          New-Item -ItemType Directory "$app\herramientas\atril\Lib" -Force | Out-Null
+          $busy = Start-Process "$app\herramientas\$env:VERSION\atril\Scripts\python.exe" -ArgumentList '-c', '"import psutil, time; time.sleep(20)"' -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 3
           Start-Process $setup -ArgumentList '/SILENT', '/SP-', '/SUPPRESSMSGBOXES', "/esperar=$($busy.Id)", '/LOG=actualizar.log' -Wait
           Get-Content "$app\instalacion.log"
           $version = & "$app\bin\atril.exe" --version
           if ("$version" -notmatch [regex]::Escape($env:VERSION)) { throw "tras actualizar, atril --version: $version" }
+          if (Test-Path "$app\herramientas\atril") { throw "no se ha borrado el entorno anterior" }
           Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES' -Wait
           Start-Sleep -Seconds 5  # el desinstalador se relanza desde una copia temporal
           if (Test-Path "$app\bin") { throw "la desinstalación ha dejado $app\bin" }

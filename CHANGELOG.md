@@ -5,6 +5,16 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [0.34.0] - 2026-11-09
+
+### Fixed
+
+- Actualizar desde la ventana seguía fallando: unos segundos después de cerrarse atril, algo
+  (probablemente el antivirus) aún retenía una librería de su entorno, y uv no podía borrarlo
+  para instalar encima. Ahora cada versión se instala en su propia carpeta
+  (`herramientas\<versión>`) y la anterior se borra después, si se puede; lo que siga en uso
+  se borra en la siguiente actualización.
+
 ## [0.33.0] - 2026-11-09
 
 ### Changed
