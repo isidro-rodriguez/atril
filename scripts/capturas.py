@@ -366,8 +366,6 @@ def open_window(root: Path):
 
 def capture(window, out: Path) -> list[Path]:
     """Recorre los apartados y guarda cada uno; devuelve los ficheros."""
-    from PIL import ImageGrab
-
     out.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []
     plan = [
@@ -389,10 +387,13 @@ def capture(window, out: Path) -> list[Path]:
 
     def shoot(name: str) -> None:
         settle()
-        x, y = window.winfo_rootx(), window.winfo_rooty()
-        width, height = window.winfo_width(), window.winfo_height()
-        options = {} if sys.platform == "win32" else {"xdisplay": os.environ["DISPLAY"]}
-        image = ImageGrab.grab(bbox=(x, y, x + width, y + height), **options)
+        image = _grab(window)
+        expected = (window.winfo_width(), window.winfo_height())
+        if image.size != expected or _unpainted(image):
+            raise SystemExit(
+                f"Captura «{name}» incompleta ({image.size}, ventana {expected}, "
+                f"pantalla {window.winfo_screenwidth()}x{window.winfo_screenheight()})."
+            )
         target = out / f"{name}.png"
         image.save(target, optimize=True)
         saved.append(target)
@@ -414,6 +415,50 @@ def capture(window, out: Path) -> list[Path]:
     window.after(1200, step)
     window.mainloop()
     return saved
+
+
+def _grab(window):
+    """Imagen de la ventana tal como la pinta ella misma.
+
+    En Windows usa ``PrintWindow``: no depende del tamaño de la pantalla (la del
+    runner de GitHub recortaba la ventana). En Linux, una captura de la pantalla X.
+    """
+    from PIL import Image, ImageGrab
+
+    width, height = window.winfo_width(), window.winfo_height()
+    if sys.platform != "win32":
+        x, y = window.winfo_rootx(), window.winfo_rooty()
+        box = (x, y, x + width, y + height)
+        return ImageGrab.grab(bbox=box, xdisplay=os.environ["DISPLAY"])
+    import ctypes
+    from ctypes import wintypes
+
+    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+    hwnd = int(window.wm_frame(), 16)
+    rect = wintypes.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    width, height = rect.right - rect.left, rect.bottom - rect.top
+    screen = user32.GetDC(None)
+    memory = gdi32.CreateCompatibleDC(screen)
+    bitmap = gdi32.CreateCompatibleBitmap(screen, width, height)
+    gdi32.SelectObject(memory, bitmap)
+    try:
+        if not user32.PrintWindow(hwnd, memory, 2):  # PW_RENDERFULLCONTENT
+            raise SystemExit("PrintWindow no ha podido pintar la ventana.")
+        header = (ctypes.c_uint32 * 10)(40, width, -height, 1 | (32 << 16), 0)
+        pixels = ctypes.create_string_buffer(width * height * 4)
+        gdi32.GetDIBits(memory, bitmap, 0, height, pixels, header, 0)
+        return Image.frombuffer("RGB", (width, height), pixels, "raw", "BGRX", 0, 1)
+    finally:
+        gdi32.DeleteObject(bitmap)
+        gdi32.DeleteDC(memory)
+        user32.ReleaseDC(None, screen)
+
+
+def _unpainted(image) -> bool:
+    """La esquina inferior derecha es negra: parte de la ventana no se pintó."""
+    corner = image.crop((image.width - 8, image.height - 8, image.width, image.height))
+    return corner.convert("L").getextrema()[1] < 16
 
 
 def check(saved: list[Path]) -> None:
