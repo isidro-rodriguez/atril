@@ -337,3 +337,13 @@ page: use absolute GitHub URLs for links.
 Before each release, also review `README.md` (the PyPI page): commands, options, the GUI
 description and installation steps must match the release; update it in the same release if
 anything changed.
+
+<!-- zensical:start (managed by the zensical-site skill; edit there, not here) -->
+### Documentation site (Zensical)
+
+- Layout: `zensical.toml`; `docs/` (sources, `docs/site.webmanifest`, `docs/assets/{favicon,fonts,images,stylesheets}`); `docs_templates/` (`main.html`: favicons, manifest and `[project.extra] theme_color`; `python/material/languages/es.html.jinja` when mkdocstrings is used). Only `uv run zensical build` writes `site/` (gitignored).
+- `docs/assets/stylesheets/typography.css` and `docs/assets/fonts/` are managed copies (Practical Typography: serif text, sans headings, 75-character measure): don't edit them; project styling goes in the project's own stylesheet, loaded after them.
+- Template paths are relative (`{{ 'assets/…' | url }}`, never a leading `/`) so the site works under a sub-path such as GitHub Pages.
+- Gate: `uv run zensical build` must end with "No issues found"; after changing the layout, run the skill's `site.py check`.
+- Upgrading Zensical: use the skill's `site.py upgrade`, which diffs every template in `docs_templates/` against the new theme before the lock changes land.
+<!-- zensical:end -->
