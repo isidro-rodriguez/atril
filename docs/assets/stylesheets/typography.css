@@ -114,8 +114,10 @@
    ========================================================================== */
 
 /* Solo el contenido: el tema también usa .md-typeset en el índice lateral,
-   el pie y los diálogos, que siguen en la sans de la interfaz. */
-.md-content .md-typeset {
+   el pie y los diálogos, que siguen en la sans de la interfaz. :where() no
+   suma especificidad, así que la hoja del proyecto puede pisar estas reglas
+   con un simple .md-typeset. */
+:where(.md-content) .md-typeset {
   font-family: var(--site-body-font);
   font-size: clamp(15px, 0.9rem, 22px);
   line-height: 1.4;
@@ -162,6 +164,6 @@
 }
 
 /* El código en línea se iguala a la altura de la serif. */
-.md-content .md-typeset code {
+:where(.md-content) .md-typeset code {
   font-size: 0.85em;
 }
