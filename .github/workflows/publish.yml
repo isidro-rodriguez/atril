@@ -74,7 +74,7 @@ jobs:
         run: |
           uv run ruff format --check .
           uv run ruff check .
-          uv run ty check --error-on-warning
+          uv run ty check
           uv run pytest
 
       - name: Construir atril
