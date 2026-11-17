@@ -210,9 +210,44 @@
    Tipografía
    ========================================================================== */
 
-.md-typeset {
-  font-size: 0.82rem;
-  line-height: 1.65;
+/* Tamaño, interlineado y fuente del texto (Charis SIL): typography.css (común).
+   Títulos e interfaz en Inter, la tipografía de la ventana de atril, en lugar
+   de la sans común; servida desde la web como las demás. */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/inter-latin-400-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/inter-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/inter-latin-700-normal.woff2") format("woff2");
+}
+
+:root {
+  --md-text-font: "Inter";
 }
 
 .md-typeset h1,

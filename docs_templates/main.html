@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{#- Favicons y manifiesto web. Las rutas son relativas para funcionar bajo
-    /atril/ en GitHub Pages. -#}
+{#- Cabecera común de los sitios Zensical (skill `zensical-site`).
+    Favicons, manifiesto web y color del navegador. Las rutas son relativas
+    (filtro `url`) para que el sitio funcione bajo una subruta, como
+    /<repo>/ en GitHub Pages. El color sale de `[project.extra] theme_color`
+    en zensical.toml. -#}
 {% block extrahead %}
-<link rel="apple-touch-icon"
-      sizes="180x180"
-      href="{{ 'assets/favicon/apple-touch-icon.png' | url }}">
+<link rel="icon" href="{{ 'assets/favicon/favicon.ico' | url }}" sizes="48x48">
 <link rel="icon"
       type="image/png"
       sizes="32x32"
@@ -14,6 +15,9 @@
       type="image/png"
       sizes="16x16"
       href="{{ 'assets/favicon/favicon-16x16.png' | url }}">
+<link rel="apple-touch-icon"
+      sizes="180x180"
+      href="{{ 'assets/favicon/apple-touch-icon.png' | url }}">
 <link rel="manifest" href="{{ 'site.webmanifest' | url }}">
-<meta name="theme-color" content="#e9eff8">
+<meta name="theme-color" content="{{ config.extra.theme_color }}">
 {% endblock %}

@@ -1,0 +1,169 @@
+/*
+ * Tipografía común de los sitios Zensical (skill `zensical-site`).
+ *
+ * Copia gestionada: no la edites en el proyecto; los cambios propios van en
+ * `assets/stylesheets/<proyecto>.css`, que se carga después y puede pisar
+ * cualquier regla. Criterios de Butterick, *Practical Typography*:
+ * cuerpo de 15–25 px, interlineado del 120–145 %, 45–90 caracteres por línea,
+ * serif para el texto y sans para los encabezados y la interfaz.
+ * Las fuentes se sirven desde el propio sitio (`theme.font = false`): sin
+ * Google Fonts, funcionan sin conexión y coinciden con los PDF de typeset-pdf.
+ */
+
+/* ==========================================================================
+   Fuentes (SIL Open Font License 1.1, licencias en ../fonts/OFL-*.txt)
+   ========================================================================== */
+
+@font-face {
+  font-family: "Charis SIL";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/charis-sil-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Charis SIL";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/charis-sil-latin-400-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Charis SIL";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/charis-sil-latin-700-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Charis SIL";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/charis-sil-latin-700-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/source-sans-3-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/source-sans-3-latin-400-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/source-sans-3-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/source-sans-3-latin-700-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/source-code-pro-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/source-code-pro-latin-700-normal.woff2") format("woff2");
+}
+
+/* ==========================================================================
+   Familias
+   ========================================================================== */
+
+:root {
+  /* El tema las lee para la interfaz (cabecera, menús, búsqueda) y el código. */
+  --md-text-font: "Source Sans 3";
+  --md-code-font: "Source Code Pro";
+  /* Texto de lectura. */
+  --site-body-font: "Charis SIL", Georgia, serif;
+  /* Longitud de línea del texto corrido: 66ch son unos 75 caracteres de
+     media con Charis SIL (el ancho de «0» supera al de la minúscula media). */
+  --site-measure: 66ch;
+}
+
+/* ==========================================================================
+   Texto: 18 px (15–22 px según la pantalla), interlineado del 140 %
+   ========================================================================== */
+
+/* Solo el contenido: el tema también usa .md-typeset en el índice lateral,
+   el pie y los diálogos, que siguen en la sans de la interfaz. :where() no
+   suma especificidad, así que la hoja del proyecto puede pisar estas reglas
+   con un simple .md-typeset. */
+:where(.md-content) .md-typeset {
+  font-family: var(--site-body-font);
+  font-size: clamp(15px, 0.9rem, 22px);
+  line-height: 1.4;
+  letter-spacing: normal;
+}
+
+/* Las líneas largas cansan: el texto corrido ronda los 75 caracteres.
+   Tablas, código, diagramas e imágenes conservan todo el ancho. */
+.md-typeset > :is(p, ul, ol, dl, blockquote, .admonition, details) {
+  max-width: var(--site-measure);
+}
+
+/* El tema reduce notas y tablas a unos 13 px; Butterick no baja de 15. */
+.md-typeset :is(.admonition, details) {
+  font-size: 0.9em;
+}
+
+.md-typeset table:not([class]) {
+  font-size: 0.85em;
+}
+
+/* ==========================================================================
+   Encabezados y rótulos en sans
+   ========================================================================== */
+
+.md-typeset :is(h1, h2, h3, h4, h5, h6),
+.md-typeset :is(.admonition-title, summary, figcaption, th),
+.md-copyright {
+  font-family: var(--md-text-font-family);
+}
+
+.md-typeset :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1.25;
+}
+
+/* ==========================================================================
+   Énfasis con moderación
+   ========================================================================== */
+
+.md-typeset strong {
+  font-weight: 700;
+}
+
+/* El código en línea se iguala a la altura de la serif. */
+:where(.md-content) .md-typeset code {
+  font-size: 0.85em;
+}

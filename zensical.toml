@@ -17,7 +17,8 @@ edit_uri = "edit/main/docs/"
 copyright = "Copyright &copy; 2026 Isidro Rodríguez · Licencia MIT"
 docs_dir = "docs"
 site_dir = "site"
-extra_css = ["assets/stylesheets/atril.css"]
+# typography.css (común) primero; atril.css (propio) la puede pisar.
+extra_css = ["assets/stylesheets/typography.css", "assets/stylesheets/atril.css"]
 
 # Orden de lectura: primero la guía para todos, después la documentación técnica.
 nav = [
@@ -46,11 +47,11 @@ nav = [
 language = "es"
 # Plantillas propias: favicons y manifiesto web (`docs_templates/main.html`).
 custom_dir = "docs_templates"
-favicon = "assets/images/favicon.png"
+favicon = "assets/favicon/favicon-32x32.png"
 logo = "assets/images/logo.png"
-# Inter es la tipografía de la ventana de atril.
-font.text = "Inter"
-font.code = "JetBrains Mono"
+# Fuentes servidas desde el sitio (assets/fonts, typography.css), sin Google Fonts.
+# Títulos e interfaz en Inter, la tipografía de la ventana de atril (atril.css).
+font = false
 features = [
     "content.action.edit",
     "content.code.annotate",
@@ -94,6 +95,10 @@ primary = "custom"
 accent = "custom"
 toggle.icon = "lucide/moon"
 toggle.name = "Cambiar a la preferencia del sistema"
+
+[project.extra]
+# Color de la barra del navegador (docs_templates/main.html) y del manifiesto.
+theme_color = "#e9eff8"
 
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
