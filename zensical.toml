@@ -17,8 +17,7 @@ edit_uri = "edit/main/docs/"
 copyright = "Copyright &copy; 2026 Isidro Rodríguez · Licencia MIT"
 docs_dir = "docs"
 site_dir = "site"
-# typography.css (común) primero; atril.css (propio) la puede pisar.
-extra_css = ["assets/stylesheets/typography.css", "assets/stylesheets/atril.css"]
+extra_css = ["assets/stylesheets/atril.css"]
 
 # Orden de lectura: primero la guía para todos, después la documentación técnica.
 nav = [
@@ -49,9 +48,9 @@ language = "es"
 custom_dir = "docs_templates"
 favicon = "assets/favicon/favicon-32x32.png"
 logo = "assets/images/logo.png"
-# Fuentes servidas desde el sitio (assets/fonts, typography.css), sin Google Fonts.
-# Títulos e interfaz en Inter, la tipografía de la ventana de atril (atril.css).
-font = false
+# Inter es la tipografía de la ventana de atril.
+font.text = "Inter"
+font.code = "JetBrains Mono"
 features = [
     "content.action.edit",
     "content.code.annotate",

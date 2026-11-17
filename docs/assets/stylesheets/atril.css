@@ -210,44 +210,16 @@
    Tipografía
    ========================================================================== */
 
-/* Tamaño, interlineado y fuente del texto (Charis SIL): typography.css (común).
-   Títulos e interfaz en Inter, la tipografía de la ventana de atril, en lugar
-   de la sans común; servida desde la web como las demás. */
-
-@font-face {
-  font-family: "Inter";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../fonts/inter-latin-400-normal.woff2") format("woff2");
+/* Legibilidad según Practical Typography (la comprueba `site.py measure`):
+   interlineado del 120-145 % y unos 75 caracteres por línea. Tablas, código
+   y figuras conservan todo el ancho. */
+.md-typeset {
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
-@font-face {
-  font-family: "Inter";
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../fonts/inter-latin-400-italic.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Inter";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("../fonts/inter-latin-600-normal.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Inter";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("../fonts/inter-latin-700-normal.woff2") format("woff2");
-}
-
-:root {
-  --md-text-font: "Inter";
+.md-typeset > :is(p, ul, ol, dl, blockquote, .admonition, details) {
+  max-width: 58ch;
 }
 
 .md-typeset h1,
@@ -484,7 +456,7 @@
   margin: 0.5em 0 0;
   color: var(--at-soft);
   font-size: 1.1em;
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .md-typeset .at-hero__actions {
@@ -528,7 +500,7 @@
   margin: 0;
   color: var(--at-soft);
   font-size: 0.76rem;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .md-typeset .at-card .twemoji,
