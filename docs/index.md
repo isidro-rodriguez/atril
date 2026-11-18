@@ -19,16 +19,14 @@ hero:
         herramientas instaladas
 ---
 
+Un **atril** es donde apoyas el libro para estudiar. Este atril sostiene a
+[DeepTutor](https://github.com/HKUDS/DeepTutor), un tutor con IA que lee tus temarios y te
+responde citando la página exacta. Instalarlo y mantenerlo exige consola, Python, Node.js y
+bastante paciencia: atril se encarga de todo eso con botones.
+
 Gratis y de código abierto. Windows 10 u 11, sin permisos de administrador.
-[DeepTutor](https://github.com/HKUDS/DeepTutor) es el tutor; atril, la ventana que lo
-instala y lo mantiene.
 
-## ¿Qué es atril?
-
-Un **atril** es donde apoyas el libro para estudiar. Este atril sostiene a DeepTutor, un tutor
-con IA que lee tus temarios y te responde citando la página exacta. DeepTutor es muy potente,
-pero instalarlo y mantenerlo exige consola, Python, Node.js y bastante paciencia. Atril se
-encarga de todo eso con botones.
+## Qué te ofrece
 
 <div class="tx-cards" markdown>
 
