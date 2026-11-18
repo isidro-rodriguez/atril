@@ -25,7 +25,7 @@ activo), las **fuentes** (cuántas y si falta indexar o descargar alguna) y el *
 Debajo, cada herramienta con su estado y, si hace falta, un botón para instalarla o
 arrancarla. Pulsar un logotipo abre la web de esa herramienta.
 
-![Inicio](../assets/images/capturas/inicio.png){ .at-shot }
+![Inicio](../assets/images/capturas/inicio.png)
 
 ## Temarios
 
@@ -44,7 +44,7 @@ pendiente.
 | Abrir carpeta | Abre la carpeta del temario. |
 | Borrar temario | Lo borra para siempre, tras dos confirmaciones (la segunda pide escribir su nombre). |
 
-![Temarios](../assets/images/capturas/temarios.png){ .at-shot }
+![Temarios](../assets/images/capturas/temarios.png)
 
 ## Biblioteca
 
@@ -52,7 +52,7 @@ Las fuentes (PDF) del temario, con su KB y su estado. Se puede buscar y ordenar 
 cabecera de cada columna. Con **doble clic** en una fuente se abre su documento con la
 aplicación del sistema (si aún no está descargado, la ventana lo avisa).
 
-![Biblioteca](../assets/images/capturas/biblioteca.png){ .at-shot }
+![Biblioteca](../assets/images/capturas/biblioteca.png)
 
 ## Backups
 
@@ -67,7 +67,7 @@ recuerda al cerrar la ventana y deja de valer si la copia cambia.
 | Restaurar… | Vuelve a una copia. Lo que había se conserva aparte, por si acaso. |
 | Abrir destino | Abre la carpeta de las copias. |
 
-![Backups](../assets/images/capturas/backups.png){ .at-shot }
+![Backups](../assets/images/capturas/backups.png)
 
 !!! warning "Las claves no viajan en las copias"
     Si tu asistente usa una clave (de una API en la nube), la copia la guarda vacía. Tras
@@ -82,7 +82,7 @@ está la explicación.
 Si la actividad no se puede guardar (disco lleno, carpeta sin permisos), el pie de la ventana
 lo avisa y el error queda en `atril-diagnostico.log`, en la carpeta temporal de Windows.
 
-![Actividad](../assets/images/capturas/actividad.png){ .at-shot }
+![Actividad](../assets/images/capturas/actividad.png)
 
 ## Ajustes
 
@@ -95,7 +95,7 @@ Todo lo que se puede configurar, en pestañas:
 | Avanzado | Lo que obliga a reinstalar DeepTutor o a reindexar: repositorio, rama, Python, paquetes, parches, puertos y parámetros del indexado. |
 | Herramientas | Instalar o reparar, actualizar DeepTutor, aplicar ajustes, diagnóstico, validar la configuración, copiar un informe para pedir ayuda y volver a una versión anterior de DeepTutor. |
 
-![Ajustes, pestaña Atril](../assets/images/capturas/ajustes-atril.png){ .at-shot }
+![Ajustes, pestaña Atril](../assets/images/capturas/ajustes-atril.png)
 
 Al guardar, atril comprueba el fichero entero y te dice qué hace falta para que el cambio
 surta efecto (aplicarlo, reinstalar o reindexar).

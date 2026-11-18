@@ -17,7 +17,6 @@ edit_uri = "edit/main/docs/"
 copyright = "Copyright &copy; 2026 Isidro Rodríguez · Licencia MIT"
 docs_dir = "docs"
 site_dir = "site"
-extra_css = ["assets/stylesheets/atril.css"]
 
 # Orden de lectura: primero la guía para todos, después la documentación técnica.
 nav = [
@@ -43,14 +42,10 @@ nav = [
 ]
 
 [project.theme]
-language = "es"
-# Plantillas propias: favicons y manifiesto web (`docs_templates/main.html`).
-custom_dir = "docs_templates"
-favicon = "assets/favicon/favicon-32x32.png"
+# Tema común de las webs: https://isidro-rodriguez.github.io/techsical/
+# Trae idioma, fuentes, funciones, paleta clara/oscura, favicons y manifiesto.
+name = "techsical"
 logo = "assets/images/logo.png"
-# Inter es la tipografía de la ventana de atril.
-font.text = "Inter"
-font.code = "JetBrains Mono"
 features = [
     "content.action.edit",
     "content.code.annotate",
@@ -59,10 +54,7 @@ features = [
     "content.footnote.tooltips",
     "content.tabs.link",
     "content.tooltips",
-    "navigation.footer",
     "navigation.indexes",
-    "navigation.instant",
-    "navigation.instant.prefetch",
     "navigation.path",
     "navigation.sections",
     "navigation.top",
@@ -71,33 +63,15 @@ features = [
     "toc.follow",
 ]
 
-# Los colores reales (paleta de la ventana) están en `docs/assets/stylesheets/atril.css`.
-[[project.theme.palette]]
-media = "(prefers-color-scheme)"
-primary = "custom"
-accent = "custom"
-toggle.icon = "lucide/sun-moon"
-toggle.name = "Cambiar a modo claro"
-
-[[project.theme.palette]]
-media = "(prefers-color-scheme: light)"
-scheme = "default"
-primary = "custom"
-accent = "custom"
-toggle.icon = "lucide/sun"
-toggle.name = "Cambiar a modo oscuro"
-
-[[project.theme.palette]]
-media = "(prefers-color-scheme: dark)"
-scheme = "slate"
-primary = "custom"
-accent = "custom"
-toggle.icon = "lucide/moon"
-toggle.name = "Cambiar a la preferencia del sistema"
-
-[project.extra]
-# Color de la barra del navegador (docs_templates/main.html) y del manifiesto.
-theme_color = "#e9eff8"
+[project.extra.techsical]
+# Azul de acento de la ventana (src/atril/gui/style.py), también en modo oscuro.
+# Opciones: https://isidro-rodriguez.github.io/techsical/guia/personalizacion/
+primary = "#0f5ec9"
+primary_dark = "#79aefc"
+accent = "#0f5ec9"
+accent_dark = "#79aefc"
+# Como la ventana: el contenido en un panel sobre un fondo gris azulado.
+framed = true
 
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
