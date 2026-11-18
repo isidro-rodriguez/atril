@@ -9,7 +9,7 @@ Un **temario** es una asignatura, una oposición o un tema que quieras estudiar.
 **Temarios** y pulsa **Nuevo temario**. Ponle un nombre, por ejemplo «Física 2.º
 Bachillerato».
 
-![Temarios](../assets/images/capturas/temarios.png){ .at-shot }
+![Temarios](../assets/images/capturas/temarios.png)
 
 ## 2. Añade tus apuntes
 
@@ -21,7 +21,7 @@ Ve a **Biblioteca**, que muestra las fuentes del temario elegido:
 - **Actualizar** comprueba si los PDF de internet tienen versión nueva. La anterior no se
   pierde: queda en el histórico.
 
-![Biblioteca](../assets/images/capturas/biblioteca.png){ .at-shot }
+![Biblioteca](../assets/images/capturas/biblioteca.png)
 
 ## 3. Indexa
 

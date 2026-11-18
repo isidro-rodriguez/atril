@@ -18,7 +18,7 @@ uv run pre-commit install      # hooks de pre-commit y pre-push (recomendado)
 | Grupo | Paquetes |
 |---|---|
 | Ejecución | `acodo`, `typer`, `psutil`, `tomlkit`, `sv-ttk` |
-| Desarrollo | `ruff`, `ty`, `pytest`, `pytest-cov`, `pre-commit`, `zensical`, `pillow` (pruebas del generador de capturas) |
+| Desarrollo | `ruff`, `ty`, `pytest`, `pytest-cov`, `pre-commit`, `techsical` (tema de la web; trae `zensical`), `pillow` (pruebas del generador de capturas) |
 
 ## Calidad
 

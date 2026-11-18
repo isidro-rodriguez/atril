@@ -44,8 +44,8 @@ dev = [
   "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
   "ruff>=0.17.1",
+  "techsical>=0.3.0",
   "ty>=0.0.89",
-  "zensical>=0.1.0",
 ]
 
 [build-system]

@@ -55,7 +55,7 @@ no, ofrece un botón para instalarla.
 Cuando todo esté en verde, pulsa **Instalar DeepTutor**. La primera vez tarda bastante: deja
 la ventana abierta y ve haciendo otra cosa. El progreso se ve en el pie de la ventana.
 
-![Inicio con todo instalado](../assets/images/capturas/inicio.png){ .at-shot }
+![Inicio con todo instalado](../assets/images/capturas/inicio.png)
 
 ## Actualizar
 
