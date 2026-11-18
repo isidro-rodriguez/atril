@@ -210,16 +210,9 @@
    Tipografía
    ========================================================================== */
 
-/* Legibilidad según Practical Typography (la comprueba `site.py measure`):
-   interlineado del 120-145 % y unos 75 caracteres por línea. Tablas, código
-   y figuras conservan todo el ancho. */
 .md-typeset {
   font-size: 0.82rem;
-  line-height: 1.4;
-}
-
-.md-typeset > :is(p, ul, ol, dl, blockquote, .admonition, details) {
-  max-width: 58ch;
+  line-height: 1.65;
 }
 
 .md-typeset h1,
@@ -456,7 +449,7 @@
   margin: 0.5em 0 0;
   color: var(--at-soft);
   font-size: 1.1em;
-  line-height: 1.4;
+  line-height: 1.55;
 }
 
 .md-typeset .at-hero__actions {
@@ -500,7 +493,7 @@
   margin: 0;
   color: var(--at-soft);
   font-size: 0.76rem;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .md-typeset .at-card .twemoji,
