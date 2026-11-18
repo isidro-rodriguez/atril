@@ -673,14 +673,14 @@ wheels = [
 
 [[package]]
 name = "techsical"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "zensical" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/22/2757d05b3036e0f3197461f51c7b6183c72dbc9adae520968cea72da6485/techsical-0.3.0.tar.gz", hash = "sha256:3b5c11387b39ccbba412a09407c72569f4eb40abb437e3b3e28f52f7eae788a7", size = 439046, upload-time = "2026-11-18T10:00:34.627Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/cd/a680053051e114a459121d6c4009ce1f176770aab3a2c2693d17ef235344/techsical-0.4.0.tar.gz", hash = "sha256:62d91e052085d4cc4b8f1f1b55a5f8d7c7226b2ba946043eba32eea92efee3fc", size = 439638, upload-time = "2026-11-18T10:48:12.667Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/17/42bc6d7273b71c0e39bc512bd3d8a4a0b65b1af00e7ab24d9cd979a2b31d/techsical-0.3.0-py3-none-any.whl", hash = "sha256:8465ac202a31c8e68b5aa8d49261d4a1ab316e09ec08b605d67f4206f6baff3e", size = 447398, upload-time = "2026-11-18T10:00:33.369Z" },
+    { url = "https://files.pythonhosted.org/packages/23/b8/a1d3633bda91cedb75a1605c7a63c98654ea17f6c01cf71363ff1f5ac1f7/techsical-0.4.0-py3-none-any.whl", hash = "sha256:7384f3c911c09edb7f82c34f134f5f9110ae692b8bb39dceb3779beffb96fe03", size = 448053, upload-time = "2026-11-18T10:48:11.309Z" },
 ]
 
 [[package]]
