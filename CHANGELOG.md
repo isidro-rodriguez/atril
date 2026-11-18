@@ -5,6 +5,16 @@ Todos los cambios relevantes de `atril` se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+## [0.39.3] - 2026-11-18
+
+### Changed
+
+- La web usa el tema [techsical](https://isidro-rodriguez.github.io/techsical/): portada con la
+  captura de Inicio junto a la presentación, artículos en un panel y la misma estructura que las
+  demás webs del autor. Sin cambios en la aplicación.
+
 ## [0.39.2] - 2026-11-09
 
 ### Fixed
