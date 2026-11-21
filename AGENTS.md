@@ -121,7 +121,7 @@ CLI commands, options and configuration keys are **in Spanish** (`atril kb index
 
 - Every `__init__.py` must include a short docstring describing the module or package.
 - The project uses `uv` as dependency manager and build backend.
-- Runtime dependencies: `acodo` (`acodo>=0.5.1,<1`), `typer` with `rich` (CLI output),
+- Runtime dependencies: `acodo` (`acodo>=0.7.0,<1`), `typer` with `rich` (CLI output),
   `psutil` (ports, command lines and process trees, portable and testable on Linux CI),
   `tomlkit` (edits `temario.toml` keeping comments; `tomllib` only reads) and `sv-ttk` (Windows 11
   look for the tkinter GUI). Anything else needs a justification (stdlib first). Raise the `acodo`

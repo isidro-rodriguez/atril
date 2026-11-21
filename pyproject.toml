@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "acodo>=0.5.1,<1",
+  "acodo>=0.7.0,<1",
   "psutil>=7",
   "rich>=14",
   "sv-ttk>=2.6",

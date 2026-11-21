@@ -4,11 +4,11 @@ requires-python = ">=3.13"
 
 [[package]]
 name = "acodo"
-version = "0.5.1"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/51/60/8470a5241b3b6073b8023124bf52f95cd58497de3b14c601b2113ad2de87/acodo-0.5.1.tar.gz", hash = "sha256:cbf974de68198aae60f0ec3fc389fc310149591a1a653acc91b0d86b6316945c", size = 29059, upload-time = "2026-11-03T13:10:57.294Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/b0/1bf8c234ca7821cfe4d8ec3c4b109dc379fbb3db0213f3caa4db527c8b1c/acodo-0.7.0.tar.gz", hash = "sha256:e64858e0f8529bbb5bd08693a48bf9bf2be3561445c7a28629db0573ddd13096", size = 30043, upload-time = "2026-11-21T19:20:22.015Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/c6/958e813cf4b4e591d6df85bc1cc523c9602fcbff3847a58792a8e91933f3/acodo-0.5.1-py3-none-any.whl", hash = "sha256:01773ebb07195c376d697871660e2e260f84bb695d9b958bf97179f86862cc51", size = 31985, upload-time = "2026-11-03T13:10:56.36Z" },
+    { url = "https://files.pythonhosted.org/packages/71/9c/9e695cc9124fef5aba9d3b696818142d306be11edadd4140e6059a2720e0/acodo-0.7.0-py3-none-any.whl", hash = "sha256:d016563564e4a335e19957700bf87875cf1efc1fd01b0af4259d16bdf3d6cd9f", size = 33023, upload-time = "2026-11-21T19:20:20.676Z" },
 ]
 
 [[package]]
@@ -46,7 +46,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "acodo", specifier = ">=0.5.1,<1" },
+    { name = "acodo", specifier = ">=0.7.0,<1" },
     { name = "psutil", specifier = ">=7" },
     { name = "rich", specifier = ">=14" },
     { name = "sv-ttk", specifier = ">=2.6" },

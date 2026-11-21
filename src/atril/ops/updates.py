@@ -8,13 +8,14 @@ lanza en modo silencioso: cierra atril, instala y vuelve a abrir la ventana.
 import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
+
+from acodo.utils import to_version
 
 from atril import __version__, net, processes
 from atril.checks import Finding, info, ok, warning
@@ -27,8 +28,6 @@ LATEST_URL = "https://api.github.com/repos/isidro-rodriguez/atril/releases/lates
 INSTALLER_SUFFIX = "-setup.exe"
 """Final del nombre del instalador entre los ficheros de la release."""
 
-_VERSION = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
-
 
 @dataclass(frozen=True, slots=True)
 class Release:
@@ -39,35 +38,6 @@ class Release:
     """Página de la release (novedades)."""
     installer_url: str | None = None
     installer_sha256: str | None = None
-
-
-def parse_version(text: str) -> tuple[int, int, int] | None:
-    """``X.Y.Z`` (con o sin ``v``) como tupla; ``None`` si no lo es.
-
-    Examples:
-        >>> parse_version("v0.30.0")
-        (0, 30, 0)
-        >>> parse_version("1.0.0rc1") is None
-        True
-    """
-    found = _VERSION.fullmatch(text.strip())
-    if found is None:
-        return None
-    major, minor, patch = (int(part) for part in found.groups())
-    return major, minor, patch
-
-
-def is_newer(candidate: str, current: str) -> bool:
-    """``candidate`` es posterior a ``current`` (las no reconocibles, nunca).
-
-    Examples:
-        >>> is_newer("0.31.0", "0.30.2")
-        True
-        >>> is_newer("0.30.0", "0.30.0")
-        False
-    """
-    new, old = parse_version(candidate), parse_version(current)
-    return new is not None and old is not None and new > old
 
 
 def latest_release(timeout: float = 10.0) -> Release:
@@ -105,7 +75,9 @@ def check(current: str = __version__) -> Release | None:
         AtrilError: Si no se ha podido consultar.
     """
     release = latest_release()
-    return release if is_newer(release.version, current) else None
+    new, old = to_version(release.version), to_version(current)
+    # Una versión que no se reconoce nunca cuenta como posterior.
+    return release if new is not None and old is not None and new > old else None
 
 
 def update_findings(current: str = __version__) -> list[Finding]:

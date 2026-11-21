@@ -9,6 +9,8 @@ from collections.abc import Callable
 from tkinter import ttk
 from typing import TYPE_CHECKING
 
+from acodo.utils import parse_count
+
 from atril.checks import ok
 from atril.config import Syllabus
 from atril.gui import style
@@ -217,11 +219,11 @@ class SyllabiView(tk.Frame):
         counts = [kb_counts([i.state for i in s.items]) for s in data.statuses]
         total = sum(c.sources for c in counts)
         self._subtitle.configure(
-            text=_count(
+            text=parse_count(
                 len(data.statuses), "base de conocimiento", "bases de conocimiento"
             )
             + " · "
-            + _count(total, "fuente", "fuentes")
+            + parse_count(total, "fuente", "fuentes")
         )
         for status, count in zip(data.statuses, counts, strict=True):
             run = status.run
@@ -378,8 +380,3 @@ class SyllabiView(tk.Frame):
         """Abre la carpeta del temario elegido (o la de temarios)."""
         data = self._data.get(self.app.syllabus_id or "")
         open_path(data.syllabus.root if data else self.app.station.syllabi_dir)
-
-
-def _count(number: int, one: str, many: str) -> str:
-    """«1 fuente», «3 fuentes»."""
-    return f"{number} {one if number == 1 else many}"
